@@ -1,0 +1,12 @@
+C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Jwt\bin\Debug\net9.0\Cable.Security.Jwt.deps.json
+C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Jwt\bin\Debug\net9.0\Cable.Security.Jwt.dll
+C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Jwt\bin\Debug\net9.0\Cable.Security.Jwt.pdb
+C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Jwt\obj\Debug\net9.0\Cable.Security.Jwt.csproj.AssemblyReference.cache
+C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Jwt\obj\Debug\net9.0\Cable.Security.Jwt.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Jwt\obj\Debug\net9.0\Cable.Security.Jwt.AssemblyInfoInputs.cache
+C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Jwt\obj\Debug\net9.0\Cable.Security.Jwt.AssemblyInfo.cs
+C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Jwt\obj\Debug\net9.0\Cable.Security.Jwt.csproj.CoreCompileInputs.cache
+C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Jwt\obj\Debug\net9.0\Cable.Security.Jwt.dll
+C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Jwt\obj\Debug\net9.0\refint\Cable.Security.Jwt.dll
+C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Jwt\obj\Debug\net9.0\Cable.Security.Jwt.pdb
+C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Jwt\obj\Debug\net9.0\ref\Cable.Security.Jwt.dll

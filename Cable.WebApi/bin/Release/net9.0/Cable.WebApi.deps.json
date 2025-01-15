@@ -1,0 +1,49 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v9.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v9.0": {
+      "Cable.WebApi/1.0.0": {
+        "dependencies": {
+          "Cable.Core": "1.0.0"
+        },
+        "runtime": {
+          "Cable.WebApi.dll": {}
+        },
+        "resources": {
+          "ar/Cable.WebApi.resources.dll": {
+            "locale": "ar"
+          }
+        }
+      },
+      "Cable.Core/1.0.0": {
+        "runtime": {
+          "Cable.Core.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        },
+        "resources": {
+          "ar/Cable.Core.resources.dll": {
+            "locale": "ar"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "Cable.WebApi/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Cable.Core/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

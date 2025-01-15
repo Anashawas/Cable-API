@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "MblltEza8Fw=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\an.hawas\\RiderProjects\\Cable\\Domain\\Domain.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\an.hawas\\.nuget\\packages\\mediatr.contracts\\2.0.1\\mediatr.contracts.2.0.1.nupkg.sha512"
+  ],
+  "logs": []
+}

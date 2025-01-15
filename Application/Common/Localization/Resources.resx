@@ -1,0 +1,99 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+
+<root>
+    <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+        <xsd:element name="root" msdata:IsDataSet="true">
+            
+        </xsd:element>
+    </xsd:schema>
+    <resheader name="resmimetype">
+        <value>text/microsoft-resx</value>
+    </resheader>
+    <resheader name="version">
+        <value>1.3</value>
+    </resheader>
+    <resheader name="reader">
+        <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </resheader>
+    <resheader name="writer">
+        <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+    </resheader>
+    <data name="ChangePasswordNotAllowed" xml:space="preserve">
+    <value>Changing password is not allowed for this user.</value>
+  </data>
+    <data name="CurrentPassword" xml:space="preserve">
+    <value>Current Password</value>
+  </data>
+    <data name="EmailMustBeUnique" xml:space="preserve">
+    <value>The email is already used</value>
+  </data>
+    <data name="FromTimeToTimeRange" xml:space="preserve">
+    <value>From Time must be less than To Time</value>
+  </data>
+    <data name="IdentifierDoesntExist" xml:space="preserve">
+    <value>The selected identifier doesn't exist</value>
+  </data>
+    <data name="InvalidCurrentPassword" xml:space="preserve">
+    <value>Current password is invalid</value>
+  </data>
+    <data name="InvalidRequestDetails" xml:space="preserve">
+    <value>Invalid request details</value>
+  </data>
+    <data name="InvalidSelctedMapServices" xml:space="preserve">
+    <value>The selected map services are invalid</value>
+  </data>
+    <data name="InvalidSelctedPrivileges" xml:space="preserve">
+    <value>The selected privileges are invalid</value>
+  </data>
+    <data name="LocationDoesntExist" xml:space="preserve">
+    <value>The selected location feature doesn't exist</value>
+  </data>
+    <data name="LocationIsRequired" xml:space="preserve">
+    <value>Location Is Required</value>
+  </data>
+    <data name="Name" xml:space="preserve">
+    <value>Name</value>
+  </data>
+    <data name="NameMustBeUnique" xml:space="preserve">
+    <value>Another record is using the same name</value>
+  </data>
+    <data name="NameMustBeUniqueWithinUnit" xml:space="preserve">
+    <value>The provided name is already used within the same hierarchy</value>
+  </data>
+    <data name="NewPassword" xml:space="preserve">
+    <value>New Password</value>
+  </data>
+    <data name="NotValidUrl" xml:space="preserve">
+    <value>The URL is not valid</value>
+  </data>
+    <data name="OrganizationUnitIsLinkedToUsers" xml:space="preserve">
+    <value>The organization unit or its sub units are currently linked to none deleted users</value>
+  </data>
+    <data name="OrganizationUnitMustExist" xml:space="preserve">
+    <value>The selected organization unit doesnot exist in the database</value>
+  </data>
+    <data name="ParentLocationNotValid" xml:space="preserve">
+    <value>The selected parent is not valid for this record</value>
+  </data>
+    <data name="ParentUnitChildUnitLinkingIsInvalid" xml:space="preserve">
+    <value>The linking between the unit and the parent unit is invalid</value>
+  </data>
+    <data name="RoleIsLinkedToUsers" xml:space="preserve">
+    <value>The role is currently linked to none deleted users</value>
+  </data>
+    <data name="RoleMustExist" xml:space="preserve">
+    <value>The selected role doesnot exist in the database</value>
+  </data>
+    <data name="UserNameMustBeUnique" xml:space="preserve">
+    <value>The user name is already used</value>
+  </data>
+  <data name="UserAlreadyRated" xml:space="preserve">
+    <value>The user already rated this charging point </value>
+  </data>
+  <data name="StatusMustExist" xml:space="preserve">
+    <value>Thes selected status doesnot exist </value>
+  </data>
+  <data name="ChargerPointTypeMustExist" xml:space="preserve">
+    <value>Charger point type does not exist</value>
+  </data>
+</root>

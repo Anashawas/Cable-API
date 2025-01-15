@@ -1,0 +1,16 @@
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\bin\Release\net9.0\Cable.WebApi.OpenAPI.deps.json
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\bin\Release\net9.0\Cable.WebApi.OpenAPI.dll
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\bin\Release\net9.0\Cable.WebApi.OpenAPI.pdb
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\bin\Release\net9.0\Cable.Core.dll
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\bin\Release\net9.0\Cable.Core.pdb
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\bin\Release\net9.0\ar\Cable.Core.resources.dll
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\obj\Release\net9.0\Cable.WebApi.OpenAPI.csproj.AssemblyReference.cache
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\obj\Release\net9.0\Cable.WebApi.OpenAPI.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\obj\Release\net9.0\Cable.WebApi.OpenAPI.AssemblyInfoInputs.cache
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\obj\Release\net9.0\Cable.WebApi.OpenAPI.AssemblyInfo.cs
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\obj\Release\net9.0\Cable.WebApi.OpenAPI.csproj.CoreCompileInputs.cache
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\obj\Release\net9.0\Cable.We.A2BA585D.Up2Date
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\obj\Release\net9.0\Cable.WebApi.OpenAPI.dll
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\obj\Release\net9.0\refint\Cable.WebApi.OpenAPI.dll
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\obj\Release\net9.0\Cable.WebApi.OpenAPI.pdb
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\obj\Release\net9.0\ref\Cable.WebApi.OpenAPI.dll
