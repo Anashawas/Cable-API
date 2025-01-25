@@ -29,8 +29,8 @@ public partial class ChargingPoint : BaseAuditableEntity
     public int ChargerPointTypeId { get; set; }
     public int StatusId { get; set; }
 
-    public virtual ICollection<AttachmentChargerPoint> AttachmentChargerPoints { get; set; } =
-        new List<AttachmentChargerPoint>();
+    public virtual ICollection<ChargingPointAttachment> ChargingPointAttachments { get; set; } =
+        new List<ChargingPointAttachment>();
 
     public virtual ChargingPointType ChargerPointType { get; set; } = null!;
 

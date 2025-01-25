@@ -89,7 +89,8 @@ app.MapUserRoutes()
     .MapPlugTypesRoutes()
     .MapRateRoutes()
     .MapStatusRoutes()
-    ;
+    .MapUserComplaintsRoutes()
+    .MapChargingPointAttachmentsRoutes();
 
 
 app.Run();

@@ -15,3 +15,4 @@ C:\Users\an.hawas\RiderProjects\Cable\Cable.Core\obj\Debug\net9.0\Cable.Core.dll
 C:\Users\an.hawas\RiderProjects\Cable\Cable.Core\obj\Debug\net9.0\refint\Cable.Core.dll
 C:\Users\an.hawas\RiderProjects\Cable\Cable.Core\obj\Debug\net9.0\Cable.Core.pdb
 C:\Users\an.hawas\RiderProjects\Cable\Cable.Core\obj\Debug\net9.0\ref\Cable.Core.dll
+C:\Users\an.hawas\RiderProjects\Cable\Cable.Core\obj\Debug\net9.0\Cable.Core.sourcelink.json

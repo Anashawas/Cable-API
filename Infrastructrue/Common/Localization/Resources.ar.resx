@@ -39,4 +39,7 @@
     <data name="PaciDataRetrievalFailure" xml:space="preserve">
     <value>فشل في استرجاع المعلومات من الهيئة العامة للمعلومات المدنية</value>
   </data>
+    <data name="FileNullOrEmpty" xml:space="preserve">
+        <value>الرجاء ارفاق ملف</value>
+    </data>
 </root>

@@ -28,7 +28,7 @@ public partial class ApplicationDbContext(
 
     #region Properties
 
-    public DbSet<AttachmentChargerPoint> AttachmentChargerPoints { get; set; }
+    public DbSet<ChargingPointAttachment> ChargingPointAttachments { get; set; }
     public DbSet<ChargingPlug> ChargingPlugs { get; set; }
     public DbSet<ChargingPoint> ChargingPoints { get; set; }
     public DbSet<ChargingPointType> ChargingPointTypes { get; set; }

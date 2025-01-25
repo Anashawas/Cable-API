@@ -87,6 +87,15 @@ namespace Infrastructrue.Common.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The uploaded file is null or emplty.
+        /// </summary>
+        internal static string FileNullOrEmpty {
+            get {
+                return ResourceManager.GetString("FileNullOrEmpty", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Invalid User Name Or Password.
         /// </summary>
         internal static string InvalidUserNameOrPassword {

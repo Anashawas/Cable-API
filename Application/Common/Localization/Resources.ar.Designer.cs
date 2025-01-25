@@ -21,21 +21,21 @@ namespace Application.Common.Localization {
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("System.Resources.Tools.StronglyTypedResourceBuilder", "4.0.0.0")]
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    public class Resources_ar {
+    internal class Resources_ar {
         
         private static global::System.Resources.ResourceManager resourceMan;
         
         private static global::System.Globalization.CultureInfo resourceCulture;
         
         [global::System.Diagnostics.CodeAnalysis.SuppressMessageAttribute("Microsoft.Performance", "CA1811:AvoidUncalledPrivateCode")]
-        public Resources_ar() {
+        internal Resources_ar() {
         }
         
         /// <summary>
         ///   Returns the cached ResourceManager instance used by this class.
         /// </summary>
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Advanced)]
-        public static global::System.Resources.ResourceManager ResourceManager {
+        internal static global::System.Resources.ResourceManager ResourceManager {
             get {
                 if (object.ReferenceEquals(resourceMan, null)) {
                     global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("Application.Common.Localization.Resources.ar", typeof(Resources_ar).Assembly);
@@ -50,7 +50,7 @@ namespace Application.Common.Localization {
         ///   resource lookups using this strongly typed resource class.
         /// </summary>
         [global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Advanced)]
-        public static global::System.Globalization.CultureInfo Culture {
+        internal static global::System.Globalization.CultureInfo Culture {
             get {
                 return resourceCulture;
             }
@@ -62,7 +62,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to لا يسمح بتغيير كلمة السر.
         /// </summary>
-        public static string ChangePasswordNotAllowed {
+        internal static string ChangePasswordNotAllowed {
             get {
                 return ResourceManager.GetString("ChangePasswordNotAllowed", resourceCulture);
             }
@@ -71,16 +71,25 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to نوع نقطة الشحن غير موجودة.
         /// </summary>
-        public static string ChargerPointTypeMustExist {
+        internal static string ChargerPointTypeMustExist {
             get {
                 return ResourceManager.GetString("ChargerPointTypeMustExist", resourceCulture);
             }
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to النقطة الشحن غير موجودة.
+        /// </summary>
+        internal static string ChargingPointMustExist {
+            get {
+                return ResourceManager.GetString("ChargingPointMustExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to كلمة السر الحالية.
         /// </summary>
-        public static string CurrentPassword {
+        internal static string CurrentPassword {
             get {
                 return ResourceManager.GetString("CurrentPassword", resourceCulture);
             }
@@ -89,16 +98,43 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to البريد الالكتروني مستعمل سابقا.
         /// </summary>
-        public static string EmailMustBeUnique {
+        internal static string EmailMustBeUnique {
             get {
                 return ResourceManager.GetString("EmailMustBeUnique", resourceCulture);
             }
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to نوع الملف غير صحيح.
+        /// </summary>
+        internal static string FileExtensionNotValid {
+            get {
+                return ResourceManager.GetString("FileExtensionNotValid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to الرجاء ارفاق ملف.
+        /// </summary>
+        internal static string FileNullOrEmpty {
+            get {
+                return ResourceManager.GetString("FileNullOrEmpty", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to حجم الملف تجازو الحد المسموح.
+        /// </summary>
+        internal static string FileSizeNotValid {
+            get {
+                return ResourceManager.GetString("FileSizeNotValid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to بداية الوقت يجب أن تكون أقل من نهاية الوقت.
         /// </summary>
-        public static string FromTimeToTimeRange {
+        internal static string FromTimeToTimeRange {
             get {
                 return ResourceManager.GetString("FromTimeToTimeRange", resourceCulture);
             }
@@ -107,7 +143,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to هذا المعرف غير موجود.
         /// </summary>
-        public static string IdentifierDoesntExist {
+        internal static string IdentifierDoesntExist {
             get {
                 return ResourceManager.GetString("IdentifierDoesntExist", resourceCulture);
             }
@@ -116,7 +152,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to كلمة السر الحالية غير صحيحة.
         /// </summary>
-        public static string InvalidCurrentPassword {
+        internal static string InvalidCurrentPassword {
             get {
                 return ResourceManager.GetString("InvalidCurrentPassword", resourceCulture);
             }
@@ -125,7 +161,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to بيانات الطلب غير صحيحة.
         /// </summary>
-        public static string InvalidRequestDetails {
+        internal static string InvalidRequestDetails {
             get {
                 return ResourceManager.GetString("InvalidRequestDetails", resourceCulture);
             }
@@ -134,7 +170,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to الخريطة المختارة غير صحيحة.
         /// </summary>
-        public static string InvalidSelctedMapServices {
+        internal static string InvalidSelctedMapServices {
             get {
                 return ResourceManager.GetString("InvalidSelctedMapServices", resourceCulture);
             }
@@ -143,7 +179,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to الصلاحيات المختارة غير صحيحة.
         /// </summary>
-        public static string InvalidSelctedPrivileges {
+        internal static string InvalidSelctedPrivileges {
             get {
                 return ResourceManager.GetString("InvalidSelctedPrivileges", resourceCulture);
             }
@@ -152,7 +188,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to هذا الموقع غير موجود.
         /// </summary>
-        public static string LocationDoesntExist {
+        internal static string LocationDoesntExist {
             get {
                 return ResourceManager.GetString("LocationDoesntExist", resourceCulture);
             }
@@ -161,7 +197,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to الموقع مطلوب.
         /// </summary>
-        public static string LocationIsRequired {
+        internal static string LocationIsRequired {
             get {
                 return ResourceManager.GetString("LocationIsRequired", resourceCulture);
             }
@@ -170,7 +206,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to الاسم.
         /// </summary>
-        public static string Name {
+        internal static string Name {
             get {
                 return ResourceManager.GetString("Name", resourceCulture);
             }
@@ -179,7 +215,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to الاسم مستعمل سابقا.
         /// </summary>
-        public static string NameMustBeUnique {
+        internal static string NameMustBeUnique {
             get {
                 return ResourceManager.GetString("NameMustBeUnique", resourceCulture);
             }
@@ -188,7 +224,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to الاسم مستعمل في احدى الوحدات المباشرة.
         /// </summary>
-        public static string NameMustBeUniqueWithinUnit {
+        internal static string NameMustBeUniqueWithinUnit {
             get {
                 return ResourceManager.GetString("NameMustBeUniqueWithinUnit", resourceCulture);
             }
@@ -197,7 +233,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to كلمة السر الجديدة.
         /// </summary>
-        public static string NewPassword {
+        internal static string NewPassword {
             get {
                 return ResourceManager.GetString("NewPassword", resourceCulture);
             }
@@ -206,7 +242,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to الرابط الالكرتوني غير صحيح.
         /// </summary>
-        public static string NotValidUrl {
+        internal static string NotValidUrl {
             get {
                 return ResourceManager.GetString("NotValidUrl", resourceCulture);
             }
@@ -215,7 +251,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to الوحدة التنظيمية مرتبطة بمستخدمين.
         /// </summary>
-        public static string OrganizationUnitIsLinkedToUsers {
+        internal static string OrganizationUnitIsLinkedToUsers {
             get {
                 return ResourceManager.GetString("OrganizationUnitIsLinkedToUsers", resourceCulture);
             }
@@ -224,7 +260,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to الوحدة التنظيمية غير صحيحة.
         /// </summary>
-        public static string OrganizationUnitMustExist {
+        internal static string OrganizationUnitMustExist {
             get {
                 return ResourceManager.GetString("OrganizationUnitMustExist", resourceCulture);
             }
@@ -233,7 +269,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to الوحدة التنظيمية المباشرة غير موجودة.
         /// </summary>
-        public static string ParentLocationNotValid {
+        internal static string ParentLocationNotValid {
             get {
                 return ResourceManager.GetString("ParentLocationNotValid", resourceCulture);
             }
@@ -242,7 +278,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to الربط بين الوحدة التنظيمية والوحدة التنظيمية الأعلى غير صحيح.
         /// </summary>
-        public static string ParentUnitChildUnitLinkingIsInvalid {
+        internal static string ParentUnitChildUnitLinkingIsInvalid {
             get {
                 return ResourceManager.GetString("ParentUnitChildUnitLinkingIsInvalid", resourceCulture);
             }
@@ -251,7 +287,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to الصلاحية مرتبطة بمستخدمين.
         /// </summary>
-        public static string RoleIsLinkedToUsers {
+        internal static string RoleIsLinkedToUsers {
             get {
                 return ResourceManager.GetString("RoleIsLinkedToUsers", resourceCulture);
             }
@@ -260,7 +296,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to الصلاحية غير موجودة.
         /// </summary>
-        public static string RoleMustExist {
+        internal static string RoleMustExist {
             get {
                 return ResourceManager.GetString("RoleMustExist", resourceCulture);
             }
@@ -269,7 +305,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to الحالة غير موجودة.
         /// </summary>
-        public static string StatusMustExist {
+        internal static string StatusMustExist {
             get {
                 return ResourceManager.GetString("StatusMustExist", resourceCulture);
             }
@@ -278,7 +314,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to يوجد تقييم لنقطة الشحن.
         /// </summary>
-        public static string UserAlreadyRated {
+        internal static string UserAlreadyRated {
             get {
                 return ResourceManager.GetString("UserAlreadyRated", resourceCulture);
             }
@@ -287,7 +323,7 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to اسم المستخدم مستعمل سابقا.
         /// </summary>
-        public static string UserNameMustBeUnique {
+        internal static string UserNameMustBeUnique {
             get {
                 return ResourceManager.GetString("UserNameMustBeUnique", resourceCulture);
             }

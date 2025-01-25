@@ -42,4 +42,7 @@
     <data name="PaciDataRetrievalFailure" xml:space="preserve">
     <value>Failed To Retrieve Address Details From PACI</value>
   </data>
+    <data name="FileNullOrEmpty" xml:space="preserve">
+        <value>The uploaded file is null or emplty</value>
+    </data>
 </root>

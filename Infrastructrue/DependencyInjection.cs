@@ -10,6 +10,7 @@ using Infrastructrue.Options;
 using Infrastructrue.Persistence;
 using Infrastructrue.Persistence.Interceptors;
 using Infrastructrue.Persistence.Repositories;
+using Infrastructrue.UploadFiles;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
@@ -30,19 +31,26 @@ public static class DependencyInjection
 
         services.AddHttpClient();
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
-
-        services
-            .RegisterDbContext(configurations)
+        services.RegisterDbContext(configurations)
             .RegisterIdentity(configurations)
+            .RegisterUploadFiles(configurations)
             .RegisterRepositories();
 
         return services;
     }
 
+
+    private static IServiceCollection RegisterUploadFiles(this IServiceCollection services, IConfiguration configurations)
+    {
+        var uploadFileOptionsSection = configurations.GetSection(UploadFileOptions.ConfigName);
+        services.Configure<UploadFileOptions>(uploadFileOptionsSection);
+        services.AddScoped<IUploadFileService, UploadFileService>();
+        return services;
+    }
+    
     private static IServiceCollection RegisterRepositories(this IServiceCollection services)
     {
-        services.AddScoped<IRateRepository,RateRepository >();
-
+        services.AddScoped<IRateRepository,RateRepository>();
         return services;
     }
     

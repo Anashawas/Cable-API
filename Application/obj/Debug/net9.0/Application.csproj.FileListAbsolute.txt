@@ -24,3 +24,4 @@ C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\Application.d
 C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\refint\Application.dll
 C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\Application.pdb
 C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\ref\Application.dll
+C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\Application.sourcelink.json

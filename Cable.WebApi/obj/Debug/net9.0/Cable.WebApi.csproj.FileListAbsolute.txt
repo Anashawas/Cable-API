@@ -20,3 +20,4 @@ C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Debug\net9.0\Cable.WebApi
 C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Debug\net9.0\refint\Cable.WebApi.dll
 C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Debug\net9.0\Cable.WebApi.pdb
 C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Debug\net9.0\ref\Cable.WebApi.dll
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Debug\net9.0\Cable.WebApi.sourcelink.json

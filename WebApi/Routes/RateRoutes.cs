@@ -13,7 +13,7 @@ public static class RateRoutes
     public static IEndpointRouteBuilder MapRateRoutes(this IEndpointRouteBuilder app)
     {
         app.MapGroup("/api/rate")
-            .WithTags("Rate")
+            .WithTags("Rates")
             .MapRoutes();
 
         return app;
@@ -24,12 +24,12 @@ public static class RateRoutes
         app.MapGet("/GetChargingPointRatesById/{id}", async (IMediator mediator,[FromRoute]int id, CancellationToken cancellation) =>
                 Results.Ok(await mediator.Send(new GetChargingPointRateByIdRequest(id), cancellation)))
             .Produces<double>()
-            .WithName("Get all rates")
-            .WithSummary(" Get all rates of the application")
             .ProducesForbidden()
             .ProducesUnAuthorized()
             .RequireAuthorization()
             .ProducesInternalServerError()
+            .WithName("Get all rates")
+            .WithSummary(" get")
             .WithOpenApi();
 
         app.MapPost("/AddRate", async (IMediator mediator, AddRateCommand request, CancellationToken cancellation) =>
@@ -48,7 +48,7 @@ public static class RateRoutes
                 return op;
             });
 
-        app.MapPatch("/UpdateRate/{id}", async (IMediator mediator, [FromRoute] int id, UpdateRateRequest request,
+        app.MapPatch("/UpdateRate/{id:int}", async (IMediator mediator, [FromRoute] int id, UpdateRateRequest request,
                     CancellationToken cancellation) =>
                 await mediator.Send(new UpdateRateCommand(id, request.ChargingPointRate), cancellation))
             .Produces<int>()

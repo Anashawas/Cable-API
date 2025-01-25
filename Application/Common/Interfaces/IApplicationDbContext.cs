@@ -6,7 +6,7 @@ namespace Application.Common.Interfaces;
 public interface IApplicationDbContext
 {
    
-     DbSet<AttachmentChargerPoint> AttachmentChargerPoints { get; set; }
+     DbSet<ChargingPointAttachment> ChargingPointAttachments { get; set; }
 
      DbSet<ChargingPlug> ChargingPlugs { get; set; }
 

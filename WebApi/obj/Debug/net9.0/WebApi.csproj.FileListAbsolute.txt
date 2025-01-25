@@ -104,3 +104,4 @@ C:\Users\an.hawas\RiderProjects\Cable\WebApi\bin\Debug\net9.0\Cable.Security.Jwt
 C:\Users\an.hawas\RiderProjects\Cable\WebApi\bin\Debug\net9.0\Cable.WebApi.OpenAPI.dll
 C:\Users\an.hawas\RiderProjects\Cable\WebApi\bin\Debug\net9.0\Cable.WebApi.OpenAPI.pdb
 C:\Users\an.hawas\RiderProjects\Cable\WebApi\bin\Debug\net9.0\ar\Infrastructrue.resources.dll
+C:\Users\an.hawas\RiderProjects\Cable\WebApi\obj\Debug\net9.0\WebApi.sourcelink.json

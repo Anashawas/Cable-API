@@ -16,3 +16,4 @@ C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Encryption\obj\Debug\net9.0
 C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Encryption\obj\Debug\net9.0\refint\Cable.Security.Encryption.dll
 C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Encryption\obj\Debug\net9.0\Cable.Security.Encryption.pdb
 C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Encryption\obj\Debug\net9.0\ref\Cable.Security.Encryption.dll
+C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Encryption\obj\Debug\net9.0\Cable.Security.Encryption.sourcelink.json

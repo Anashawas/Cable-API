@@ -6,7 +6,6 @@
 /// <param name="Id">The id of the user</param>
 /// <param name="Username">The user name</param>
 /// <param name="Name">The display name</param>
-/// <param name="IsActiveDirectory">Is Active Directory User</param>
 /// <param name="AccessToken">The access token</param>
 /// <param name="RefreshToken">The refresh token</param>
 /// <param name="Privileges">The user privleges</param>

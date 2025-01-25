@@ -96,4 +96,16 @@
   <data name="ChargerPointTypeMustExist" xml:space="preserve">
     <value>Charger point type does not exist</value>
   </data>
+  <data name="ChargingPointMustExist" xml:space="preserve">
+    <value>Charging point does not exist </value>
+  </data>
+  <data name="FileSizeNotValid" xml:space="preserve">
+        <value>The file size is exceeded limits </value>
+    </data>
+  <data name="FileExtensionNotValid" xml:space="preserve">
+        <value>The file Extenstion is not valid</value>
+    </data>
+  <data name="FileNullOrEmpty" xml:space="preserve">
+    <value>The uploaded file is null or emplty</value>
+  </data>
 </root>

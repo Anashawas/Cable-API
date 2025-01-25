@@ -1,6 +1,11 @@
 ﻿namespace Application.Users.Queries.GetAllUsers;
 
-public record GetAllUsersDto();
+public record GetAllUsersDto(
+    string Name,
+    string Phone,
+    string? UserName,
+    string? Email,
+    RoleSummary Role);
 
 /// <summary>
 /// The summary of the role
@@ -8,8 +13,6 @@ public record GetAllUsersDto();
 /// <param name="Id">The id of the role</param>
 /// <param name="Name">The name of the role</param>
 public record RoleSummary(int Id, string Name);
-
-
 
 public class GetAllUsersDtoMapper : Profile
 {
@@ -22,11 +25,9 @@ public class GetAllUsersDtoMapper : Profile
                     userAccount.Role
                 )
             ))
-            
             ;
     }
 }
-
 
 public class RoleSummaryMapper : Profile
 {

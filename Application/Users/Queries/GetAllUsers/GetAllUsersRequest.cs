@@ -1,7 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 
 namespace Application.Users.Queries.GetAllUsers;
-[ApplicationAuthorize(PrivilegeCode = "Admin")]
 public record GetAllUsersRequest() : IRequest<List<GetAllUsersDto>>;
 
 public class GetAllUsersQueryHandler(IApplicationDbContext applicationDbContext, IMapper mapper)

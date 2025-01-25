@@ -25,8 +25,8 @@ public class RateRepository(ApplicationDbContext applicationDbContext) : IRateRe
             await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
             {
                 if (!await reader.ReadAsync(cancellationToken)) return chargingPointRate;
-                int totalRate = reader.GetInt32(0);
-                int totalCount = reader.GetInt32(1);
+                var totalRate = reader.GetInt32(0);
+                var totalCount = reader.GetInt32(1);
 
                 if (totalCount == 0)
                 {

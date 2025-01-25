@@ -78,6 +78,15 @@ namespace Application.Common.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Charging point does not exist .
+        /// </summary>
+        public static string ChargingPointMustExist {
+            get {
+                return ResourceManager.GetString("ChargingPointMustExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Current Password.
         /// </summary>
         public static string CurrentPassword {
@@ -92,6 +101,33 @@ namespace Application.Common.Localization {
         public static string EmailMustBeUnique {
             get {
                 return ResourceManager.GetString("EmailMustBeUnique", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The file Extenstion is not valid.
+        /// </summary>
+        public static string FileExtensionNotValid {
+            get {
+                return ResourceManager.GetString("FileExtensionNotValid", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The uploaded file is null or emplty.
+        /// </summary>
+        public static string FileNullOrEmpty {
+            get {
+                return ResourceManager.GetString("FileNullOrEmpty", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The file size is exceeded limits .
+        /// </summary>
+        public static string FileSizeNotValid {
+            get {
+                return ResourceManager.GetString("FileSizeNotValid", resourceCulture);
             }
         }
         

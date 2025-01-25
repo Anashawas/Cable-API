@@ -12,25 +12,23 @@ namespace Infrastructrue.Persistence.Configurations;
 
 public partial class UserComplaintConfiguration : IEntityTypeConfiguration<UserComplaint>
 {
-    public void Configure(EntityTypeBuilder<UserComplaint> entity)
+    public void Configure(EntityTypeBuilder<UserComplaint> builder)
     {
-        entity.HasKey(e => e.Id).HasName("PK_NewTable");
+        builder.HasKey(e => e.Id).HasName("PK_NewTable");
+        
+        builder.Property(e => e.Note).HasMaxLength(500);
 
-        entity.Property(e => e.CreatedAt).HasColumnType("datetime");
-        entity.Property(e => e.ModifiedAt).HasColumnType("datetime");
-        entity.Property(e => e.Note).HasMaxLength(500);
-
-        entity.HasOne(d => d.ChargingPoint).WithMany(p => p.UserComplaints)
+        builder.HasOne(d => d.ChargingPoint).WithMany(p => p.UserComplaints)
             .HasForeignKey(d => d.ChargingPointId)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("FK_UserComplaints_ChargingPoint");
 
-        entity.HasOne(d => d.User).WithMany(p => p.UserComplaints)
+        builder.HasOne(d => d.User).WithMany(p => p.UserComplaints)
             .HasForeignKey(d => d.UserId)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("FK_UserComplaints_UserAccount");
 
-        OnConfigurePartial(entity);
+        OnConfigurePartial(builder);
     }
 
     partial void OnConfigurePartial(EntityTypeBuilder<UserComplaint> entity);

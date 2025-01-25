@@ -96,4 +96,16 @@
   <data name="ChargerPointTypeMustExist" xml:space="preserve">
     <value>نوع نقطة الشحن غير موجودة</value>
   </data>
+  <data name="ChargingPointMustExist" xml:space="preserve">
+    <value>النقطة الشحن غير موجودة</value>
+  </data>
+  <data name="FileSizeNotValid" xml:space="preserve">
+    <value>حجم الملف تجازو الحد المسموح</value>
+  </data>
+  <data name="FileExtensionNotValid" xml:space="preserve">
+    <value>نوع الملف غير صحيح</value>
+  </data>
+  <data name="FileNullOrEmpty" xml:space="preserve">
+    <value>الرجاء ارفاق ملف</value>
+  </data>
 </root>

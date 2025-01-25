@@ -6,14 +6,18 @@ using Domain.Common;
 
 namespace Domain.Enitites;
 
-public partial class AttachmentChargerPoint :BaseAuditableEntity
+public partial class ChargingPointAttachment :BaseAuditableEntity
 {
     public int ChargingPointId { get; set; }
 
-    public int FilePath { get; set; }
+    public string FilePath { get; set; } = null!;
 
-    public int FileSize { get; set; }
-    public string FileType { get; set; } = null!;
+    public long FileSize { get; set; }
     
+    public string FileExtension { get; set; } = null!;
+    
+    public string FileName { get; set; } = null!;
+
+    public string ContentType { get; set; } = null!;
     public virtual ChargingPoint ChargingPoint { get; set; } = null!;
 }
