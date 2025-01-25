@@ -21,7 +21,7 @@ public class UploadFileService(
                                     ?? throw new NotFoundException(
                                         $"Can not find user with id {currentUserService.UserId}");
 
-    private string UserUploadPath => Path.Combine(_uploadFileOption.Path, CurrentUserId);
+    private string UserUploadPath => Path.Combine(_uploadFileOption.ChargingPointAttachmentsPath, CurrentUserId);
 
 
     public async Task<byte[]> GetFileAsync(string fileName, CancellationToken cancellationToken )
@@ -37,8 +37,7 @@ public class UploadFileService(
     {
         if (file is { Length: <= 0 })
             throw new DataValidationException(nameof(file), Resources.FileNullOrEmpty);
-
-
+        
         if (!Directory.Exists(UserUploadPath))
             Directory.CreateDirectory(UserUploadPath);
 

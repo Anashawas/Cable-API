@@ -6,5 +6,6 @@ public class UploadFileOptions
     public long LimitSize { get; set; }
     public string[] AllowedExtensions { get; set; } = null!;
 
-    public string Path { get; set; } = null!;
+    public string ChargingPointAttachmentsPath { get; set; } = null!;
+    public string BannerPath { get; set; } = null!;
 }

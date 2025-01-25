@@ -6,8 +6,7 @@ public record GetAllChargingPointAttachmentsByIdRequest(int Id) : IRequest<List<
 
 public class GetAllChargingPointAttachmentsByIdQueryHandler(
     IApplicationDbContext applicationDbContext,
-    IUploadFileService uploadFileService,
-    IMapper mapper)
+    IUploadFileService uploadFileService)
     : IRequestHandler<GetAllChargingPointAttachmentsByIdRequest, List<UploadFile>>
 {
     public async Task<List<UploadFile>> Handle(GetAllChargingPointAttachmentsByIdRequest request,
@@ -19,11 +18,11 @@ public class GetAllChargingPointAttachmentsByIdQueryHandler(
                 .Select(async item =>
                 {
                     var fileContent = await uploadFileService.GetFileAsync(item.FilePath, cancellationToken);
-                    return new UploadFile(item.FileName, item.ContentType, fileContent, item.FileExtension, item.FileSize);
+                    return new UploadFile(item.FileName, item.ContentType, fileContent, item.FilePath,
+                        item.FileExtension, item.FileSize);
                 })
         );
 
         return files.ToList();
-       
     }
 }

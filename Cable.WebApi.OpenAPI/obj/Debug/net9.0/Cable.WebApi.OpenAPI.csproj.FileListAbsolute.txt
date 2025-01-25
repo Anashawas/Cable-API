@@ -14,3 +14,4 @@ C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\obj\Debug\net9.0\Cabl
 C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\obj\Debug\net9.0\refint\Cable.WebApi.OpenAPI.dll
 C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\obj\Debug\net9.0\Cable.WebApi.OpenAPI.pdb
 C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\obj\Debug\net9.0\ref\Cable.WebApi.OpenAPI.dll
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi.OpenAPI\obj\Debug\net9.0\Cable.WebApi.OpenAPI.sourcelink.json
