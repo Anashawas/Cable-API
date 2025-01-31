@@ -6,6 +6,11 @@ namespace Application.Common.Interfaces;
 public interface IApplicationDbContext
 {
    
+     
+     DbSet<Banner> Banners { get; set; }
+     DbSet<BannerDuration> BannerDurations { get; set; }
+     DbSet<BannerAttachment> BannerAttachments { get; set; }
+     
      DbSet<ChargingPointAttachment> ChargingPointAttachments { get; set; }
 
      DbSet<ChargingPlug> ChargingPlugs { get; set; }

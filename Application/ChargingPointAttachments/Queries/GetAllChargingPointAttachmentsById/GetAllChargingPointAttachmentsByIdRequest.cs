@@ -1,4 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Application.Common.Enums;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Application.ChargingPointAttachments.Queries.GetAllChargingPointAttachmentsById;
 
@@ -17,8 +19,9 @@ public class GetAllChargingPointAttachmentsByIdQueryHandler(
                 .Where(x => x.ChargingPointId == request.Id).AsEnumerable()
                 .Select(async item =>
                 {
-                    var fileContent = await uploadFileService.GetFileAsync(item.FilePath, cancellationToken);
-                    return new UploadFile(item.FileName, item.ContentType, fileContent, item.FilePath,
+                    var fileContent = await uploadFileService.GetFileAsync(UploadFileFolders.CableAttachments ,item.FileName, cancellationToken);
+                    return new UploadFile(item.FileName, item.ContentType, fileContent,
+                        uploadFileService.GetFilePath(UploadFileFolders.CableAttachments,item.FileName),
                         item.FileExtension, item.FileSize);
                 })
         );

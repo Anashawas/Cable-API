@@ -108,4 +108,13 @@
   <data name="FileNullOrEmpty" xml:space="preserve">
     <value>The uploaded file is null or emplty</value>
   </data>
+  <data name="UserBannerAlreadyExist" xml:space="preserve">
+    <value>the user banner already exist</value>
+  </data>
+  <data name="StartDateMustBeLessThanEndDate" xml:space="preserve">
+    <value>start date must be less than end date</value>
+  </data>
+  <data name="CheckBannerIsExist" xml:space="preserve">
+    <value>Banner is not exist in database </value>
+  </data>
 </root>

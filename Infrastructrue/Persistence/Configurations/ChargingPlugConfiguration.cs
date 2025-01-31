@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using System;
 using System.Collections.Generic;
 using Domain.Enitites;
+using Infrastructrue.UploadFiles;
 
 
 #nullable disable
@@ -12,6 +13,7 @@ namespace Infrastructrue.Persistence.Configurations;
 
 public partial class ChargingPlugConfiguration : IEntityTypeConfiguration<ChargingPlug>
 {
+    
     public void Configure(EntityTypeBuilder<ChargingPlug> entity)
     {
         entity.ToTable("ChargingPlug");

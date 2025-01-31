@@ -108,4 +108,13 @@
   <data name="FileNullOrEmpty" xml:space="preserve">
     <value>الرجاء ارفاق ملف</value>
   </data>
+  <data name="UserBannerAlreadyExist" xml:space="preserve">
+    <value>المعلن موجود في قاعدة البيانات</value>
+  </data>
+  <data name="StartDateMustBeLessThanEndDate" xml:space="preserve">
+    <value>تاريخ البداية لا يمكن ان يكون اكبر من تاريخ النهاية</value>
+  </data>
+  <data name="CheckBannerIsExist" xml:space="preserve">
+    <value>المعلن غير موجود في الداتا بيس </value>
+  </data>
 </root>

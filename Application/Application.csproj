@@ -46,7 +46,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Banners\" />
+      <Folder Include="BannersAttachments\Commands\UpdateAttachment\" />
     </ItemGroup>
 
 </Project>

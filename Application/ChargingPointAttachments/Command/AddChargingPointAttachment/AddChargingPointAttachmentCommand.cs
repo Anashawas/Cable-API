@@ -1,4 +1,5 @@
-﻿using Application.Common.Extensions;
+﻿using Application.Common.Enums;
+using Application.Common.Extensions;
 using Microsoft.AspNetCore.Http;
 
 namespace Application.ChargingPointAttachments.Command;
@@ -16,11 +17,10 @@ public class AddChargingPointAttachmentCommandHandler(
         {
             var chargingPointAttachment = new ChargingPointAttachment
             {
-                FileName = file.GetFileName(),
+                FileName = await uploadFileService.SaveFileAsync(file, UploadFileFolders.CableAttachments, cancellationToken),
                 FileExtension = file.GetFileExtension(),
                 FileSize = file.Length,
                 ChargingPointId = request.Id,
-                FilePath = await uploadFileService.SaveFileAsync(file,cancellationToken),
                 ContentType = file.ContentType,
             };
             chargingPointAttachments.Add(chargingPointAttachment);

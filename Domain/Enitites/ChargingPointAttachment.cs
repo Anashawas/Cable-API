@@ -10,8 +10,6 @@ public partial class ChargingPointAttachment :BaseAuditableEntity
 {
     public int ChargingPointId { get; set; }
 
-    public string FilePath { get; set; } = null!;
-
     public long FileSize { get; set; }
     
     public string FileExtension { get; set; } = null!;

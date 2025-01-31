@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Cable.Core")]
 [assembly: System.Reflection.AssemblyCopyrightAttribute(" ")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f4830c88216e71f290164aaace9302a8b9de8f3f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+85a883fae8d5732443144e0b8c9a6153b82d4f0b")]
 [assembly: System.Reflection.AssemblyProductAttribute("Cable.Core")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Cable.Core")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

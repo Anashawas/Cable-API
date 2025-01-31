@@ -90,8 +90,8 @@ app.MapUserRoutes()
     .MapRateRoutes()
     .MapStatusRoutes()
     .MapUserComplaintsRoutes()
-    .MapChargingPointAttachmentsRoutes();
-
+    .MapChargingPointAttachmentsRoutes()
+    .MapBannerRoutes();
 
 app.Run();
 

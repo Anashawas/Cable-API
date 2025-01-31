@@ -28,7 +28,7 @@ public static class ChargingPointAttachmentsRoutes
             .RequireAuthorization()
             .ProducesForbidden()
             .ProducesUnAuthorized()
-            .WithName(" Get All Charging Point Attachments By Id")
+            .WithName("Get All Charging Point Attachments By Id")
             .WithSummary("Get All Charging Point Attachments By Id")
             .WithOpenApi(op =>
             {
@@ -53,6 +53,7 @@ public static class ChargingPointAttachmentsRoutes
                 op.RequestBody.Required = true;
                 return op;
             }).DisableAntiforgery();
+
         app.MapDelete("DeleteChargingPointAttachmentCommand/{id:int}",
                 async (IMediator mediator, int id, CancellationToken cancellationToken)
                     => await mediator.Send(new DeleteChargingPointAttachmentCommand(id), cancellationToken))

@@ -28,6 +28,9 @@ public partial class ApplicationDbContext(
 
     #region Properties
 
+    public DbSet<Banner> Banners { get; set; }
+    public DbSet<BannerDuration> BannerDurations { get; set; }
+    public DbSet<BannerAttachment> BannerAttachments { get; set; }
     public DbSet<ChargingPointAttachment> ChargingPointAttachments { get; set; }
     public DbSet<ChargingPlug> ChargingPlugs { get; set; }
     public DbSet<ChargingPoint> ChargingPoints { get; set; }

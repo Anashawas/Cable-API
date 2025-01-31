@@ -87,6 +87,15 @@ namespace Application.Common.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Banner is not exist in database .
+        /// </summary>
+        public static string CheckBannerIsExist {
+            get {
+                return ResourceManager.GetString("CheckBannerIsExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Current Password.
         /// </summary>
         public static string CurrentPassword {
@@ -303,6 +312,15 @@ namespace Application.Common.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to start date must be less than end date.
+        /// </summary>
+        public static string StartDateMustBeLessThanEndDate {
+            get {
+                return ResourceManager.GetString("StartDateMustBeLessThanEndDate", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Thes selected status doesnot exist .
         /// </summary>
         public static string StatusMustExist {
@@ -317,6 +335,15 @@ namespace Application.Common.Localization {
         public static string UserAlreadyRated {
             get {
                 return ResourceManager.GetString("UserAlreadyRated", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to the user banner already exist.
+        /// </summary>
+        public static string UserBannerAlreadyExist {
+            get {
+                return ResourceManager.GetString("UserBannerAlreadyExist", resourceCulture);
             }
         }
         
