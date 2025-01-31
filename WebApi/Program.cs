@@ -79,6 +79,7 @@ if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
 app.UseCors();
 
 // app.UseHttpsRedirection();
+app.UseForwardedHeaders();
 app.UseCustomAuthenticationResponse();
 app.UseAuthentication();
 app.UseAuthorization();
