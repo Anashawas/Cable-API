@@ -23,10 +23,11 @@ C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Release\net9.0\Infrastr
 C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Release\net9.0\Infrastructrue.AssemblyInfo.cs
 C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Release\net9.0\Infrastructrue.csproj.CoreCompileInputs.cache
 C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Release\net9.0\EFCoreSqlServerNetTopologySuite.cs
-C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Release\net9.0\ar\Infrastructrue.resources.cs
 C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Release\net9.0\ar\Infrastructrue.resources.dll
 C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Release\net9.0\Infrastr.A7375EA4.Up2Date
 C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Release\net9.0\Infrastructrue.dll
 C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Release\net9.0\refint\Infrastructrue.dll
 C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Release\net9.0\Infrastructrue.pdb
 C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Release\net9.0\ref\Infrastructrue.dll
+C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Release\net9.0\Infrastructrue.sourcelink.json
+C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Release\net9.0\ar\Infrastructrue.resources.cs

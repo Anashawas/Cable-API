@@ -9,6 +9,6 @@ public partial class BannerDuration : BaseAuditableEntity
     public DateOnly StartDate { get; set; }
     public DateOnly EndDate { get; set; }
 
-    public Banner Banner { get; set; }
+    public Banner Banner { get; set; } = null!;
     
 }

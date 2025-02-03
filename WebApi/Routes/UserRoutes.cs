@@ -30,7 +30,6 @@ public static class UserRoutes
         app.MapGet("/GetAllUsers", async (IMediator mediator, CancellationToken cancellation) =>
                 Results.Ok(await mediator.Send(new GetAllUsersRequest(), cancellation)))
             .Produces<List<GetAllUsersDto>>()
-            .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesForbidden()
             .ProducesInternalServerError()
@@ -53,7 +52,6 @@ public static class UserRoutes
                 op.Responses["200"].Description = "The id of the user";
                 return op;
             });
-        ;
 
         app.MapPut("/{id}",
                 async (IMediator mediator, [FromRoute] int id, UpdateUserRequest request,

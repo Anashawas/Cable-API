@@ -10,3 +10,4 @@ C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Jwt\obj\Release\net9.0\Cabl
 C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Jwt\obj\Release\net9.0\refint\Cable.Security.Jwt.dll
 C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Jwt\obj\Release\net9.0\Cable.Security.Jwt.pdb
 C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Jwt\obj\Release\net9.0\ref\Cable.Security.Jwt.dll
+C:\Users\an.hawas\RiderProjects\Cable\Cable.Security.Jwt\obj\Release\net9.0\Cable.Security.Jwt.sourcelink.json

@@ -28,6 +28,6 @@ C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Debug\net9.0\Infrastruc
 C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Debug\net9.0\ref\Infrastructrue.dll
 C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\bin\Debug\net9.0\ar\Infrastructrue.resources.dll
 C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Debug\net9.0\Infrastructrue.Common.Localization.Resources.ar.resources
-C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Debug\net9.0\ar\Infrastructrue.resources.cs
 C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Debug\net9.0\ar\Infrastructrue.resources.dll
 C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Debug\net9.0\Infrastructrue.sourcelink.json
+C:\Users\an.hawas\RiderProjects\Cable\Infrastructrue\obj\Debug\net9.0\ar\Infrastructrue.resources.cs

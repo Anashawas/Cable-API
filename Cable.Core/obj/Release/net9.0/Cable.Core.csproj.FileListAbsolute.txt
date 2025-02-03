@@ -9,9 +9,10 @@ C:\Users\an.hawas\RiderProjects\Cable\Cable.Core\obj\Release\net9.0\Cable.Core.G
 C:\Users\an.hawas\RiderProjects\Cable\Cable.Core\obj\Release\net9.0\Cable.Core.AssemblyInfoInputs.cache
 C:\Users\an.hawas\RiderProjects\Cable\Cable.Core\obj\Release\net9.0\Cable.Core.AssemblyInfo.cs
 C:\Users\an.hawas\RiderProjects\Cable\Cable.Core\obj\Release\net9.0\Cable.Core.csproj.CoreCompileInputs.cache
-C:\Users\an.hawas\RiderProjects\Cable\Cable.Core\obj\Release\net9.0\ar\Cable.Core.resources.cs
 C:\Users\an.hawas\RiderProjects\Cable\Cable.Core\obj\Release\net9.0\ar\Cable.Core.resources.dll
 C:\Users\an.hawas\RiderProjects\Cable\Cable.Core\obj\Release\net9.0\Cable.Core.dll
 C:\Users\an.hawas\RiderProjects\Cable\Cable.Core\obj\Release\net9.0\refint\Cable.Core.dll
 C:\Users\an.hawas\RiderProjects\Cable\Cable.Core\obj\Release\net9.0\Cable.Core.pdb
 C:\Users\an.hawas\RiderProjects\Cable\Cable.Core\obj\Release\net9.0\ref\Cable.Core.dll
+C:\Users\an.hawas\RiderProjects\Cable\Cable.Core\obj\Release\net9.0\Cable.Core.sourcelink.json
+C:\Users\an.hawas\RiderProjects\Cable\Cable.Core\obj\Release\net9.0\ar\Cable.Core.resources.cs

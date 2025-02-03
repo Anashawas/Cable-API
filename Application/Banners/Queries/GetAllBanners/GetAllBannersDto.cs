@@ -24,10 +24,10 @@ public class GetAllBannersDtoMapping : Profile
         CreateMap<Banner, GetAllBannersDto>()
             .ForCtorParam(nameof(GetAllBannersDto.BannerDurations),
                 opt => opt.MapFrom((banner, context) =>
-                    context.Mapper.Map<BannerDurationSummery>(banner.BannerDurations)))
+                    context.Mapper.Map<List<BannerDurationSummery>>(banner.BannerDurations)))
             .ForCtorParam(nameof(GetAllBannersDto.BannerAttachments),
                 opt => opt.MapFrom((banner, context) =>
-                    context.Mapper.Map<BannerAttachmentSummery>(banner.BannerAttachments)));
+                    context.Mapper.Map<List<BannerAttachmentSummery>>(banner.BannerAttachments)));
     }
 }
 

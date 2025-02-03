@@ -104,3 +104,4 @@ C:\Users\an.hawas\RiderProjects\Cable\WebApi\obj\Release\net9.0\refint\WebApi.dl
 C:\Users\an.hawas\RiderProjects\Cable\WebApi\obj\Release\net9.0\WebApi.pdb
 C:\Users\an.hawas\RiderProjects\Cable\WebApi\obj\Release\net9.0\WebApi.genruntimeconfig.cache
 C:\Users\an.hawas\RiderProjects\Cable\WebApi\obj\Release\net9.0\ref\WebApi.dll
+C:\Users\an.hawas\RiderProjects\Cable\WebApi\obj\Release\net9.0\WebApi.sourcelink.json

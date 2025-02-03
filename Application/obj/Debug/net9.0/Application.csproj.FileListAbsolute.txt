@@ -17,7 +17,6 @@ C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\Application.G
 C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\Application.AssemblyInfoInputs.cache
 C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\Application.AssemblyInfo.cs
 C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\Application.csproj.CoreCompileInputs.cache
-C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\ar\Application.resources.cs
 C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\ar\Application.resources.dll
 C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\Applicat.44B5EDA2.Up2Date
 C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\Application.dll
@@ -25,3 +24,4 @@ C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\refint\Applic
 C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\Application.pdb
 C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\ref\Application.dll
 C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\Application.sourcelink.json
+C:\Users\an.hawas\RiderProjects\Cable\Application\obj\Debug\net9.0\ar\Application.resources.cs

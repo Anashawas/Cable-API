@@ -24,4 +24,10 @@
       <ProjectReference Include="..\Infrastructrue\Infrastructrue.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Remove="Properties\PublishProfiles\SmaterASP.pubxml" />
+      <None Remove="Properties\PublishProfiles\anashawas-001-site1 - FTP.pubxml" />
+      <None Remove="Properties\PublishProfiles\Test.pubxml" />
+    </ItemGroup>
+
 </Project>

@@ -13,10 +13,11 @@ C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Release\net9.0\Cable.WebA
 C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Release\net9.0\Cable.WebApi.AssemblyInfoInputs.cache
 C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Release\net9.0\Cable.WebApi.AssemblyInfo.cs
 C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Release\net9.0\Cable.WebApi.csproj.CoreCompileInputs.cache
-C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Release\net9.0\ar\Cable.WebApi.resources.cs
 C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Release\net9.0\ar\Cable.WebApi.resources.dll
 C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Release\net9.0\Cable.We.721D8F92.Up2Date
 C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Release\net9.0\Cable.WebApi.dll
 C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Release\net9.0\refint\Cable.WebApi.dll
 C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Release\net9.0\Cable.WebApi.pdb
 C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Release\net9.0\ref\Cable.WebApi.dll
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Release\net9.0\Cable.WebApi.sourcelink.json
+C:\Users\an.hawas\RiderProjects\Cable\Cable.WebApi\obj\Release\net9.0\ar\Cable.WebApi.resources.cs

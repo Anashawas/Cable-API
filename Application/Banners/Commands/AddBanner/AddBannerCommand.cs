@@ -15,13 +15,13 @@ public class AddBannerCommandHandler(IApplicationDbContext applicationDbContext)
             Phone = request.Phone,
         };
         applicationDbContext.Banners.Add(banner);
-
         var bannerDuration = new BannerDuration()
         {
-            Banner = banner,
+            Banner =banner,
             StartDate = request.StartDate,
             EndDate = request.EndDate
         };
+        
         applicationDbContext.BannerDurations.Add(bannerDuration);
         await applicationDbContext.SaveChanges(cancellationToken);
         return banner.Id;

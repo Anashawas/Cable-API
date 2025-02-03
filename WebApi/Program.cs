@@ -71,15 +71,15 @@ app.UseRequestLocalization(op =>
 });
 
 app.UseCableExceptionHandlerMiddleware();
-if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
-{
+//if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
+//{
     app.MapOpenApi("/OpenApi/Cable-API.json");
-}
+//}
 
 app.UseCors();
 
 // app.UseHttpsRedirection();
-app.UseForwardedHeaders();
+// app.UseForwardedHeaders();
 app.UseCustomAuthenticationResponse();
 app.UseAuthentication();
 app.UseAuthorization();
