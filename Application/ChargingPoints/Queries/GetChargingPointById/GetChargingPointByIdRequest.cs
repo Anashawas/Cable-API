@@ -1,4 +1,5 @@
-﻿using Application.Common.Interfaces.Repositories;
+﻿using Application.Common.Enums;
+using Application.Common.Interfaces.Repositories;
 using Cable.Core.Exceptions;
 using Microsoft.EntityFrameworkCore;
 
@@ -6,12 +7,13 @@ namespace Application.ChargingPoints.Queries.GetChargingPointById;
 
 public record GetChargingPointByIdRequest(int Id) : IRequest<GetChargingPointByIdDto>;
 
-public class GetChargingPointByIdQuery(IApplicationDbContext applicationDbContext, IRateRepository rateRepository)
+public class GetChargingPointByIdQuery(IApplicationDbContext applicationDbContext,IUploadFileService uploadFileService ,IRateRepository rateRepository)
     : IRequestHandler<GetChargingPointByIdRequest, GetChargingPointByIdDto>
 {
     public async Task<GetChargingPointByIdDto> Handle(GetChargingPointByIdRequest request,
         CancellationToken cancellationToken)
     {
+        
         var result = await (from chargingPoint in applicationDbContext.ChargingPoints
                              join userAccount in applicationDbContext.UserAccounts on chargingPoint.OwnerId
                                  equals userAccount.Id
@@ -22,7 +24,13 @@ public class GetChargingPointByIdQuery(IApplicationDbContext applicationDbContex
                                  chargingPlug.ChargingPointId into chargingPlugGroup
                              from chargingPlug in chargingPlugGroup.DefaultIfEmpty()
                              join plugType in applicationDbContext.PlugTypes on chargingPlug.PlugTypeId equals
-                                 plugType.Id
+                                 plugType.Id into plugTypeGroup
+                             from plugType in plugTypeGroup.DefaultIfEmpty()
+                             
+                             join chargingPointAttachment in applicationDbContext.ChargingPointAttachments
+                                  on chargingPoint.Id equals chargingPointAttachment.ChargingPointId into chargingPointAttachmentGroup
+                             from chargingPointAttachment in chargingPointAttachmentGroup.DefaultIfEmpty()
+                             
                              join status in applicationDbContext.Statuses on chargingPoint.StatusId equals status.Id
                              where !chargingPoint.IsDeleted && chargingPoint.Id == request.Id
                              select new GetChargingPointByIdDto(
@@ -46,7 +54,9 @@ public class GetChargingPointByIdQuery(IApplicationDbContext applicationDbContex
                                  new UserAccountSummary(userAccount.Id, userAccount.Name),
                                  chargingPoint.ChargingPlugs.Select(x => new PlugTypeSummary(x.PlugType.Id,
                                      x.PlugType.Name,
-                                     x.PlugType.SerialNumber)).ToList()
+                                     x.PlugType.SerialNumber)).ToList(),
+                                 chargingPoint.ChargingPointAttachments.Select(x=>
+                                     new UploadFile(x.FileName,x.ContentType,uploadFileService.GetFilePath(UploadFileFolders.CableAttachments,x.FileName),x.FileExtension,x.FileSize)).ToList()
                              )
                          ).AsNoTracking().FirstOrDefaultAsync(cancellationToken) ??
                      throw new NotFoundException($"can not find charging point with id {request.Id}");

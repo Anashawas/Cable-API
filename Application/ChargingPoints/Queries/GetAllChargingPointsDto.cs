@@ -9,9 +9,7 @@ public record GetAllChargingPointsDto(
     string? ToTime,
     double Latitude,
     double Longitude,
-    int StatusId,
-    int ChargerPointTypeId,
-    PlugTypeSummary PlugType
+    int ChargerPointTypeId
 );
 
 public record PlugTypeSummary(int Id, string? Name, string SerialNumber);

@@ -13,7 +13,7 @@ using Microsoft.Extensions.Options;
 
 namespace Infrastructrue.UploadFiles;
 
-public class UploadFileService(ICurrentUserService currentUserService, IOptions<UploadFileOptions> uploadFileOption)
+public class UploadFileService(ICurrentUserService currentUserService, IHttpContextAccessor httpContextAccessor, IOptions<UploadFileOptions> uploadFileOption)
     : IUploadFileService
 {
     private readonly UploadFileOptions _uploadFileOption = uploadFileOption.Value;
@@ -28,8 +28,10 @@ public class UploadFileService(ICurrentUserService currentUserService, IOptions<
         CancellationToken cancellationToken)
     {
         var filePath = Path.Combine(_uploadFileOption.FileUploadPath,
-            UploadFilePathHelper.SetupFolderPath(folder, CurrentUserId, fileName));
+            UploadFilePathHelper.GetFilePath(_uploadFileOption.ServerUrl, folder, CurrentUserId, fileName));
+
         UploadFilePathHelper.CheckFileIsExist(filePath);
+
         return await File.ReadAllBytesAsync(
             filePath,
             cancellationToken);
@@ -41,10 +43,9 @@ public class UploadFileService(ICurrentUserService currentUserService, IOptions<
         if (file is { Length: <= 0 })
             throw new DataValidationException(nameof(file), Resources.FileNullOrEmpty);
         var fileName = file.GetFileName();
-        var filePath = Path.Combine(_uploadFileOption.FileUploadPath,
-            UploadFilePathHelper.SetupFolderPath(folder, CurrentUserId, fileName));
 
-        UploadFilePathHelper.CheckFileIsExist(filePath);
+        var filePath =
+            UploadFilePathHelper.SetupFolderPath(_uploadFileOption.FileUploadPath, folder, CurrentUserId, fileName);
 
         await using var stream = new FileStream(filePath, FileMode.Create);
         await file.CopyToAsync(stream, cancellationToken);
@@ -67,7 +68,11 @@ public class UploadFileService(ICurrentUserService currentUserService, IOptions<
 
     public string GetFilePath(UploadFileFolders folder, string fileName)
     {
-        return UploadFilePathHelper.GetFilePath(_uploadFileOption.ServerUrl, folder, CurrentUserId, fileName);
+        var request = httpContextAccessor.HttpContext?.Request;
+        var baseUrl = request != null
+            ? $"{request.Scheme}://{request.Host}"
+            : _uploadFileOption.ServerUrl;
+        return UploadFilePathHelper.GetFilePath(baseUrl, folder, CurrentUserId, fileName);
     }
 
     public void DeleteFiles(UploadFileFolders uploadFileFolders, string[] filesNames,
@@ -75,8 +80,8 @@ public class UploadFileService(ICurrentUserService currentUserService, IOptions<
     {
         foreach (var fileName in filesNames)
         {
-            var filePath = Path.Combine(_uploadFileOption.FileUploadPath,
-                UploadFilePathHelper.SetupFolderPath(uploadFileFolders, CurrentUserId, fileName));
+            var filePath = Path.Combine(_uploadFileOption.FileUploadPath, uploadFileFolders.ToString(),
+                CurrentUserId, fileName);
 
             UploadFilePathHelper.CheckFileIsExist(filePath);
             File.Delete(filePath);

@@ -2,17 +2,21 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Application;
+using Application.Common.Enums;
 using Application.Common.Interfaces;
 using Cable.Identity;
 using Cable.Routes;
 using Cable.WebApi.Middlewares;
 using Cable.WebApi.OpenAPI.Filters;
 using FluentValidation;
+using Hangfire;
 using Infrastructrue;
+using Microsoft.Extensions.FileProviders;
 using Scalar.AspNetCore;
+using static System.Enum;
 
 string[] supportedCultures = ["en-us", "en", "ar-kw", "ar"];
-
+const string openApiPath = "/OpenApi/Cable-API/v1.json";
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Logging.AddConsole();
@@ -63,6 +67,24 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
 var app = builder.Build();
 
+
+var fileUploadPath = builder.Configuration.GetValue<string>("File:FileUploadPath");
+
+foreach (var folder in GetNames<UploadFileFolders>())
+{
+    var fullPath = Path.Combine(fileUploadPath!, folder);
+    if (!Directory.Exists(fullPath))
+        Directory.CreateDirectory(fullPath);
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(fullPath),
+        RequestPath = $"/{folder}"
+    });
+}
+
+
+
+
 app.UseRequestLocalization(op =>
 {
     op.SetDefaultCulture(supportedCultures[2]);
@@ -71,18 +93,29 @@ app.UseRequestLocalization(op =>
 });
 
 app.UseCableExceptionHandlerMiddleware();
-//if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
-//{
-    app.MapOpenApi("/OpenApi/Cable-API.json");
-//}
+if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
+{
+    app.MapOpenApi(openApiPath);
+    app.MapScalarApiReference("Cable-API/v1", opt =>
+    {
+        opt.WithOpenApiRoutePattern(openApiPath);
+        opt.WithPreferredScheme("Bearer");
+
+        opt.Theme = ScalarTheme.BluePlanet;
+        opt.DefaultHttpClient = new KeyValuePair<ScalarTarget, ScalarClient>(ScalarTarget.Http, ScalarClient.Http11);
+        opt.ShowSidebar = true;
+        opt.Title = "Cable API";
+    });
+}
 
 app.UseCors();
 
 // app.UseHttpsRedirection();
-// app.UseForwardedHeaders();
+
 app.UseCustomAuthenticationResponse();
 app.UseAuthentication();
 app.UseAuthorization();
+app.MapHangfireDashboard("/Cable-Jobs-Dashboard");
 
 app.MapUserRoutes()
     .MapChargingPointsRoutes()
@@ -92,7 +125,11 @@ app.MapUserRoutes()
     .MapStatusRoutes()
     .MapUserComplaintsRoutes()
     .MapChargingPointAttachmentsRoutes()
-    .MapBannerRoutes();
+    .MapBannerRoutes()
+    .MapBannerAttachmentRoutes()
+    .MapSystemVersionRoutes()
+    .MapCarManagementRoutes()
+    .MapNotificationTokenRoutes();
 
 app.Run();
 

@@ -5,7 +5,11 @@ using Application.Common.Interfaces.Repositories;
 using Cable.Security.Jwt;
 using Cable.Security.Jwt.Interfaces;
 using FluentValidation;
+using Hangfire;
+using Infrastructrue.Firebase.FirebaseService;
+using Infrastructrue.Firebase.NotificationService;
 using Infrastructrue.Identity;
+using infrastructrue.Options;
 using Infrastructrue.Options;
 using Infrastructrue.Persistence;
 using Infrastructrue.Persistence.Interceptors;
@@ -34,26 +38,64 @@ public static class DependencyInjection
         services.RegisterDbContext(configurations)
             .RegisterIdentity(configurations)
             .RegisterUploadFiles(configurations)
+            .RegisterGoogleService(configurations)
+            .RegisterFirebaseService(configurations)
+            .RegisterHangFire(configurations)
             .RegisterRepositories();
 
         return services;
     }
 
 
-    private static IServiceCollection RegisterUploadFiles(this IServiceCollection services, IConfiguration configurations)
+    private static IServiceCollection RegisterGoogleService(this IServiceCollection services,
+        IConfiguration configurations)
+    {
+        var googleOption = configurations.GetSection(GoogleOption.ConfigName);
+        services.Configure<GoogleOption>(googleOption);
+        return services;
+    }
+
+    private static IServiceCollection RegisterFirebaseService(this IServiceCollection services,
+        IConfiguration configurations)
+    {
+        var firebaseOption = configurations.GetSection(FirebaseOption.ConfigName);
+        services.Configure<FirebaseOption>(firebaseOption);
+        services.AddSingleton<IFirebaseService, FirebaseService>();
+        services.AddScoped<INotificationService, NotificationService>();      
+        return services;
+        
+    }
+
+    private static IServiceCollection RegisterUploadFiles(this IServiceCollection services,
+        IConfiguration configurations)
     {
         var uploadFileOptionsSection = configurations.GetSection(UploadFileOptions.ConfigName);
         services.Configure<UploadFileOptions>(uploadFileOptionsSection);
         services.AddScoped<IUploadFileService, UploadFileService>();
         return services;
     }
-    
-    private static IServiceCollection RegisterRepositories(this IServiceCollection services)
+
+    private static IServiceCollection RegisterHangFire(this IServiceCollection services, IConfiguration configurations)
     {
-        services.AddScoped<IRateRepository,RateRepository>();
+        services.AddHangfire(opt =>
+            {
+                opt.SetDataCompatibilityLevel(CompatibilityLevel.Version_180);
+                opt.UseSqlServerStorage(configurations.GetConnectionString("Cable"));
+                opt.UseSimpleAssemblyNameTypeSerializer();
+                opt.UseRecommendedSerializerSettings();
+            }
+        );
+        services.AddHangfireServer();
         return services;
     }
-    
+
+
+    private static IServiceCollection RegisterRepositories(this IServiceCollection services)
+    {
+        services.AddScoped<IRateRepository, RateRepository>();
+        return services;
+    }
+
     private static IServiceCollection RegisterIdentity(this IServiceCollection services, IConfiguration configurations)
     {
         services.AddPasswordHasher();
@@ -62,6 +104,7 @@ public static class DependencyInjection
         services.AddScoped<ITokenGenerationService, TokenGenerationService>();
         services.AddScoped<IIdentityService, IdentityService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
+
         var tokenConfigSection = configurations.GetSection(TokenOptions.ConfigName);
         services.Configure<TokenOptions>(tokenConfigSection);
         var tokenSettings = tokenConfigSection.Get<TokenOptions>();

@@ -21,7 +21,7 @@ public class LoggingBehaviour<TRequest>(
 
         if (userId.HasValue)
         {
-            userName = await identityService.GetUserName(userId.Value);
+            userName = await identityService.GetName(userId.Value, cancellationToken);
         }
 
         _logger.LogInformation("Cable Request: {Name} {@UserId} {@UserName} {@Request}",

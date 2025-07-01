@@ -1,12 +1,1 @@
-{
-  "Version": 1,
-  "Hash": "QGVSizwXrTph6AuD6pqykRFG+aXM2jYWKVOutMjEBdE=",
-  "Source": "WebApi",
-  "BasePath": "_content/WebApi",
-  "Mode": "Default",
-  "ManifestType": "Publish",
-  "ReferencedProjectsConfiguration": [],
-  "DiscoveryPatterns": [],
-  "Assets": [],
-  "Endpoints": []
-}
+{"Version":1,"Hash":"Ug62MIzwfjthcKcfVApb2i2mKAsIw1lyk/NPocaX7hw=","Source":"WebApi","BasePath":"/","Mode":"Root","ManifestType":"Publish","ReferencedProjectsConfiguration":[],"DiscoveryPatterns":[],"Assets":[],"Endpoints":[]}

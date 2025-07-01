@@ -60,6 +60,33 @@ namespace Application.Common.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The selected car model doesnot exsit .
+        /// </summary>
+        public static string CarModelMustExist {
+            get {
+                return ResourceManager.GetString("CarModelMustExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The selected car doesnot exsit.
+        /// </summary>
+        public static string CarMustExist {
+            get {
+                return ResourceManager.GetString("CarMustExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The select car type doesnot exist .
+        /// </summary>
+        public static string CarTypeMustExist {
+            get {
+                return ResourceManager.GetString("CarTypeMustExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Changing password is not allowed for this user..
         /// </summary>
         public static string ChangePasswordNotAllowed {
@@ -155,6 +182,15 @@ namespace Application.Common.Localization {
         public static string IdentifierDoesntExist {
             get {
                 return ResourceManager.GetString("IdentifierDoesntExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Invalid google token.
+        /// </summary>
+        public static string InvaildGoogleToken {
+            get {
+                return ResourceManager.GetString("InvaildGoogleToken", resourceCulture);
             }
         }
         
@@ -294,6 +330,15 @@ namespace Application.Common.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to The selected plug type does not exist.
+        /// </summary>
+        public static string PlugTypeMustExist {
+            get {
+                return ResourceManager.GetString("PlugTypeMustExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to The role is currently linked to none deleted users.
         /// </summary>
         public static string RoleIsLinkedToUsers {
@@ -344,6 +389,15 @@ namespace Application.Common.Localization {
         public static string UserBannerAlreadyExist {
             get {
                 return ResourceManager.GetString("UserBannerAlreadyExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to The selected user is not exsit.
+        /// </summary>
+        public static string UserMustExist {
+            get {
+                return ResourceManager.GetString("UserMustExist", resourceCulture);
             }
         }
         

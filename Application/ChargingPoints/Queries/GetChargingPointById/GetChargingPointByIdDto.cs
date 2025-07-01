@@ -19,7 +19,8 @@ public record GetChargingPointByIdDto(
     ChargingPointTypeSummary? ChargerPointType,
     StatusSummary? Status,
     UserAccountSummary? Owner,
-    List<PlugTypeSummary>? PlugType
+    List<PlugTypeSummary>? PlugType,
+    List<UploadFile>? Files
 )
 {
     public double ChargingPointAverage { get; set; }

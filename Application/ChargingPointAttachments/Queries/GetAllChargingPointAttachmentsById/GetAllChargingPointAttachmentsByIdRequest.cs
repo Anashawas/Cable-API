@@ -19,8 +19,8 @@ public class GetAllChargingPointAttachmentsByIdQueryHandler(
                 .Where(x => x.ChargingPointId == request.Id).AsEnumerable()
                 .Select(async item =>
                 {
-                    var fileContent = await uploadFileService.GetFileAsync(UploadFileFolders.CableAttachments ,item.FileName, cancellationToken);
-                    return new UploadFile(item.FileName, item.ContentType, fileContent,
+                    // var fileContent = await uploadFileService.GetFileAsync(UploadFileFolders.CableAttachments ,item.FileName, cancellationToken);
+                    return new UploadFile(item.FileName, item.ContentType,
                         uploadFileService.GetFilePath(UploadFileFolders.CableAttachments,item.FileName),
                         item.FileExtension, item.FileSize);
                 })

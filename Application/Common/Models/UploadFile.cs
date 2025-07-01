@@ -7,7 +7,6 @@ namespace Application.Common.Models;
 public  record UploadFile(
     string FileName,
     string ContentType,
-    byte[] FileContent,
     string FilePath,
     string FileExtension,
     long FileSize);

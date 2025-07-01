@@ -18,9 +18,16 @@ public sealed class BearerSecuritySchemeTransformer(IAuthenticationSchemeProvide
                 ["Bearer"] = new OpenApiSecurityScheme
                 {
                     Type = SecuritySchemeType.Http,
-                    Scheme = "bearer", 
+                    Scheme = "bearer",
+                    Name = "JWT Authentication",
                     In = ParameterLocation.Header,
-                    BearerFormat = "Json Web Token"
+                    BearerFormat = "Json Web Token",
+                    Description = "Put **_ONLY_** your JWT Bearer token on textbox below!",
+                    Reference = new OpenApiReference
+                    {
+                        Id = JwtBearerDefaults.AuthenticationScheme,
+                        Type = ReferenceType.SecurityScheme
+                    }
                 }
             };
             document.Components ??= new OpenApiComponents();
@@ -29,10 +36,11 @@ public sealed class BearerSecuritySchemeTransformer(IAuthenticationSchemeProvide
 
         document.Info = new()
         {
-            Title = "Cable API",
+            Title = "Cable API Management",
             Version = "v1",
             Description = "This document describes the REST APIs used for Cable application",
         };
+        
         foreach (var operation in document.Paths.Values.SelectMany(path => path.Operations))
         {
             operation.Value.Security.Add(new OpenApiSecurityRequirement

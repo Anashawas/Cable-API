@@ -28,6 +28,11 @@ public partial class ApplicationDbContext(
 
     #region Properties
 
+    public  DbSet<SystemVersion> SystemVersions { get; set; }
+    public DbSet<Car> Cars { get; set; }
+    public DbSet<UserCar> UserCars { get; set; }
+    public DbSet<CarType> CarTypes { get; set; }
+    public DbSet<CarModel> CarModels { get; set; }
     public DbSet<Banner> Banners { get; set; }
     public DbSet<BannerDuration> BannerDurations { get; set; }
     public DbSet<BannerAttachment> BannerAttachments { get; set; }
@@ -43,6 +48,7 @@ public partial class ApplicationDbContext(
     public DbSet<Status> Statuses { get; set; }
     public DbSet<UserAccount> UserAccounts { get; set; }
     public DbSet<UserComplaint> UserComplaints { get; set; }
+    public DbSet<NotificationToken> NotificationTokens { get; set; }
 
     #endregion
 

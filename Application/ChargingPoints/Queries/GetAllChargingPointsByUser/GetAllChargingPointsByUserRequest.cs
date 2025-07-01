@@ -34,15 +34,11 @@ public class GetAllChargingPointsByUserRequestHandler(
                 chargingPoint.ToTime,
                 chargingPoint.Latitude,
                 chargingPoint.Longitude,
-                chargingPoint.StatusId,
-                chargingPoint.ChargerPointTypeId,
-                new PlugTypeSummary(plugType.Id, plugType.Name, plugType.SerialNumber)
+                chargingPoint.ChargerPointTypeId
             );
 
         if (!string.IsNullOrEmpty(request.CityName))
             query = query.Where(x => x.CityName.Contains(request.CityName));
-        if (request.PlugTypeId.HasValue)
-            query = query.Where(x => x.PlugType.Id == request.PlugTypeId);
         if (request.ChargerPointTypeId.HasValue)
             query = query.Where(x => x.ChargerPointTypeId == request.ChargerPointTypeId);
 

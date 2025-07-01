@@ -117,4 +117,22 @@
   <data name="CheckBannerIsExist" xml:space="preserve">
     <value>Banner is not exist in database </value>
   </data>
+  <data name="InvaildGoogleToken" xml:space="preserve">
+    <value>Invalid google token</value>
+  </data>
+  <data name="CarTypeMustExist" xml:space="preserve">
+    <value>The select car type doesnot exist </value>
+  </data>
+  <data name="CarModelMustExist" xml:space="preserve">
+    <value>The selected car model doesnot exsit </value>
+  </data>
+  <data name="UserMustExist" xml:space="preserve">
+    <value>The selected user is not exsit</value>
+  </data>
+  <data name="CarMustExist" xml:space="preserve">
+    <value>The selected car doesnot exsit</value>
+  </data>
+  <data name="PlugTypeMustExist" xml:space="preserve">
+    <value>The selected plug type does not exist</value>
+  </data>
 </root>

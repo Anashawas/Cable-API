@@ -5,11 +5,14 @@ using Application.Users.Commands.ChangePassword;
 using Application.Users.Commands.DeleteUser;
 using Application.Users.Commands.UpdateUser;
 using Application.Users.Queries.GetAllUsers;
+using Application.Users.Queries.GetUserById;
 using Cable.Requests.Identity;
 using Cable.Requests.Users;
 using Cable.Responses.Identity;
+using Google.Apis.Auth;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Identity.Client.Internal;
 
 namespace Cable.Routes;
 
@@ -29,6 +32,7 @@ public static class UserRoutes
     {
         app.MapGet("/GetAllUsers", async (IMediator mediator, CancellationToken cancellation) =>
                 Results.Ok(await mediator.Send(new GetAllUsersRequest(), cancellation)))
+            .RequireAuthorization()
             .Produces<List<GetAllUsersDto>>()
             .ProducesUnAuthorized()
             .ProducesForbidden()
@@ -37,10 +41,22 @@ public static class UserRoutes
             .WithSummary("Lists all users")
             .WithOpenApi();
 
+        app.MapGet("/GetUserById/{id:int}",
+            async ([FromRoute] int id, IMediator mediator, CancellationToken cancellationToken)
+                => Results.Ok(await mediator.Send(new GetUserByIdRequest(id), cancellationToken)))
+            .RequireAuthorization()
+            .Produces<GetUserByIdDto>()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Get User ById")
+            .WithSummary("Get User ById")
+            .WithOpenApi();
+            ; 
+
         app.MapPost("/AddUser", async (IMediator mediator, AddUserCommand request, CancellationToken cancellation) =>
                 Results.Ok(await mediator.Send(request, cancellation)))
             .Produces<int>()
-            .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesForbidden()
             .ProducesInternalServerError()
@@ -52,13 +68,15 @@ public static class UserRoutes
                 op.Responses["200"].Description = "The id of the user";
                 return op;
             });
+   
+   
 
         app.MapPut("/{id}",
                 async (IMediator mediator, [FromRoute] int id, UpdateUserRequest request,
                         CancellationToken cancellation) =>
                     await mediator.Send(new
                         UpdateUserCommand(id, request.Name, request.UserName,
-                            request.RoleId, request.Phone, request.Email,request.IsActive), cancellation))
+                            request.RoleId, request.Phone, request.Email,request.IsActive,request.Country, request.City), cancellation))
             .Produces(200)
             .RequireAuthorization()
             .ProducesUnAuthorized()
@@ -139,7 +157,7 @@ public static class UserRoutes
     {
         app.MapPost("/authenticate", async (LoginRequest request, IAuthenticationService authenticationService,
                     CancellationToken cancellationToken)
-                => Results.Ok(await authenticationService.Login(request.Username, request.Password, cancellationToken))
+                => Results.Ok(await authenticationService.Login(request.Email, request.Password, cancellationToken))
             )
             .AddEndpointFilter<LoginRequestValidationFilter>()
             .ProducesInternalServerError()
@@ -151,9 +169,24 @@ public static class UserRoutes
                 op.RequestBody.Required = true;
                 return op;
             });
-        ;
+        
 
-        //todo: rename
+             
+        app.MapPost("/login-by-google", async ( IAuthenticationService authenticationService,FirebaseLoginDetails firebaseLoginDetails, CancellationToken cancellationToken) =>
+                Results.Ok(await authenticationService.LoginFirebaseAsync(firebaseLoginDetails, cancellationToken)))
+            .Produces<UserLoginResult>()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Login by google token ")
+            .WithSummary("Login by google token for user")
+            .WithOpenApi(op =>
+            {
+                op.RequestBody.Required = true;
+                return op;
+            });
+        
+        
         app.MapPost("/login-by-token", async (ICurrentUserService currentUserService,
                     IAuthenticationService authenticationService, CancellationToken cancellationToken)
                 => Results.Ok(await authenticationService.LoginByToken(currentUserService.Token, cancellationToken))

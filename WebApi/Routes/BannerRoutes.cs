@@ -49,6 +49,7 @@ public static class BannerRoutes
                 op.Responses["200"].Description = "The id of the banner";
                 return op;
             });
+
         app.MapPut("/UpdateBanner/{id:int}",
                 async (IMediator mediator, UpdateBannerRequest request, CancellationToken cancellationToken, int id) =>
                     await mediator.Send(
@@ -67,7 +68,7 @@ public static class BannerRoutes
                 op.Responses["200"].Description = "The id of the banner";
                 return op;
             });
-        
+
         app.MapDelete("/DeleteBanner/{id:int}",
                 async (IMediator mediator, int id, CancellationToken cancellationToken) =>
                     await mediator.Send(new DeleteBannerCommand(id), cancellationToken))

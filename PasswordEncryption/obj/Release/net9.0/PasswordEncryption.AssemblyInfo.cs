@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PasswordEncryption")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+56c22aa967dc8932de042040c7a7bcf783f61349")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+66cbdfb3aaaf79a70e3eb42cda705b06324739e3")]
 [assembly: System.Reflection.AssemblyProductAttribute("PasswordEncryption")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PasswordEncryption")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

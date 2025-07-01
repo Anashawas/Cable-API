@@ -1,6 +1,8 @@
 ﻿using Application.Common.Enums;
 using Application.Common.Extensions;
+using Cable.Core.Exceptions;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
 
 namespace Application.ChargingPointAttachments.Command;
 
@@ -12,12 +14,17 @@ public class AddChargingPointAttachmentCommandHandler(
 {
     public async Task<int[]> Handle(AddChargingPointAttachmentCommand request, CancellationToken cancellationToken)
     {
+        var chargingPoint =
+            await applicationDbContext.ChargingPoints.FirstOrDefaultAsync(x => x.Id == request.Id, cancellationToken) ??
+            throw new NotFoundException(nameof(ChargingPoint), request.Id);
+
         List<ChargingPointAttachment> chargingPointAttachments = [];
         foreach (var file in request.Files)
         {
             var chargingPointAttachment = new ChargingPointAttachment
             {
-                FileName = await uploadFileService.SaveFileAsync(file, UploadFileFolders.CableAttachments, cancellationToken),
+                FileName = await uploadFileService.SaveFileAsync(file, UploadFileFolders.CableAttachments,
+                    cancellationToken),
                 FileExtension = file.GetFileExtension(),
                 FileSize = file.Length,
                 ChargingPointId = request.Id,

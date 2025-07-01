@@ -5,36 +5,39 @@ namespace Application.Common.Interfaces;
 
 public interface IApplicationDbContext
 {
-   
-     
-     DbSet<Banner> Banners { get; set; }
-     DbSet<BannerDuration> BannerDurations { get; set; }
-     DbSet<BannerAttachment> BannerAttachments { get; set; }
-     
-     DbSet<ChargingPointAttachment> ChargingPointAttachments { get; set; }
+    DbSet<Car> Cars { get; set; }
+    DbSet<NotificationToken> NotificationTokens { get; set; }
+    DbSet<UserCar> UserCars { get; set; }
+    DbSet<CarType> CarTypes { get; set; }
+    DbSet<CarModel> CarModels { get; set; }
+    DbSet<Banner> Banners { get; set; }
+    DbSet<BannerDuration> BannerDurations { get; set; }
+    DbSet<BannerAttachment> BannerAttachments { get; set; }
 
-     DbSet<ChargingPlug> ChargingPlugs { get; set; }
+    DbSet<SystemVersion> SystemVersions { get; set; }
+    DbSet<ChargingPointAttachment> ChargingPointAttachments { get; set; }
 
-     DbSet<ChargingPoint> ChargingPoints { get; set; }
+    DbSet<ChargingPlug> ChargingPlugs { get; set; }
 
-     DbSet<ChargingPointType> ChargingPointTypes { get; set; }
+    DbSet<ChargingPoint> ChargingPoints { get; set; }
 
-     DbSet<PlugType> PlugTypes { get; set; }
+    DbSet<ChargingPointType> ChargingPointTypes { get; set; }
 
-     DbSet<Privilege> Privilages { get; set; }
+    DbSet<PlugType> PlugTypes { get; set; }
 
-     DbSet<Rate> Rates { get; set; }
+    DbSet<Privilege> Privilages { get; set; }
 
-     DbSet<Role> Roles { get; set; }
+    DbSet<Rate> Rates { get; set; }
 
-     DbSet<RolePrivlage> RolePrivlages { get; set; }
+    DbSet<Role> Roles { get; set; }
 
-     DbSet<Status> Statuses { get; set; }
+    DbSet<RolePrivlage> RolePrivlages { get; set; }
 
-     DbSet<UserAccount> UserAccounts { get; set; }
+    DbSet<Status> Statuses { get; set; }
 
-     DbSet<UserComplaint> UserComplaints { get; set; }
-     
-     Task<int> SaveChanges(CancellationToken cancellationToken=default);
+    DbSet<UserAccount> UserAccounts { get; set; }
 
+    DbSet<UserComplaint> UserComplaints { get; set; }
+
+    Task<int> SaveChanges(CancellationToken cancellationToken = default);
 }

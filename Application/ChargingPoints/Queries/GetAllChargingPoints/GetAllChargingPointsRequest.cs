@@ -3,7 +3,7 @@
 namespace Application.ChargingPoints.Queries.GetAllChargingPoints;
 
 public record GetAllChargingPointsRequest(
-    int? ChargerPointTypeId, string? CityName, int? PlugTypeId
+    int? ChargerPointTypeId, string? CityName
     ) : IRequest<List<GetAllChargingPointsDto>>;
 
 public class GetAllChargingPointsRequestHandler(IApplicationDbContext applicationDbContext, IMapper mapper)
@@ -16,9 +16,6 @@ public class GetAllChargingPointsRequestHandler(IApplicationDbContext applicatio
             join chargingPlug in applicationDbContext.ChargingPlugs.AsNoTracking() on chargingPoint.Id equals
                 chargingPlug.ChargingPointId into chargingPlugGroup
             from chargingPlug in chargingPlugGroup.DefaultIfEmpty()
-            join plugType in applicationDbContext.PlugTypes.AsNoTracking() on chargingPlug.PlugTypeId equals
-                plugType.Id into plugTypeGroup
-            from plugType in plugTypeGroup.DefaultIfEmpty()
             where !chargingPoint.IsDeleted 
             select new GetAllChargingPointsDto(
                 chargingPoint.Id,
@@ -29,15 +26,12 @@ public class GetAllChargingPointsRequestHandler(IApplicationDbContext applicatio
                 chargingPoint.ToTime,
                 chargingPoint.Latitude,
                 chargingPoint.Longitude,
-                chargingPoint.StatusId,
-                chargingPoint.ChargerPointTypeId,
-                new PlugTypeSummary(plugType.Id, plugType.Name, plugType.SerialNumber)
+                chargingPoint.ChargerPointTypeId
+               
             );
 
         if (!string.IsNullOrEmpty(request.CityName))
             query = query.Where(x => x.CityName != null && x.CityName.Contains(request.CityName));
-        if (request.PlugTypeId.HasValue)
-            query = query.Where(x => x.PlugType.Id == request.PlugTypeId);
         if (request.ChargerPointTypeId.HasValue)
             query = query.Where(x => x.ChargerPointTypeId == request.ChargerPointTypeId);
 

@@ -117,4 +117,22 @@
   <data name="CheckBannerIsExist" xml:space="preserve">
     <value>المعلن غير موجود في الداتا بيس </value>
   </data>
+  <data name="InvaildGoogleToken" xml:space="preserve">
+    <value> google token غير موجود </value>
+  </data>
+  <data name="CarTypeMustExist" xml:space="preserve">
+    <value>نوع السيارة المختارة  غير موجود</value>
+  </data>
+  <data name="CarModelMustExist" xml:space="preserve">
+    <value>مودل السيارة المختارة  غير موجود</value>
+  </data>
+  <data name="UserMustExist" xml:space="preserve">
+    <value>المستخدم المختار غير موجود</value>
+  </data>
+  <data name="CarMustExist" xml:space="preserve">
+    <value>السيارة المختارة غير موجودة</value>
+  </data>
+  <data name="PlugTypeMustExist" xml:space="preserve">
+    <value>نوع الشاحن المختار غير موجود</value>
+  </data>
 </root>

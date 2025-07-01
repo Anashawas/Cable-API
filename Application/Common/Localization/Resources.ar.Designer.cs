@@ -60,6 +60,33 @@ namespace Application.Common.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to مودل السيارة المختارة  غير موجود.
+        /// </summary>
+        public static string CarModelMustExist {
+            get {
+                return ResourceManager.GetString("CarModelMustExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to السيارة المختارة غير موجودة.
+        /// </summary>
+        public static string CarMustExist {
+            get {
+                return ResourceManager.GetString("CarMustExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to نوع السيارة المختارة  غير موجود.
+        /// </summary>
+        public static string CarTypeMustExist {
+            get {
+                return ResourceManager.GetString("CarTypeMustExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to لا يسمح بتغيير كلمة السر.
         /// </summary>
         public static string ChangePasswordNotAllowed {
@@ -155,6 +182,15 @@ namespace Application.Common.Localization {
         public static string IdentifierDoesntExist {
             get {
                 return ResourceManager.GetString("IdentifierDoesntExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to  google token غير موجود .
+        /// </summary>
+        public static string InvaildGoogleToken {
+            get {
+                return ResourceManager.GetString("InvaildGoogleToken", resourceCulture);
             }
         }
         
@@ -294,6 +330,15 @@ namespace Application.Common.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to نوع الشاحن المختار غير موجود.
+        /// </summary>
+        public static string PlugTypeMustExist {
+            get {
+                return ResourceManager.GetString("PlugTypeMustExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to الصلاحية مرتبطة بمستخدمين.
         /// </summary>
         public static string RoleIsLinkedToUsers {
@@ -344,6 +389,15 @@ namespace Application.Common.Localization {
         public static string UserBannerAlreadyExist {
             get {
                 return ResourceManager.GetString("UserBannerAlreadyExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to المستخدم المختار غير موجود.
+        /// </summary>
+        public static string UserMustExist {
+            get {
+                return ResourceManager.GetString("UserMustExist", resourceCulture);
             }
         }
         

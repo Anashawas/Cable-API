@@ -9,7 +9,7 @@ public class RateRepository(ApplicationDbContext applicationDbContext) : IRateRe
     public async Task<double> CalculateChargePointAverageRate(int chargingPointId, int chargingPointRate,
         CancellationToken cancellationToken = default)
     {
-        var query = @"
+        const string query = @"
     SELECT COALESCE(SUM(ChargingPointRate), 0) AS TotalRate, 
            COUNT(*) AS TotalCount
     FROM Rates
@@ -51,7 +51,5 @@ public class RateRepository(ApplicationDbContext applicationDbContext) : IRateRe
             .AsNoTracking()
             .Select(x => x.AVGChargingPointRate)
             .FirstOrDefaultAsync(cancellationToken);
-       
-
     
 }

@@ -7,7 +7,10 @@ public record AddUserCommand(
     string Phone,
     int RoleId,
     string? Password,
-    string? Username
+    string? Username,
+    string ? Email,
+    string ? Country, 
+    string ? City 
 )
     : IRequest<int>;
 
@@ -21,10 +24,12 @@ public class AddUserCommandHandler(IApplicationDbContext applicationDbContext, I
             Name = request.Name,
             Phone = request.Phone,
             RoleId = request.RoleId,
-            UserName = request.Username,
             Password = string.IsNullOrEmpty(request.Password) ? null : passwordHasher.HashPassword(request.Password),
             IsDeleted = false,
-            IsActive = true
+            IsActive = true,
+            Email = request.Email,
+            Country = request.Country,
+            City = request.City
         };
 
         applicationDbContext.UserAccounts.Add(user);

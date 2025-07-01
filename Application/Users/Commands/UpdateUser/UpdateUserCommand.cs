@@ -9,8 +9,11 @@ public record UpdateUserCommand(
     string UserName,
     int RoleId,
     string Phone,
-    string? Email,
-    bool IsActive) : IRequest;
+    string Email,
+    bool IsActive,
+    string? Country,
+    string? City
+    ) : IRequest;
 
 public class UpdateUserCommandHandler(IApplicationDbContext applicationDbContext) : IRequestHandler<UpdateUserCommand>
 {
@@ -20,10 +23,12 @@ public class UpdateUserCommandHandler(IApplicationDbContext applicationDbContext
             cancellationToken) ?? throw new NotFoundException($"cannot find user with id: {request.Id}");
 
         user.Name = request.Name;
-        user.UserName = request.UserName;
         user.RoleId = request.RoleId;
         user.IsActive = request.IsActive;
         user.Phone = request.Phone;
+        user.Email = request.Email;
+        user.Country = request.Country;
+        user.City = request.City;
 
         await applicationDbContext.SaveChanges(cancellationToken);
     }

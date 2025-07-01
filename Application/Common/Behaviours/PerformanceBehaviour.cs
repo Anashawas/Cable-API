@@ -34,7 +34,7 @@ public class PerformanceBehaviour<TRequest, TResponse>(
 
             if (userId.HasValue)
             {
-                userName = await identityService.GetUserName(userId.Value, cancellationToken);
+                userName = await identityService.GetName(userId.Value, cancellationToken);
             }
 
             logger.LogWarning("Cable Long Running Request: {Name} ({ElapsedMilliseconds} milliseconds) {@UserId} {@UserName} {@Request}",

@@ -24,10 +24,10 @@ public class IdentityService : IIdentityService
             ).AsNoTracking().ToListAsync(cancellationToken);
 
 
-    public async Task<string> GetUserName(int userId, CancellationToken cancellationToken = default)
-        => (await _applicationDbContext.UserAccounts.AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken))
-            ?.UserName;
+    // public async Task<string> GetUserName(int userId, CancellationToken cancellationToken = default)
+    //     => (await _applicationDbContext.UserAccounts.AsNoTracking()
+    //             .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken))
+    //         ?.Name!;
 
     public async Task<bool> HasPrivilege(int userId, string privilegeKey, CancellationToken cancellationToken = default)
         => await (from u in _applicationDbContext.UserAccounts
@@ -46,5 +46,5 @@ public class IdentityService : IIdentityService
         => (await _applicationDbContext.UserAccounts
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.Id == userId, cancellationToken))
-            ?.Name;
+            ?.Name!;
 }

@@ -18,7 +18,10 @@ public partial class UserAccountConfiguration : IEntityTypeConfiguration<UserAcc
         entity.Property(e => e.Password).HasMaxLength(255);
         entity.Property(e => e.Phone).HasMaxLength(50);
         entity.Property(e => e.RoleId).HasColumnName("RoleID");
-        entity.Property(e => e.UserName).HasMaxLength(50);
+        entity.Property(e => e.City).HasMaxLength(50);
+        entity.Property(e => e.Country).HasMaxLength(50);
+        entity.Property(e => e.FirebaseUId).HasMaxLength(255);
+        entity.Property(e => e.RegistrationProvider).HasMaxLength(255);
 
         entity.Property(e=>e.Email).HasMaxLength(255);
         entity.HasOne(d => d.Role).WithMany(p => p.UserAccounts)
