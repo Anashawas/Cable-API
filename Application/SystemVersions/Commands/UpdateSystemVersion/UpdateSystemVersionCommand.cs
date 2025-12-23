@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Application.SystemVersions.Commands.AddSystemVersionUpdate;
 
-public record UpdateSystemVersionCommand(int Id, string Platform, string Version, string UpdateForce) : IRequest;
+public record UpdateSystemVersionCommand(int Id, string Platform, string Version, bool UpdateForce) : IRequest;
 
 public class UpdateSystemVersionCommandHandler(IApplicationDbContext applicationDbContext)
     : IRequestHandler<UpdateSystemVersionCommand>

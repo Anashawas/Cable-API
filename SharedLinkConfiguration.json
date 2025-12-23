@@ -1,0 +1,32 @@
+{
+  "SharedLink": {
+    "PagePath": "D:\\SharedLink\\index.html",
+    "AndroidPackage": "com.cable.projectx",
+    "IosAppId": "6480162073", 
+    "WebFallbackUrl": "https://yourdomain.com/web"
+  }
+}
+
+// Add this to your appsettings.json, appsettings.Development.json, and appsettings.Production.json files
+
+// Example complete configuration:
+{
+  "ConnectionStrings": {
+    "Cable": "your-connection-string"
+  },
+  "File": {
+    "FileUploadPath": "C:\\uploads"
+  },
+  "SharedLink": {
+    "PagePath": "D:\\SharedLink\\index.html",
+    "AndroidPackage": "com.cable.projectx", 
+    "IosAppId": "6480162073",
+    "WebFallbackUrl": "https://yourdomain.com/web"
+  },
+  "Database": {
+    "DefaultSchema": "dbo",
+    "CommandTimeOutInSeconds": 30,
+    "EnableDetailedErrors": false,
+    "EnableSensitiveDataLogging": false
+  }
+}

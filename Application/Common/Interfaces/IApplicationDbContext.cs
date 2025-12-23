@@ -5,7 +5,6 @@ namespace Application.Common.Interfaces;
 
 public interface IApplicationDbContext
 {
-    DbSet<Car> Cars { get; set; }
     DbSet<NotificationToken> NotificationTokens { get; set; }
     DbSet<UserCar> UserCars { get; set; }
     DbSet<CarType> CarTypes { get; set; }
@@ -35,9 +34,16 @@ public interface IApplicationDbContext
 
     DbSet<Status> Statuses { get; set; }
 
+    DbSet<StationType> StationTypes { get; set; }
+
     DbSet<UserAccount> UserAccounts { get; set; }
 
     DbSet<UserComplaint> UserComplaints { get; set; }
+    DbSet<SharedLink> SharedLinks { get; set; }
+    DbSet<SharedLinkType> SharedLinkTypes { get; set; }
 
+    DbSet<SharedLinkUsage> SharedLinkUsages  { get; set; }
+    DbSet<OtpRateLimit> OtpRateLimits { get; set; }
+    DbSet<PhoneVerification> PhoneVerifications { get; set; }
     Task<int> SaveChanges(CancellationToken cancellationToken = default);
 }

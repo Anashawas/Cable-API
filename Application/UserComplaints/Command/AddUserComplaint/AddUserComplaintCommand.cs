@@ -12,12 +12,12 @@ public class AddUserComplaintCommandHandler(IApplicationDbContext applicationDbC
     public async Task<int> Handle(AddUserComplaintCommand request, CancellationToken cancellationToken)
     {
         
-        var user = await applicationDbContext.UserComplaints.FirstOrDefaultAsync(x=>x.UserId ==currentUserService.UserId,cancellationToken)
+        var user = await applicationDbContext.UserAccounts.FirstOrDefaultAsync(x=>x.Id ==currentUserService.UserId,cancellationToken)
             ?? throw new NotFoundException($"can not find user with id {currentUserService.UserId}");
         
         var userComplaint = new UserComplaint
         {
-            UserId = user.UserId,
+            UserId = user.Id,
             Note = request.Note,
             ChargingPointId = request.ChargingPointId
         };

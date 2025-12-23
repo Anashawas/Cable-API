@@ -1,8 +1,4 @@
-﻿using Application.CarsManagement.Cars.Commands.AddCar;
-using Application.CarsManagement.Cars.Commands.DeleteCar;
-using Application.CarsManagement.Cars.Commands.UpdateCar;
-using Application.CarsManagement.Cars.Queries.GetAllCars;
-using Application.CarsManagement.CarsModels.Commands.AddCarModal;
+﻿using Application.CarsManagement.CarsModels.Commands.AddCarModal;
 using Application.CarsManagement.CarsModels.Commands.DeleteCarModel;
 using Application.CarsManagement.CarsModels.Commands.UpdateCarModel;
 using Application.CarsManagement.CarsModels.Queries.GetAllCarsModels;
@@ -13,7 +9,8 @@ using Application.CarsManagement.CarsTypes.Queries.GetAllCarsTypes;
 using Application.CarsManagement.UserCars.Commands.AddUserCar;
 using Application.CarsManagement.UserCars.Commands.DeleteUserCar;
 using Application.CarsManagement.UserCars.Commands.UpdateUserCar;
-using Application.CarsManagement.UserCars.Queries.GetAllUserUserCars;
+using Application.CarsManagement.UserCars.Queries.GetAllUserCars;
+
 using Cable.Requests.CarsManagement;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -28,7 +25,6 @@ public static class CarManagementRoutes
             .WithTags("Car Management")
             .MapCarTypesRoutes()
             .MapCarModelsRoutes()
-            .MapCarsRoutes()
             .MapUserCarsRoutes()
             ;
         return app;
@@ -40,9 +36,6 @@ public static class CarManagementRoutes
                 async ( IMediator mediator, CancellationToken cancellation) =>
                     Results.Ok(await mediator.Send(new GetAllUserCarsRequest (), cancellation)))
             .Produces<List<GetAllUserCarsDto>>()
-            .RequireAuthorization()
-            .ProducesUnAuthorized()
-            .ProducesForbidden()
             .ProducesInternalServerError()
             .WithName("Get all user cars")
             .WithSummary(" Get all  user cars")
@@ -107,9 +100,6 @@ public static class CarManagementRoutes
                 async (IMediator mediator, CancellationToken cancellation) =>
                     Results.Ok(await mediator.Send(new GetAllCarsModelsRequest(), cancellation)))
             .Produces<List<GetAllCarsModelsDto>>()
-            .RequireAuthorization()
-            .ProducesUnAuthorized()
-            .ProducesForbidden()
             .ProducesInternalServerError()
             .WithName("Get all  car models ")
             .WithSummary(" Get all car models")
@@ -175,9 +165,6 @@ public static class CarManagementRoutes
                 async (IMediator mediator, CancellationToken cancellation) =>
                     Results.Ok(await mediator.Send(new GetAllCarsTypesRequest(), cancellation)))
             .Produces<List<GetAllCarsTypesDto>>()
-            .RequireAuthorization()
-            .ProducesUnAuthorized()
-            .ProducesForbidden()
             .ProducesInternalServerError()
             .WithName("Get all car types ")
             .WithSummary(" Get all  car types ")
@@ -238,71 +225,5 @@ public static class CarManagementRoutes
         return app;
     }
 
-    private static RouteGroupBuilder MapCarsRoutes(this RouteGroupBuilder app)
-    {
-        app.MapGet("/GetAllCars",
-                async (IMediator mediator, CancellationToken cancellation) =>
-                    Results.Ok(await mediator.Send(new GetAllCarsRequest(), cancellation)))
-            .Produces<List<GetAllCarsDto>>()
-            .RequireAuthorization()
-            .ProducesUnAuthorized()
-            .ProducesForbidden()
-            .ProducesInternalServerError()
-            .WithName("Get all cars ")
-            .WithSummary("Get all cars")
-            .WithOpenApi();
 
-
-        app.MapPost("/AddCar",
-                async (IMediator mediator, AddCarCommand request, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(request, cancellationToken)))
-            .Produces<int>()
-            .RequireAuthorization()
-            .ProducesUnAuthorized()
-            .ProducesForbidden()
-            .ProducesInternalServerError()
-            .WithName("Add car ")
-            .WithSummary("Add car ")
-            .WithOpenApi(op =>
-            {
-                op.RequestBody.Required = true;
-                op.Responses["200"].Description = "The id of the car";
-                return op;
-            });
-        app.MapDelete("/DeleteCar/{id}",
-                async (IMediator mediator, [FromRoute] int id, CancellationToken cancellationToken) =>
-                await mediator.Send(new DeleteCarCommand(id), cancellationToken))
-            .Produces(200)
-            .RequireAuthorization()
-            .ProducesUnAuthorized()
-            .ProducesForbidden()
-            .ProducesNotFound()
-            .ProducesInternalServerError()
-            .WithName("Delete car ")
-            .WithSummary("Delete car")
-            .WithOpenApi();
-
-        app.MapPut("/UpdateCar/{id:int}",
-                async ([FromRoute] int id, IMediator mediator, UpdateCarRequest request,
-                        CancellationToken cancellationToken) =>
-                    await mediator.Send(
-                        new UpdateCarCommand(id, request.CarModelId), cancellationToken))
-            .Produces(200)
-            .RequireAuthorization()
-            .ProducesUnAuthorized()
-            .ProducesForbidden()
-            .ProducesNotFound()
-            .ProducesInternalServerError()
-            .WithName("Update car ")
-            .WithSummary("Update car by id")
-            .WithOpenApi(op =>
-            {
-                op.Parameters[0].Required = true;
-                op.Parameters[0].Description = "The id of the car";
-                op.RequestBody.Required = true;
-                return op;
-            });
-
-        return app;
-    }
 }

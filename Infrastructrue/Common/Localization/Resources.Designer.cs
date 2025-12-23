@@ -132,6 +132,15 @@ namespace Infrastructrue.Common.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Your Cable verification code is: {0}. This code expires in {1} minutes.
+        /// </summary>
+        internal static string OtpMessage {
+            get {
+                return ResourceManager.GetString("OtpMessage", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Failed To Retrieve Address Details From PACI.
         /// </summary>
         internal static string PaciDataRetrievalFailure {

@@ -14,7 +14,7 @@ public partial class ChargingPointAttachment :BaseAuditableEntity
     
     public string FileExtension { get; set; } = null!;
     
-    public string FileName { get; set; } = null!;
+    public string FileName { get; set; } = null!; 
 
     public string ContentType { get; set; } = null!;
     public virtual ChargingPoint ChargingPoint { get; set; } = null!;

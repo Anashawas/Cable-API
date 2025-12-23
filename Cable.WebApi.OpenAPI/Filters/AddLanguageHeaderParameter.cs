@@ -18,7 +18,7 @@ public class AddAcceptLanguageHeaderParameter : IOpenApiOperationTransformer
             Schema = new OpenApiSchema
             {
                 Type = "string",
-                Default = new OpenApiString("en")
+                Default = new OpenApiString("ar")
             },
             Description = "Language preference for the response"
         });

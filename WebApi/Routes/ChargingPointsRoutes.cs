@@ -4,11 +4,13 @@ using Application.ChargingPoints.Commands.UpdateChangingPointStatus;
 using Application.ChargingPoints.Commands.UpdateChargingPoint;
 using Application.ChargingPoints.Commands.UpdateChargingPointLocation;
 using Application.ChargingPoints.Commands.UpdateChargingPointVisitorsCount;
+using Application.ChargingPoints.Commands.UploadChargingPointIcon;
 using Application.ChargingPoints.Queries;
 using Application.ChargingPoints.Queries.GetAllChargingPoints;
 using Application.ChargingPoints.Queries.GetAllChargingPointsByUser;
 using Application.ChargingPoints.Queries.GetChargingPointById;
 using Cable.Requests.ChargingPoints;
+using Hangfire;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -31,33 +33,38 @@ public static class ChargingPointsRoutes
                 async (GetAllChargingPointsRequest request, IMediator mediator, CancellationToken cancellation) =>
                     Results.Ok(await mediator.Send(request, cancellation)))
             .Produces<List<GetAllChargingPointsDto>>()
-            .RequireAuthorization()
-            .ProducesUnAuthorized()
-            .ProducesForbidden()
             .ProducesInternalServerError()
             .WithName("Get all charging points")
             .WithSummary(" Get all charging points of the application")
             .WithOpenApi();
-        
+
         app.MapPost("GetAllChargingPointByUserId",
-                async (IMediator mediator,GetAllChargingPointsByUserRequest request, CancellationToken cancellationToken) =>
+                async (IMediator mediator, GetAllChargingPointsByUserRequest request,
+                        CancellationToken cancellationToken) =>
                     Results.Ok(await mediator.Send(request, cancellationToken)))
             .Produces<List<GetAllChargingPointsDto>>()
-            .RequireAuthorization()
-            .ProducesUnAuthorized()
-            .ProducesForbidden()
             .ProducesInternalServerError()
             .WithName("Get all charging points by user id")
             .WithSummary("Get all charging points by user id of the application")
             .WithOpenApi();
+        
+        
+        app.MapPost("UploadChargingPoint/{id:int}",
+                async (IMediator mediator,[FromForm] IFormFile file,[FromRoute] int id,
+                        CancellationToken cancellationToken) =>
+                    await mediator.Send(new UploadChargingPointIconCommand(file,id) ,cancellationToken))
+            .Produces(200)
+            .ProducesInternalServerError()
+            .WithName("Upload charging point icon")
+            .WithSummary("Upload charging point icon")
+            .WithOpenApi()
+            .DisableAntiforgery();
 
-        app.MapGet("/GetChargingPointById/{id}",
+
+        app.MapGet("/GetChargingPointById/{id:int}",
                 async (IMediator mediator, [FromRoute] int id, CancellationToken cancellationToken) =>
                 Results.Ok(await mediator.Send(new GetChargingPointByIdRequest(id), cancellationToken)))
             .Produces<GetChargingPointByIdDto>()
-            .RequireAuthorization()
-            .ProducesUnAuthorized()
-            .ProducesForbidden()
             .ProducesNotFound()
             .ProducesInternalServerError()
             .WithName("Get charging point by id")
@@ -65,23 +72,24 @@ public static class ChargingPointsRoutes
             .WithOpenApi();
 
         app.MapPost("/AddChargingPoint",
-                async (IMediator mediator, AddChargingPointCommand request, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(request, cancellationToken)))
+                async (IMediator mediator,
+                        AddChargingPointCommand request,
+                        CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(
+                        request,
+                        cancellationToken)))
             .Produces<int>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesForbidden()
             .ProducesInternalServerError()
+            .DisableAntiforgery()
             .WithName("Add charging point")
             .WithSummary("Add charging point of the application")
-            .WithOpenApi(op =>
-            {
-                op.RequestBody.Required = true;
-                op.Responses["200"].Description = "The id of the charging point";
-                return op;
-            });
+            .WithOpenApi();
 
-        app.MapDelete("/DeleteChargingPoint/{id}",
+
+        app.MapDelete("/DeleteChargingPoint/{id:int}",
                 async (IMediator mediator, [FromRoute] int id, CancellationToken cancellationToken) =>
                 await mediator.Send(new DeleteChargingPointCommand(id), cancellationToken))
             .Produces(200)
@@ -94,14 +102,17 @@ public static class ChargingPointsRoutes
             .WithSummary("Delete charging point of the application")
             .WithOpenApi();
 
-        app.MapPut("/UpdateChargingPoint/{id}",
+        app.MapPut("/UpdateChargingPoint/{id:int}",
                 async (IMediator mediator, [FromRoute] int id, UpdateChargingPointRequest request,
                         CancellationToken cancellationToken) =>
                     await mediator.Send(
                         new UpdateChargingPointCommand(id, request.Name, request.Note, request.CountryName,
                             request.CityName, request.Phone, request.MethodPayment,
                             request.Price, request.FromTime, request.ToTime, request.ChargerSpeed,
-                            request.ChargersCount, request.ChargerPointTypeId), cancellationToken))
+                            request.ChargersCount, request.Latitude, request.Longitude,
+                            request.ChargerPointTypeId, request.StatusId,
+                            request.StationTypeId, request.OwnerPhone,request.IsVerified, request.HasOffer, request.Service, request.OfferDescription,request.Address, request.PlugTypeIds ),
+                        cancellationToken))
             .Produces(200)
             .RequireAuthorization()
             .ProducesUnAuthorized()
@@ -118,7 +129,7 @@ public static class ChargingPointsRoutes
                 return op;
             });
 
-        app.MapPut("UpdateChargingPointLocation/{id}",
+        app.MapPut("UpdateChargingPointLocation/{id:int}",
                 async (IMediator mediator, [FromRoute] int id, UpdateChargingPointLocationRequest request,
                         CancellationToken cancellationToken) =>
                     await mediator.Send(
@@ -140,14 +151,11 @@ public static class ChargingPointsRoutes
                 return op;
             });
 
-        app.MapPatch("UpdateChargingPointVisitorsCount/{id}",
+        app.MapPatch("UpdateChargingPointVisitorsCount/{id:int}",
                 async (IMediator mediator, [FromRoute] int id, CancellationToken cancellationToken) =>
                 await mediator.Send(
                     new UpdateChargingPointVisitorsCountCommand(id), cancellationToken))
             .Produces(200)
-            .RequireAuthorization()
-            .ProducesUnAuthorized()
-            .ProducesForbidden()
             .ProducesNotFound()
             .ProducesInternalServerError()
             .WithName("Update charging point visitors count")
@@ -158,9 +166,10 @@ public static class ChargingPointsRoutes
                 op.Parameters[0].Description = "The id of the charging point";
                 return op;
             });
-        
-        app.MapPatch("UpdateChargingPointStatus/{id}",
-                async (IMediator mediator, [FromRoute] int id, UpdateChargingPointStatusRequest request, CancellationToken cancellationToken) =>
+
+        app.MapPatch("UpdateChargingPointStatus/{id:int}",
+                async (IMediator mediator, [FromRoute] int id, UpdateChargingPointStatusRequest request,
+                        CancellationToken cancellationToken) =>
                     await mediator.Send(new UpdateChargingPointStatusCommand(id, request.StatusId), cancellationToken))
             .Produces(200)
             .RequireAuthorization()

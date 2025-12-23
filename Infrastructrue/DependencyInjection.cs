@@ -16,6 +16,7 @@ using Infrastructrue.Persistence.Interceptors;
 using Infrastructrue.Persistence.Repositories;
 using Infrastructrue.UploadFiles;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
@@ -41,6 +42,8 @@ public static class DependencyInjection
             .RegisterGoogleService(configurations)
             .RegisterFirebaseService(configurations)
             .RegisterHangFire(configurations)
+            .RegisterSharedLink(configurations)
+            .RegisterOtpServices(configurations)
             .RegisterRepositories();
 
         return services;
@@ -66,6 +69,14 @@ public static class DependencyInjection
         
     }
 
+    private static IServiceCollection RegisterSharedLink(this IServiceCollection services,
+        IConfiguration configurations)
+    {
+        var sharedLinkOptionsSection = configurations.GetSection(SharedLinkOptions.ConfigName);
+        services.Configure<SharedLinkOptions>(sharedLinkOptionsSection);
+        
+        return services;
+    }
     private static IServiceCollection RegisterUploadFiles(this IServiceCollection services,
         IConfiguration configurations)
     {
@@ -90,9 +101,25 @@ public static class DependencyInjection
     }
 
 
+    private static IServiceCollection RegisterOtpServices(this IServiceCollection services, IConfiguration configurations)
+    {
+        // Configure OTP options
+        services.Configure<OtpOptions>(configurations.GetSection(OtpOptions.ConfigName));
+        services.Configure<SmsOptions>(configurations.GetSection(SmsOptions.ConfigName));
+        
+        // Register services
+        services.AddScoped<IOtpService, Services.OtpService>();
+        services.AddScoped<ISmsService, Services.SmsService>();
+        
+        return services;
+    }
+
     private static IServiceCollection RegisterRepositories(this IServiceCollection services)
     {
         services.AddScoped<IRateRepository, RateRepository>();
+        services.AddScoped<IUserAccountRepository, UserAccountRepository>();
+        services.AddScoped<IChargingPointRepository, ChargingPointRepository>();
+        services.AddScoped<ISharedLinkRepository, SharedLinkRepository>();
         return services;
     }
 
@@ -158,6 +185,7 @@ public static class DependencyInjection
         });
 
         services.AddScoped<IApplicationDbContext, ApplicationDbContext>();
+        services.AddScoped<IApplicationDbContextProcedures, ApplicationDbContextProcedures>();
         services.AddScoped<SaveChangesInterceptor, AuditableEntitySaveChangesInterceptor>();
 
 

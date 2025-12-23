@@ -1,4 +1,5 @@
-﻿using Application.Common.Enums;
+﻿
+using Cable.Core.Emuns;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -17,13 +18,9 @@ public class GetAllChargingPointAttachmentsByIdQueryHandler(
         var files = await Task.WhenAll(
             applicationDbContext.ChargingPointAttachments
                 .Where(x => x.ChargingPointId == request.Id).AsEnumerable()
-                .Select(async item =>
-                {
-                    // var fileContent = await uploadFileService.GetFileAsync(UploadFileFolders.CableAttachments ,item.FileName, cancellationToken);
-                    return new UploadFile(item.FileName, item.ContentType,
-                        uploadFileService.GetFilePath(UploadFileFolders.CableAttachments,item.FileName),
-                        item.FileExtension, item.FileSize);
-                })
+                .Select(async item => new UploadFile(item.FileName, item.ContentType,
+                    uploadFileService.GetFilePath(UploadFileFolders.CableAttachments,item.FileName),
+                    item.FileExtension, item.FileSize))
         );
 
         return files.ToList();

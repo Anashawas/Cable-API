@@ -1,45 +1,51 @@
-﻿using Application.Common.Enums;
+﻿using Cable.Core.Emuns;
 using Cable.Core.Exceptions;
+using static System.Enum;
 
 namespace Infrastructrue.Utilities;
 
 public static class UploadFilePathHelper
 {
-    public static string SetupFolderPath(string fileUploadPath, UploadFileFolders folder, string userId, string fileName)
+    public static string SetupFolderPath(string fileUploadPath, UploadFileFolders folder, string fileName)
     {
-        CreatePath(fileUploadPath,folder,userId);
-       return folder switch
-        {
-            UploadFileFolders.CableAttachments => Path.Combine( fileUploadPath,UploadFileFolders.CableAttachments.ToString(),userId,fileName),
-            UploadFileFolders.CableBanners =>  Path.Combine( fileUploadPath,UploadFileFolders.CableBanners.ToString(),userId,fileName),
-            _ => throw new NotFoundException(nameof(folder), folder)
-        }; 
-    } 
-    
-   
+        // var isPublicFolder = IsPublicFolder(folder);
 
-    private static void CreatePath(string fileUploadPath, UploadFileFolders folder, string userId)
-    {
-        var existPath = Path.Combine(fileUploadPath, folder.ToString(),userId);
-        if (!Path.Exists(existPath))
-            Directory.CreateDirectory(existPath);
+        var folderName = folder.ToString();
+
+        var fullPath =
+            Path.Combine(fileUploadPath, folderName);
+
+        CreatePath(fullPath);
+
+        return Path.Combine(fullPath, fileName);
     }
 
-    public static string GetFilePath(string serverUrl, UploadFileFolders folder, string userId, string fileName)
+
+    private static void CreatePath(string path)
     {
-        return folder switch
-        {
-            UploadFileFolders.CableAttachments =>
-                $"{serverUrl}/{UploadFileFolders.CableAttachments}/{userId}/{fileName}",
-            UploadFileFolders.CableBanners => $"{serverUrl}/{UploadFileFolders.CableBanners}/{userId}/{fileName}",
-            _ => throw new NotFoundException(nameof(folder), folder)
-        };
+        if (!Directory.Exists(path))
+            Directory.CreateDirectory(path);
+    }
+
+    // public static bool IsPublicFolder(UploadFileFolders folder)
+    // {
+    //     var allowedFolders = GetNames<AllowedUploadFiles>().Select(f => f.ToLower());
+    //     return allowedFolders.Contains(folder.ToString().ToLower());
+    // }
+
+    public static string GetFilePath(string serverUrl, UploadFileFolders folder, string fileName)
+    {
+        // var isPublicFolder = IsPublicFolder(folder);
+        var folderName = folder.ToString();
+
+        return
+            $"{serverUrl}/{folderName}/{fileName}";
     }
 
 
     public static void CheckFileIsExist(string filePath)
     {
-        if (!File.Exists(filePath)) 
+        if (!File.Exists(filePath))
             throw new NotFoundException(nameof(filePath), filePath);
     }
 }

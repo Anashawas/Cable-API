@@ -18,9 +18,6 @@ public static class ChargingPointTypesRoutes
         app.MapGet("/GetAllChargingPointTypes", async (IMediator mediator, CancellationToken cancellation) =>
                 Results.Ok(await mediator.Send(new GetAllChargingPointTypesRequest(), cancellation)))
             .Produces<List<GetAllChargingPointTypesDto>>()
-            .ProducesForbidden()
-            .ProducesUnAuthorized()
-            .RequireAuthorization()
             .ProducesInternalServerError()
             .WithName("Get all charging point types")
             .WithSummary(" Get all charging point types of the application")

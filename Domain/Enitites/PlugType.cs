@@ -10,6 +10,7 @@ public partial class PlugType:BaseAuditableEntity
 {
     public string? Name { get; set; }
     public string SerialNumber { get; set; } = null!;
+    public string PlugTypeFamily { get; set; } =  null!;
     public virtual ICollection<ChargingPlug> ChargingPlugs { get; set; } = new List<ChargingPlug>();
     public virtual ICollection<UserCar> UserCars { get; set; } = new List<UserCar>();
     

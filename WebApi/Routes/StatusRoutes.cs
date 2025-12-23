@@ -21,9 +21,6 @@ public static class StatusRoutes
             .Produces<List<GetAllStatusesDto>>()
             .WithName("Get all statuses")
             .WithSummary(" Get all statuses of the application")
-            .ProducesForbidden()
-            .ProducesUnAuthorized()
-            .RequireAuthorization()
             .ProducesInternalServerError()
             .WithOpenApi();
         return app;

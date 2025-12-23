@@ -13,7 +13,8 @@ public static class DbContextExtensions
     /// <param name="schemaName">The schema name</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns></returns>
-    public static async Task<int> GenerateObjectId(this DbContext context, string tableName, string schemaName, CancellationToken cancellationToken = default)
+    public static async Task<int> GenerateObjectId(this DbContext context, string tableName, string schemaName,
+        CancellationToken cancellationToken = default)
     {
         var parameterReturnValue = new SqlParameter
         {
@@ -25,23 +26,25 @@ public static class DbContextExtensions
 
         var sqlParameters = new[]
         {
-         new SqlParameter()
-         {
-             ParameterName="TableName",
-             SqlDbType=System.Data.SqlDbType.NVarChar,
-             Size=255,
-             Value=tableName,
-         },
+            new SqlParameter()
+            {
+                ParameterName = "TableName",
+                SqlDbType = System.Data.SqlDbType.NVarChar,
+                Size = 255,
+                Value = tableName,
+            },
             parameterReturnValue
         };
 
-        await context.Database.ExecuteSqlRawAsync($"exec [{schemaName}].[OW_spGetNewObjectID] @TableName, @ObjectID OUTPUT"
+        await context.Database.ExecuteSqlRawAsync(
+            $"exec [{schemaName}].[OW_spGetNewObjectID] @TableName, @ObjectID OUTPUT"
             , sqlParameters, cancellationToken);
 
         return Convert.ToInt32(parameterReturnValue?.Value);
     }
 
-    public static async Task<int> GetIdByMaxValue(this DbContext context, string columnName, string tableName, string schemaName, CancellationToken cancellationToken = default)
+    public static async Task<int> GetIdByMaxValue(this DbContext context, string columnName, string tableName,
+        string schemaName, CancellationToken cancellationToken = default)
     {
         var parameterReturnValue = new SqlParameter
         {
@@ -50,11 +53,15 @@ public static class DbContextExtensions
             Direction = System.Data.ParameterDirection.Output
         };
         var sqlParameters = new[]
-       {
-         parameterReturnValue
-     };
-        await context.Database.ExecuteSqlRawAsync($"set @Result=(Select Isnull(max({columnName}),0)+1 from [{schemaName}].[{tableName}])", sqlParameters);
+        {
+            parameterReturnValue
+        };
+        await context.Database.ExecuteSqlRawAsync(
+            $"set @Result=(Select Isnull(max({columnName}),0)+1 from [{schemaName}].[{tableName}])", sqlParameters);
         return Convert.ToInt32(parameterReturnValue.Value);
         //return 
     }
+
+
+ 
 }

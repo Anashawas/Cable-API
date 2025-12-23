@@ -6,5 +6,5 @@ public partial class SystemVersion
 
     public string Platform { get; set; } = null!;
     public string Version { get; set; } = null!;
-    public string? ForceUpdate { get; set; }
+    public bool ForceUpdate { get; set; }
 }

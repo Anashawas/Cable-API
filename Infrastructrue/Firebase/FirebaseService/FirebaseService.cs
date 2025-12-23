@@ -41,9 +41,10 @@ public class FirebaseService : IFirebaseService
             await FirebaseAdmin.Auth.FirebaseAuth.DefaultInstance.GetUserAsync(decodedToken.Uid, cancellationToken)
             ?? throw new NotFoundException("Firebase User", decodedToken.Uid);
 
+        
         return new(
             userDetails.Uid,
-            userDetails.ProviderId,
+            userDetails.ProviderData.FirstOrDefault()?.ProviderId,
             userDetails.Email,
             userDetails.DisplayName
         );

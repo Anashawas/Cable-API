@@ -12,33 +12,29 @@ public class RateRepository(ApplicationDbContext applicationDbContext) : IRateRe
         const string query = @"
     SELECT COALESCE(SUM(ChargingPointRate), 0) AS TotalRate, 
            COUNT(*) AS TotalCount
-    FROM Rates
+    FROM Rate
     WHERE ChargingPointId = @ChargingPointId AND IsDeleted = 0";
 
-        await using (var command = applicationDbContext.Database.GetDbConnection().CreateCommand())
+        await using var command = applicationDbContext.Database.GetDbConnection().CreateCommand();
+        command.CommandText = query;
+        command.Parameters.Add(new SqlParameter("@ChargingPointId", chargingPointId));
+
+        await applicationDbContext.Database.OpenConnectionAsync(cancellationToken);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken)) return chargingPointRate;
+        var totalRate = reader.GetInt32(0);
+        var totalCount = reader.GetInt32(1);
+
+        if (totalCount == 0)
         {
-            command.CommandText = query;
-            command.Parameters.Add(new SqlParameter("@ChargingPointId", chargingPointId));
-
-            await applicationDbContext.Database.OpenConnectionAsync(cancellationToken);
-
-            await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
-            {
-                if (!await reader.ReadAsync(cancellationToken)) return chargingPointRate;
-                var totalRate = reader.GetInt32(0);
-                var totalCount = reader.GetInt32(1);
-
-                if (totalCount == 0)
-                {
-                    return chargingPointRate;
-                }
-
-                var newSum = totalRate + chargingPointRate;
-                var newCount = totalCount + 1;
-
-                return (double)newSum / newCount;
-            }
+            return chargingPointRate;
         }
+
+        var newSum = totalRate + chargingPointRate;
+        var newCount = totalCount + 1;
+
+        return (double)newSum / newCount;
     }
 
     public async Task<double> GetChargingPointRateAverage(int chargingPointId, CancellationToken cancellationToken = default) 

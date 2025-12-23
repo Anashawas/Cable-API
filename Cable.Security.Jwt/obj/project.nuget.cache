@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "zZ4f6HiOIEQ=",
+  "dgSpecHash": "VXb7yRsRiIY=",
   "success": true,
-  "projectFilePath": "C:\\Users\\an.hawas\\RiderProjects\\Cable\\Cable.Security.Jwt\\Cable.Security.Jwt.csproj",
+  "projectFilePath": "D:\\Cable\\Cable\\Cable.Security.Jwt\\Cable.Security.Jwt.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\an.hawas\\.nuget\\packages\\microsoft.extensions.dependencyinjection.abstractions\\9.0.4\\microsoft.extensions.dependencyinjection.abstractions.9.0.4.nupkg.sha512",
     "C:\\Users\\an.hawas\\.nuget\\packages\\microsoft.extensions.logging.abstractions\\8.0.2\\microsoft.extensions.logging.abstractions.8.0.2.nupkg.sha512",
@@ -12,10 +12,7 @@
     "C:\\Users\\an.hawas\\.nuget\\packages\\microsoft.identitymodel.jsonwebtokens\\8.9.0\\microsoft.identitymodel.jsonwebtokens.8.9.0.nupkg.sha512",
     "C:\\Users\\an.hawas\\.nuget\\packages\\microsoft.identitymodel.logging\\8.9.0\\microsoft.identitymodel.logging.8.9.0.nupkg.sha512",
     "C:\\Users\\an.hawas\\.nuget\\packages\\microsoft.identitymodel.tokens\\8.9.0\\microsoft.identitymodel.tokens.8.9.0.nupkg.sha512",
-    "C:\\Users\\an.hawas\\.nuget\\packages\\system.identitymodel.tokens.jwt\\8.9.0\\system.identitymodel.tokens.jwt.8.9.0.nupkg.sha512",
-    "C:\\Users\\an.hawas\\.nuget\\packages\\microsoft.netcore.app.ref\\9.0.5\\microsoft.netcore.app.ref.9.0.5.nupkg.sha512",
-    "C:\\Users\\an.hawas\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\9.0.5\\microsoft.windowsdesktop.app.ref.9.0.5.nupkg.sha512",
-    "C:\\Users\\an.hawas\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\9.0.5\\microsoft.aspnetcore.app.ref.9.0.5.nupkg.sha512"
+    "C:\\Users\\an.hawas\\.nuget\\packages\\system.identitymodel.tokens.jwt\\8.9.0\\system.identitymodel.tokens.jwt.8.9.0.nupkg.sha512"
   ],
   "logs": []
 }

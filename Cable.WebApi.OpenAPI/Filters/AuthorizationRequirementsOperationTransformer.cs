@@ -7,13 +7,6 @@ namespace Cable.WebApi.OpenAPI.Filters;
 
 public class AuthorizationRequirementsOperationTransformer : IOpenApiOperationTransformer
 {
-    
-
-    public AuthorizationRequirementsOperationTransformer()
-    {
-    }
-    
-
     public Task TransformAsync(OpenApiOperation operation, OpenApiOperationTransformerContext context,
         CancellationToken cancellationToken)
     {
@@ -41,7 +34,7 @@ public class AuthorizationRequirementsOperationTransformer : IOpenApiOperationTr
         }
         else
         {
-            operation.Responses["401"].Description = "Forbidden";
+            operation.Responses["403"].Description = "Forbidden";
         }
 
         var oAuthScheme = new OpenApiSecurityScheme

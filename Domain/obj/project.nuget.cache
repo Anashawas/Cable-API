@@ -1,13 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "tiBDw8J/wWI=",
+  "dgSpecHash": "5FJPixfy4ng=",
   "success": true,
-  "projectFilePath": "C:\\Users\\an.hawas\\RiderProjects\\Cable\\Domain\\Domain.csproj",
+  "projectFilePath": "D:\\Cable\\Cable\\Domain\\Domain.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\an.hawas\\.nuget\\packages\\mediatr.contracts\\2.0.1\\mediatr.contracts.2.0.1.nupkg.sha512",
-    "C:\\Users\\an.hawas\\.nuget\\packages\\microsoft.netcore.app.ref\\9.0.5\\microsoft.netcore.app.ref.9.0.5.nupkg.sha512",
-    "C:\\Users\\an.hawas\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\9.0.5\\microsoft.windowsdesktop.app.ref.9.0.5.nupkg.sha512",
-    "C:\\Users\\an.hawas\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\9.0.5\\microsoft.aspnetcore.app.ref.9.0.5.nupkg.sha512"
+    "C:\\Users\\an.hawas\\.nuget\\packages\\mediatr.contracts\\2.0.1\\mediatr.contracts.2.0.1.nupkg.sha512"
   ],
   "logs": []
 }

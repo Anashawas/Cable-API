@@ -1,4 +1,5 @@
 ﻿using Cable.Core.Exceptions;
+using Cable.Core.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Banners.Commands.UpdateBanner;
@@ -8,6 +9,8 @@ public record UpdateBannerCommand(
     string Name,
     string Phone,
     string Email,
+    int? ActionType,
+    string? ActionUrl,
     DateOnly? StartDate,
     DateOnly? EndDate)
     : IRequest;
@@ -22,9 +25,17 @@ public class UpdateBannerCommandHandler(IApplicationDbContext applicationDbConte
                 cancellationToken)
             ?? throw new NotFoundException($"Can not find banner with id {request.Id}");
 
+        // Normalize phone number if provided
+        var normalizedPhone = !string.IsNullOrEmpty(request.Phone) 
+            ? PhoneNumberUtility.NormalizePhoneNumber(request.Phone) ?? request.Phone 
+            : request.Phone;
+
         banner.Name = request.Name;
-        banner.Phone = request.Phone;
+        banner.Phone = normalizedPhone;
         banner.Email = request.Email;
+        banner.ActionType = request.ActionType;
+        banner.ActionUrl = request.ActionUrl;
+        
         if (request.StartDate.HasValue || request.EndDate.HasValue)
         {
             var bannerDuration =

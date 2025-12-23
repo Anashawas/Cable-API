@@ -8,8 +8,8 @@
 /// <param name="Email">The email of the user</param>
 /// <param name="RoleId">The role of the user</param>
 /// <param name="IsActive">Determines if the user is active or not</param>
-public record UpdateUserRequest(string Name, string UserName,string Phone,
-    int RoleId,  bool IsActive,string Email,
+public record UpdateUserRequest(string? Name, string UserName,string Phone,
+    int RoleId,  bool IsActive,string? Email,
     string? Country,
     string? City
     );

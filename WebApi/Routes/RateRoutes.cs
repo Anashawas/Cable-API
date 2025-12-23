@@ -24,12 +24,9 @@ public static class RateRoutes
         app.MapGet("/GetChargingPointRatesById/{id}", async (IMediator mediator,[FromRoute]int id, CancellationToken cancellation) =>
                 Results.Ok(await mediator.Send(new GetChargingPointRateByIdRequest(id), cancellation)))
             .Produces<double>()
-            .ProducesForbidden()
-            .ProducesUnAuthorized()
-            .RequireAuthorization()
             .ProducesInternalServerError()
             .WithName("Get all rates")
-            .WithSummary(" get")
+            .WithSummary("Get all rates")
             .WithOpenApi();
 
         app.MapPost("/AddRate", async (IMediator mediator, AddRateCommand request, CancellationToken cancellation) =>

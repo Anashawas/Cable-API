@@ -1,5 +1,6 @@
 ﻿using Application.Banners.Commands.DeleteBanner;
 using Application.BannersAttachments.Commands;
+using Application.BannersAttachments.Commands.AddBannerAttachment;
 using Application.BannersAttachments.Commands.DeleteBannerAttachment;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;

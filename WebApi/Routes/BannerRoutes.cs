@@ -25,9 +25,6 @@ public static class BannerRoutes
         app.MapGet("/GetAllBanners", async (IMediator mediator, CancellationToken cancellationToken) => Results.Ok(
                 await mediator.Send(new GetAllBannersRequest(), cancellationToken)))
             .Produces<List<GetAllBannersDto>>()
-            .RequireAuthorization()
-            .ProducesForbidden()
-            .ProducesUnAuthorized()
             .ProducesInternalServerError()
             .WithName("Get All Banners")
             .WithSummary("Get all banners")
@@ -53,7 +50,7 @@ public static class BannerRoutes
         app.MapPut("/UpdateBanner/{id:int}",
                 async (IMediator mediator, UpdateBannerRequest request, CancellationToken cancellationToken, int id) =>
                     await mediator.Send(
-                        new UpdateBannerCommand(id, request.Name, request.Phone, request.Email, request.StartDate,
+                        new UpdateBannerCommand(id, request.Name, request.Phone, request.Email,request.ActionType,request.ActionUrl, request.StartDate,
                             request.EndDate), cancellationToken))
             .Produces<int>()
             .RequireAuthorization()

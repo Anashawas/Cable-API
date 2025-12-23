@@ -1,9 +1,10 @@
 ﻿using System.Net.Mail;
-using Application.Common.Enums;
+
 using Application.Common.Extensions;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Cable.Core;
+using Cable.Core.Emuns;
 using Cable.Core.Exceptions;
 using Infrastructrue.Common.Localization;
 using Infrastructrue.Options;
@@ -27,25 +28,25 @@ public class UploadFileService(ICurrentUserService currentUserService, IHttpCont
     public async Task<byte[]> GetFileAsync(UploadFileFolders folder, string fileName,
         CancellationToken cancellationToken)
     {
-        var filePath = Path.Combine(_uploadFileOption.FileUploadPath,
-            UploadFilePathHelper.GetFilePath(_uploadFileOption.ServerUrl, folder, CurrentUserId, fileName));
+        // var isPublicFolder = UploadFilePathHelper.IsPublicFolder(folder);
+        var folderName = folder.ToString();
+        
+        var filePath = 
+             Path.Combine(_uploadFileOption.FileUploadPath,  folderName,  fileName);
 
         UploadFilePathHelper.CheckFileIsExist(filePath);
 
-        return await File.ReadAllBytesAsync(
-            filePath,
-            cancellationToken);
+        return await File.ReadAllBytesAsync(filePath, cancellationToken);
     }
-
     public async Task<string> SaveFileAsync(IFormFile file, UploadFileFolders folder,
         CancellationToken cancellationToken)
     {
         if (file is { Length: <= 0 })
             throw new DataValidationException(nameof(file), Resources.FileNullOrEmpty);
-        var fileName = file.GetFileName();
+        var fileName =file.GetFileName();
 
         var filePath =
-            UploadFilePathHelper.SetupFolderPath(_uploadFileOption.FileUploadPath, folder, CurrentUserId, fileName);
+            UploadFilePathHelper.SetupFolderPath(_uploadFileOption.FileUploadPath, folder, fileName);
 
         await using var stream = new FileStream(filePath, FileMode.Create);
         await file.CopyToAsync(stream, cancellationToken);
@@ -72,19 +73,26 @@ public class UploadFileService(ICurrentUserService currentUserService, IHttpCont
         var baseUrl = request != null
             ? $"{request.Scheme}://{request.Host}"
             : _uploadFileOption.ServerUrl;
-        return UploadFilePathHelper.GetFilePath(baseUrl, folder, CurrentUserId, fileName);
+        return UploadFilePathHelper.GetFilePath(baseUrl, folder, fileName);
     }
 
     public void DeleteFiles(UploadFileFolders uploadFileFolders, string[] filesNames,
         CancellationToken cancellationToken)
     {
+        // var isPublicFolder = UploadFilePathHelper.IsPublicFolder(uploadFileFolders);
+        // var basePath = isPublicFolder ? nameof(FolderType.Public) : nameof(FolderType.Private);
+        var folderName = uploadFileFolders.ToString();
+        
         foreach (var fileName in filesNames)
         {
-            var filePath = Path.Combine(_uploadFileOption.FileUploadPath, uploadFileFolders.ToString(),
-                CurrentUserId, fileName);
+            var filePath = 
+                Path.Combine(_uploadFileOption.FileUploadPath,  folderName, fileName.ToString());
 
             UploadFilePathHelper.CheckFileIsExist(filePath);
             File.Delete(filePath);
         }
     }
+
+
+
 }

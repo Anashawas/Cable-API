@@ -14,6 +14,7 @@ public class UpdateRateCommandHandler(IApplicationDbContext applicationDbContext
         var rate = await applicationDbContext.Rates.FirstOrDefaultAsync(x => x.Id == request.Id, cancellationToken) ??
                    throw new NotFoundException($"can find rate with id {request.Id}");
 
+        rate.ChargingPointRate = request.ChargingPointRate;
         rate.AVGChargingPointRate =
             await rateRepository.CalculateChargePointAverageRate(rate.ChargingPointId, request.ChargingPointRate,
                 cancellationToken);

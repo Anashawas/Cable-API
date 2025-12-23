@@ -12,7 +12,7 @@ public static class ChargingPointAttachmentsRoutes
     public static IEndpointRouteBuilder MapChargingPointAttachmentsRoutes(this IEndpointRouteBuilder app)
     {
         app.MapGroup("/api/chargingPointAttchments")
-            .WithTags()
+            .WithTags("charging Point Attachments")
             .MapRoute();
 
         return app;
@@ -20,14 +20,11 @@ public static class ChargingPointAttachmentsRoutes
 
     private static RouteGroupBuilder MapRoute(this RouteGroupBuilder app)
     {
-        app.MapGet("GetAllChargingPointAttachmentsByIdRequest/{id:int}",
+        app.MapGet("GetAllChargingPointAttachmentsById/{id:int}",
                 async (IMediator mediator, int id, CancellationToken cancellationToken) =>
                     Results.Ok(
                         await mediator.Send(new GetAllChargingPointAttachmentsByIdRequest(id), cancellationToken)))
             .Produces<List<UploadFile>>()
-            .RequireAuthorization()
-            .ProducesForbidden()
-            .ProducesUnAuthorized()
             .WithName("Get All Charging Point Attachments By Id")
             .WithSummary("Get All Charging Point Attachments By Id")
             .WithOpenApi(op =>

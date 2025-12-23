@@ -1,6 +1,7 @@
 ﻿namespace Cable.Requests.ChargingPoints;
 
-public record UpdateChargingPointRequest(string Name,
+public record UpdateChargingPointRequest(
+    string Name,
     string? Note,
     string? CountryName,
     string? CityName,
@@ -11,4 +12,17 @@ public record UpdateChargingPointRequest(string Name,
     string? ToTime,
     int? ChargerSpeed,
     int? ChargersCount,
-    int ChargerPointTypeId);
+    double Latitude,
+    double Longitude,
+    int ChargerPointTypeId,
+    int StatusId,
+    int StationTypeId,
+    string?OwnerPhone,
+    bool IsVerified,
+    bool HasOffer,
+    string? Service,
+    string? OfferDescription,
+    string? Address,
+    List<int>? PlugTypeIds
+    );
+

@@ -1,4 +1,5 @@
-﻿using Application.Common.Enums;
+﻿
+using Cable.Core.Emuns;
 using Microsoft.AspNetCore.Http;
 
 namespace Application.Common.Interfaces;

@@ -17,7 +17,7 @@ public class AddUserComplaintCommandValidator : AbstractValidator<AddUserComplai
     
     private async Task<bool> ChargingPointExists(int chargingPointId, CancellationToken cancellationToken)
     {
-        return await _applicationDbContext.ChargingPoints.AnyAsync(x => x.Id == chargingPointId, cancellationToken);
+        return await _applicationDbContext.ChargingPoints.AnyAsync(x => x.Id == chargingPointId && !x.IsDeleted, cancellationToken);
     }
     
 }

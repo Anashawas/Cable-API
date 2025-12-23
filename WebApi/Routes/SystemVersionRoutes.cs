@@ -22,10 +22,7 @@ public static class SystemVersionRoutes
             async (IMediator mediator, CancellationToken cancellationToken) =>
                 Results.Ok(await mediator.Send(new GetAllSystemVersionsRequest(), cancellationToken)))
             .Produces<List<GetAllSystemVersionsDto>>()
-            .RequireAuthorization()
-            .ProducesForbidden()
             .ProducesInternalServerError()
-            .ProducesUnAuthorized()
             .WithName("Get all System Versions")
             .WithSummary("Get all System Versions")
             .WithOpenApi();
@@ -34,11 +31,8 @@ public static class SystemVersionRoutes
                 async (IMediator mediator,CheckSystemVersionRequest  request, CancellationToken cancellationToken) =>
                     Results.Ok(await mediator.Send(request, cancellationToken)))
             .Produces<bool>()
-            .RequireAuthorization()
-            .ProducesForbidden()
             .ProducesNotFound()
             .ProducesInternalServerError()
-            .ProducesUnAuthorized()
             .WithName("Check System Version")
             .WithSummary("Check system version")
             .WithOpenApi(op =>

@@ -1,10 +1,12 @@
 ﻿namespace Application.Users.Queries.GetAllUsers;
 
 public record GetAllUsersDto(
-    string Name,
-    string Phone,
+    int Id,
+    string? Name,
+    string? Phone,
     string? UserName,
     string? Email,
+    bool IsPhoneVerified,
     RoleSummary Role);
 
 /// <summary>
@@ -14,25 +16,3 @@ public record GetAllUsersDto(
 /// <param name="Name">The name of the role</param>
 public record RoleSummary(int Id, string Name);
 
-public class GetAllUsersDtoMapper : Profile
-{
-    public GetAllUsersDtoMapper()
-    {
-        CreateMap<UserAccount, GetAllUsersDto>()
-            .ForCtorParam("Role", opt => opt.MapFrom((userAccount, context)
-                => context.Mapper.Map<Role, RoleSummary>
-                (
-                    userAccount.Role
-                )
-            ))
-            ;
-    }
-}
-
-public class RoleSummaryMapper : Profile
-{
-    public RoleSummaryMapper()
-    {
-        CreateMap<Role, RoleSummary>();
-    }
-}

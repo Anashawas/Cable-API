@@ -123,6 +123,15 @@ namespace Application.Common.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Can not delete this car model  because it is currently connected to other users .
+        /// </summary>
+        public static string CheckCarModelInUse {
+            get {
+                return ResourceManager.GetString("CheckCarModelInUse", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Current Password.
         /// </summary>
         public static string CurrentPassword {
@@ -366,6 +375,15 @@ namespace Application.Common.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Station type does not exist.
+        /// </summary>
+        public static string StationTypeMustExist {
+            get {
+                return ResourceManager.GetString("StationTypeMustExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Thes selected status doesnot exist .
         /// </summary>
         public static string StatusMustExist {
@@ -389,6 +407,15 @@ namespace Application.Common.Localization {
         public static string UserBannerAlreadyExist {
             get {
                 return ResourceManager.GetString("UserBannerAlreadyExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to User car doesnot exist.
+        /// </summary>
+        public static string UserCarMustExist {
+            get {
+                return ResourceManager.GetString("UserCarMustExist", resourceCulture);
             }
         }
         

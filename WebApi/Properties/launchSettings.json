@@ -21,6 +21,16 @@
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
+    "Staging": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "launchUrl": "Cable-API/v1",
+      "applicationUrl": "https://localhost:7272;http://localhost:5202",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Staging"
+      }
+    },
     "Cable": {
       "commandName": "Project",
       "dotnetRunMessages": true,

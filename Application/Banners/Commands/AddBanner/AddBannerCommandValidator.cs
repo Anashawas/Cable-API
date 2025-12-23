@@ -11,16 +11,16 @@ public class AddBannerCommandValidator : AbstractValidator<AddBannerCommand>
     public AddBannerCommandValidator(IApplicationDbContext applicationDbContext)
     {
         _applicationDbContext = applicationDbContext;
-        RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.Email).NotEmpty().MaximumLength(50);
-        RuleFor(x => x.Phone).NotEmpty().MaximumLength(50);
-        RuleFor(x => x.StartDate).NotEmpty();
-        RuleFor(x => x.EndDate).NotEmpty();
-        RuleFor(x => x)
-            .Must(duration => duration.StartDate <= duration.EndDate)
-            .WithMessage(Resources.StartDateMustBeLessThanEndDate);
-        
-        RuleFor(x => x).MustAsync(CheckBannerIsExist).WithMessage(Resources.UserBannerAlreadyExist);
+        // RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
+        // RuleFor(x => x.Email).NotEmpty().MaximumLength(50);
+        // RuleFor(x => x.Phone).NotEmpty().MaximumLength(50);
+        // RuleFor(x => x.StartDate).NotEmpty();
+        // RuleFor(x => x.EndDate).NotEmpty();
+        // RuleFor(x => x)
+        //     .Must(duration => duration.StartDate <= duration.EndDate)
+        //     .WithMessage(Resources.StartDateMustBeLessThanEndDate);
+        //
+        // RuleFor(x => x).MustAsync(CheckBannerIsExist).WithMessage(Resources.UserBannerAlreadyExist);
     }
 
 

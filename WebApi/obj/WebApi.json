@@ -20,7 +20,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -77,7 +77,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -154,7 +154,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -211,7 +211,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -264,6 +264,150 @@
         ]
       }
     },
+    "/api/users/send-otp": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Send OTP to phone number for authentication",
+        "operationId": "Send OTP",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language preference for the response",
+            "schema": {
+              "type": "string",
+              "default": "ar"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendOtpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendOtpResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/users/verify-otp": {
+      "post": {
+        "tags": [
+          "Users"
+        ],
+        "summary": "Verify OTP and authenticate user",
+        "operationId": "Verify OTP",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language preference for the response",
+            "schema": {
+              "type": "string",
+              "default": "ar"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserLoginResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
     "/api/users/GetAllUsers": {
       "get": {
         "tags": [
@@ -278,7 +422,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -357,7 +501,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -424,7 +568,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -444,28 +588,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "integer",
-                  "format": "int32"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
+                  "$ref": "#/components/schemas/UserDetailsResult"
                 }
               }
             }
@@ -511,7 +634,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -598,7 +721,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -677,7 +800,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -747,7 +870,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -817,7 +940,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -841,26 +964,6 @@
                   "items": {
                     "$ref": "#/components/schemas/GetAllChargingPointsDto"
                   }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
                 }
               }
             }
@@ -897,7 +1000,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -925,25 +1028,72 @@
               }
             }
           },
-          "401": {
-            "description": "Unauthorized",
+          "500": {
+            "description": "Internal Server Error",
             "content": {
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/charging-points/UploadChargingPoint/{id}": {
+      "post": {
+        "tags": [
+          "Charging Points"
+        ],
+        "summary": "Upload charging point icon",
+        "operationId": "Upload charging point icon",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language preference for the response",
+            "schema": {
+              "type": "string",
+              "default": "ar"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "required": [
+                  "file"
+                ],
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "$ref": "#/components/schemas/IFormFile"
+                  }
                 }
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
           },
           "500": {
             "description": "Internal Server Error",
@@ -986,7 +1136,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -997,26 +1147,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/GetChargingPointByIdDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
                 }
               }
             }
@@ -1063,7 +1193,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -1150,7 +1280,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -1229,7 +1359,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -1318,7 +1448,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -1407,33 +1537,13 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
         "responses": {
           "200": {
             "description": "OK"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
           },
           "404": {
             "description": "Not Found",
@@ -1486,7 +1596,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -1566,7 +1676,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -1580,26 +1690,6 @@
                   "items": {
                     "$ref": "#/components/schemas/GetAllChargingPointTypesDto"
                   }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
                 }
               }
             }
@@ -1636,7 +1726,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -1650,26 +1740,6 @@
                   "items": {
                     "$ref": "#/components/schemas/GetAllPlugTypesDto"
                   }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
                 }
               }
             }
@@ -1706,7 +1776,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -1793,7 +1863,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -1880,7 +1950,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -1939,7 +2009,7 @@
         "tags": [
           "Rates"
         ],
-        "summary": " get",
+        "summary": "Get all rates",
         "operationId": "Get all rates",
         "parameters": [
           {
@@ -1957,7 +2027,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -1969,26 +2039,6 @@
                 "schema": {
                   "type": "number",
                   "format": "double"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
                 }
               }
             }
@@ -2025,7 +2075,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -2112,7 +2162,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -2190,7 +2240,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -2204,26 +2254,6 @@
                   "items": {
                     "$ref": "#/components/schemas/GetAllStatusesDto"
                   }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
                 }
               }
             }
@@ -2260,7 +2290,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -2274,26 +2304,6 @@
                   "items": {
                     "$ref": "#/components/schemas/GetUserComplaintsDto"
                   }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
                 }
               }
             }
@@ -2339,7 +2349,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -2409,7 +2419,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -2496,7 +2506,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -2575,7 +2585,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -2621,8 +2631,11 @@
         ]
       }
     },
-    "/api/chargingPointAttchments/GetAllChargingPointAttachmentsByIdRequest/{id}": {
+    "/api/chargingPointAttchments/GetAllChargingPointAttachmentsById/{id}": {
       "get": {
+        "tags": [
+          "charging Point Attachments"
+        ],
         "summary": "Get All Charging Point Attachments By Id",
         "operationId": "Get All Charging Point Attachments By Id",
         "parameters": [
@@ -2641,7 +2654,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -2658,26 +2671,6 @@
                 }
               }
             }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
           }
         },
         "security": [
@@ -2689,6 +2682,9 @@
     },
     "/api/chargingPointAttchments/AddChargingPointAttachmentCommand/{id}": {
       "post": {
+        "tags": [
+          "charging Point Attachments"
+        ],
         "summary": "Add Charging Point Attachment Command",
         "operationId": "Add Charging Point Attachment Command",
         "parameters": [
@@ -2707,7 +2703,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -2784,6 +2780,9 @@
     },
     "/api/chargingPointAttchments/DeleteChargingPointAttachmentCommand/{id}": {
       "delete": {
+        "tags": [
+          "charging Point Attachments"
+        ],
         "summary": "Delete Charging Point Attachment Command",
         "operationId": "Delete Charging Point Attachment Command",
         "parameters": [
@@ -2802,7 +2801,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -2862,7 +2861,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -2876,26 +2875,6 @@
                   "items": {
                     "$ref": "#/components/schemas/GetAllBannersDto"
                   }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
                 }
               }
             }
@@ -2932,7 +2911,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -3019,7 +2998,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -3106,7 +3085,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -3183,7 +3162,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -3278,7 +3257,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -3346,7 +3325,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -3364,28 +3343,8 @@
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
           "500": {
             "description": "Internal Server Error",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3416,7 +3375,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -3441,16 +3400,6 @@
               }
             }
           },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
           "404": {
             "description": "Not Found",
             "content": {
@@ -3463,16 +3412,6 @@
           },
           "500": {
             "description": "Internal Server Error",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3503,7 +3442,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -3591,7 +3530,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -3671,7 +3610,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -3685,26 +3624,6 @@
                   "items": {
                     "$ref": "#/components/schemas/GetAllCarsTypesDto"
                   }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
                 }
               }
             }
@@ -3741,7 +3660,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -3828,7 +3747,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -3907,7 +3826,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -3987,7 +3906,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -4001,26 +3920,6 @@
                   "items": {
                     "$ref": "#/components/schemas/GetAllCarsModelsDto"
                   }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
                 }
               }
             }
@@ -4057,7 +3956,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -4144,7 +4043,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -4223,7 +4122,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -4232,322 +4131,6 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/UpdateCarModelRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "Bearer": [ ]
-          }
-        ]
-      }
-    },
-    "/api/carmanagement/GetAllCars": {
-      "get": {
-        "tags": [
-          "Car Management"
-        ],
-        "summary": "Get all cars",
-        "operationId": "Get all cars ",
-        "parameters": [
-          {
-            "name": "Accept-Language",
-            "in": "header",
-            "description": "Language preference for the response",
-            "schema": {
-              "type": "string",
-              "default": "en"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/GetAllCarsDto"
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "Bearer": [ ]
-          }
-        ]
-      }
-    },
-    "/api/carmanagement/AddCar": {
-      "post": {
-        "tags": [
-          "Car Management"
-        ],
-        "summary": "Add car ",
-        "operationId": "Add car ",
-        "parameters": [
-          {
-            "name": "Accept-Language",
-            "in": "header",
-            "description": "Language preference for the response",
-            "schema": {
-              "type": "string",
-              "default": "en"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AddCarCommand"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "integer",
-                  "format": "int32"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "Bearer": [ ]
-          }
-        ]
-      }
-    },
-    "/api/carmanagement/DeleteCar/{id}": {
-      "delete": {
-        "tags": [
-          "Car Management"
-        ],
-        "summary": "Delete car",
-        "operationId": "Delete car ",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "Accept-Language",
-            "in": "header",
-            "description": "Language preference for the response",
-            "schema": {
-              "type": "string",
-              "default": "en"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "Bearer": [ ]
-          }
-        ]
-      }
-    },
-    "/api/carmanagement/UpdateCar/{id}": {
-      "put": {
-        "tags": [
-          "Car Management"
-        ],
-        "summary": "Update car by id",
-        "operationId": "Update car ",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "Accept-Language",
-            "in": "header",
-            "description": "Language preference for the response",
-            "schema": {
-              "type": "string",
-              "default": "en"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateCarRequest"
               }
             }
           },
@@ -4619,7 +4202,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -4633,26 +4216,6 @@
                   "items": {
                     "$ref": "#/components/schemas/GetAllUserCarsDto"
                   }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
                 }
               }
             }
@@ -4689,7 +4252,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -4776,7 +4339,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -4846,7 +4409,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -4926,7 +4489,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -4948,26 +4511,6 @@
                 "schema": {
                   "type": "integer",
                   "format": "int32"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CableProblemDetails"
                 }
               }
             }
@@ -5004,7 +4547,7 @@
             "description": "Language preference for the response",
             "schema": {
               "type": "string",
-              "default": "en"
+              "default": "ar"
             }
           }
         ],
@@ -5022,6 +4565,75 @@
           "200": {
             "description": "OK"
           },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/files/GetAllBannerAttachmentsById/{id}": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "Retrieves all banner attachments by ID with authentication",
+        "operationId": "Get All Banner Attachments By Id",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language preference for the response",
+            "schema": {
+              "type": "string",
+              "default": "ar"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          },
           "403": {
             "description": "Forbidden",
             "content": {
@@ -5032,8 +4644,558 @@
               }
             }
           },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/files/{folder}/{fileName}": {
+      "get": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "Retrieves a file with authentication",
+        "operationId": "Get File",
+        "parameters": [
+          {
+            "name": "folder",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language preference for the response",
+            "schema": {
+              "type": "string",
+              "default": "ar"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileResult"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/shared-links/create": {
+      "post": {
+        "tags": [
+          "Shared Links"
+        ],
+        "summary": "Create a new shared link",
+        "operationId": "Create shared link",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language preference for the response",
+            "schema": {
+              "type": "string",
+              "default": "ar"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSharedLinkCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/shared-links/validate/{token}": {
+      "get": {
+        "tags": [
+          "Shared Links"
+        ],
+        "summary": "Validate and use a shared link",
+        "operationId": "Validate shared link",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deviceInfo",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ipAddress",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language preference for the response",
+            "schema": {
+              "type": "string",
+              "default": "ar"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidateSharedLinkResult"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/shared-links/get/{token}": {
+      "get": {
+        "tags": [
+          "Shared Links"
+        ],
+        "summary": "Get shared link details by token",
+        "operationId": "Get shared link by token",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language preference for the response",
+            "schema": {
+              "type": "string",
+              "default": "ar"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedLinkDto2"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/shared-links/my-links": {
+      "get": {
+        "tags": [
+          "Shared Links"
+        ],
+        "summary": "Get current user's shared links",
+        "operationId": "Get my shared links",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language preference for the response",
+            "schema": {
+              "type": "string",
+              "default": "ar"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SharedLinkDto2"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/shared-links/usage/{linkId}": {
+      "get": {
+        "tags": [
+          "Shared Links"
+        ],
+        "summary": "Get usage statistics for a shared link",
+        "operationId": "Get shared link usage",
+        "parameters": [
+          {
+            "name": "linkId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language preference for the response",
+            "schema": {
+              "type": "string",
+              "default": "ar"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SharedLinkUsageDto"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/shared-links/types": {
+      "get": {
+        "tags": [
+          "Shared Links"
+        ],
+        "summary": "Get all available shared link types",
+        "operationId": "Get shared link types",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language preference for the response",
+            "schema": {
+              "type": "string",
+              "default": "ar"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SharedLinkTypeDto"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Bearer": [ ]
+          }
+        ]
+      }
+    },
+    "/api/shared-links/cleanup-expired": {
+      "post": {
+        "tags": [
+          "Shared Links"
+        ],
+        "summary": "Clean up expired shared links (admin only)",
+        "operationId": "Cleanup expired links",
+        "parameters": [
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language preference for the response",
+            "schema": {
+              "type": "string",
+              "default": "ar"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CableProblemDetails"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5068,6 +5230,8 @@
           "name",
           "phone",
           "email",
+          "actionType",
+          "actionUrl",
           "startDate",
           "endDate"
         ],
@@ -5082,6 +5246,16 @@
           "email": {
             "type": "string"
           },
+          "actionType": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "example": null
+          },
+          "actionUrl": {
+            "type": "string",
+            "nullable": true
+          },
           "startDate": {
             "type": "string",
             "format": "date"
@@ -5089,18 +5263,6 @@
           "endDate": {
             "type": "string",
             "format": "date"
-          }
-        }
-      },
-      "AddCarCommand": {
-        "required": [
-          "carModelId"
-        ],
-        "type": "object",
-        "properties": {
-          "carModelId": {
-            "type": "integer",
-            "format": "int32"
           }
         }
       },
@@ -5147,7 +5309,15 @@
           "latitude",
           "longitude",
           "chargerPointTypeId",
-          "statusId"
+          "statusId",
+          "stationTypeId",
+          "ownerPhone",
+          "isVerified",
+          "hasOffer",
+          "service",
+          "offerDescription",
+          "address",
+          "plugTypeIds"
         ],
         "type": "object",
         "properties": {
@@ -5215,13 +5385,48 @@
           "statusId": {
             "type": "integer",
             "format": "int32"
+          },
+          "stationTypeId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ownerPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "isVerified": {
+            "type": "boolean"
+          },
+          "hasOffer": {
+            "type": "boolean"
+          },
+          "service": {
+            "type": "string",
+            "nullable": true
+          },
+          "offerDescription": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "plugTypeIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "nullable": true
           }
         }
       },
       "AddPlugTypeCommand": {
         "required": [
           "name",
-          "serialNumber"
+          "serialNumber",
+          "plugTypeFamily"
         ],
         "type": "object",
         "properties": {
@@ -5230,6 +5435,9 @@
             "nullable": true
           },
           "serialNumber": {
+            "type": "string"
+          },
+          "plugTypeFamily": {
             "type": "string"
           }
         }
@@ -5266,15 +5474,14 @@
             "type": "string"
           },
           "forceUpdate": {
-            "type": "string",
-            "nullable": true
+            "type": "boolean"
           }
         }
       },
       "AddUserCarCommand": {
         "required": [
           "userId",
-          "carId",
+          "carModelId",
           "plugTypeId"
         ],
         "type": "object",
@@ -5283,7 +5490,7 @@
             "type": "integer",
             "format": "int32"
           },
-          "carId": {
+          "carModelId": {
             "type": "integer",
             "format": "int32"
           },
@@ -5298,16 +5505,16 @@
           "name",
           "phone",
           "roleId",
-          "password",
-          "username",
           "email",
+          "password",
           "country",
           "city"
         ],
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "phone": {
             "type": "string"
@@ -5316,15 +5523,11 @@
             "type": "integer",
             "format": "int32"
           },
-          "password": {
-            "type": "string",
-            "nullable": true
-          },
-          "username": {
-            "type": "string",
-            "nullable": true
-          },
           "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "password": {
             "type": "string",
             "nullable": true
           },
@@ -5445,37 +5648,6 @@
       "CarModelSummary": {
         "required": [
           "id",
-          "name",
-          "carType"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "name": {
-            "type": "string"
-          },
-          "carType": {
-            "$ref": "#/components/schemas/CarTypeSummary"
-          }
-        }
-      },
-      "CarSummary": {
-        "required": [
-          "carModel"
-        ],
-        "type": "object",
-        "properties": {
-          "carModel": {
-            "$ref": "#/components/schemas/CarModelSummary"
-          }
-        }
-      },
-      "CarTypeSummary": {
-        "required": [
-          "id",
           "name"
         ],
         "type": "object",
@@ -5486,6 +5658,29 @@
           },
           "name": {
             "type": "string"
+          }
+        }
+      },
+      "CarModelWithPlugs": {
+        "required": [
+          "carModelId",
+          "carModelName",
+          "plugTypes"
+        ],
+        "type": "object",
+        "properties": {
+          "carModelId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "carModelName": {
+            "type": "string"
+          },
+          "plugTypes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlugTypeSummary2"
+            }
           }
         }
       },
@@ -5563,6 +5758,53 @@
           }
         }
       },
+      "CreateSharedLinkCommand": {
+        "required": [
+          "linkType",
+          "targetId",
+          "parameters",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "linkType": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "example": null
+          },
+          "parameters": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": null
+          },
+          "maxUsage": {
+            "type": "integer",
+            "format": "int32",
+            "default": 1
+          }
+        }
+      },
+      "EntityTagHeaderValue": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "$ref": "#/components/schemas/StringSegment"
+          },
+          "isWeak": {
+            "type": "boolean"
+          }
+        },
+        "nullable": true
+      },
       "FieldError": {
         "type": "object",
         "properties": {
@@ -5574,6 +5816,31 @@
             "items": {
               "type": "string"
             }
+          }
+        }
+      },
+      "FileResult": {
+        "type": "object",
+        "properties": {
+          "contentType": {
+            "type": "string",
+            "nullable": true
+          },
+          "fileDownloadName": {
+            "type": "string",
+            "nullable": true
+          },
+          "lastModified": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": null
+          },
+          "entityTag": {
+            "$ref": "#/components/schemas/EntityTagHeaderValue"
+          },
+          "enableRangeProcessing": {
+            "type": "boolean"
           }
         }
       },
@@ -5593,6 +5860,8 @@
           "id",
           "name",
           "phone",
+          "actionType",
+          "actionUrl",
           "bannerDurations",
           "bannerAttachments"
         ],
@@ -5608,6 +5877,16 @@
           "phone": {
             "type": "string"
           },
+          "actionType": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "example": null
+          },
+          "actionUrl": {
+            "type": "string",
+            "nullable": true
+          },
           "bannerDurations": {
             "type": "array",
             "items": {
@@ -5622,29 +5901,26 @@
           }
         }
       },
-      "GetAllCarsDto": {
-        "required": [
-          "carModel"
-        ],
-        "type": "object",
-        "properties": {
-          "carModel": {
-            "$ref": "#/components/schemas/CarModelSummary"
-          }
-        }
-      },
       "GetAllCarsModelsDto": {
         "required": [
+          "id",
           "name",
-          "carType"
+          "carModels"
         ],
         "type": "object",
         "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
           "name": {
             "type": "string"
           },
-          "carType": {
-            "$ref": "#/components/schemas/CarTypeSummary"
+          "carModels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CarModelSummary"
+            }
           }
         }
       },
@@ -5695,12 +5971,31 @@
           "id",
           "name",
           "cityName",
+          "countryName",
           "phone",
+          "ownerPhone",
           "fromTime",
           "toTime",
           "latitude",
           "longitude",
-          "chargerPointTypeId"
+          "isVerified",
+          "hasOffer",
+          "service",
+          "offerDescription",
+          "address",
+          "avgChargingPointRate",
+          "iConUrl",
+          "rateCount",
+          "price",
+          "chargerSpeed",
+          "chargersCount",
+          "visitorsCount",
+          "note",
+          "methodPayment",
+          "statusSummary",
+          "chargingPointType",
+          "stationType",
+          "plugTypeSummary"
         ],
         "type": "object",
         "properties": {
@@ -5715,7 +6010,15 @@
             "type": "string",
             "nullable": true
           },
+          "countryName": {
+            "type": "string",
+            "nullable": true
+          },
           "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "ownerPhone": {
             "type": "string",
             "nullable": true
           },
@@ -5735,9 +6038,84 @@
             "type": "number",
             "format": "double"
           },
-          "chargerPointTypeId": {
+          "isVerified": {
+            "type": "boolean"
+          },
+          "hasOffer": {
+            "type": "boolean"
+          },
+          "service": {
+            "type": "string",
+            "nullable": true
+          },
+          "offerDescription": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "avgChargingPointRate": {
+            "type": "number",
+            "format": "double",
+            "nullable": true,
+            "example": null
+          },
+          "iConUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "rateCount": {
             "type": "integer",
             "format": "int32"
+          },
+          "price": {
+            "type": "number",
+            "format": "double",
+            "nullable": true,
+            "example": null
+          },
+          "chargerSpeed": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "example": null
+          },
+          "chargersCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "example": null
+          },
+          "visitorsCount": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "example": null
+          },
+          "note": {
+            "type": "string",
+            "nullable": true
+          },
+          "methodPayment": {
+            "type": "string",
+            "nullable": true
+          },
+          "statusSummary": {
+            "$ref": "#/components/schemas/StatusSummary"
+          },
+          "chargingPointType": {
+            "$ref": "#/components/schemas/ChargingPointTypeSummary"
+          },
+          "stationType": {
+            "$ref": "#/components/schemas/StationTypeSummary"
+          },
+          "plugTypeSummary": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlugTypeSummary"
+            }
           }
         }
       },
@@ -5780,7 +6158,8 @@
         "required": [
           "id",
           "name",
-          "serialNumber"
+          "serialNumber",
+          "plugTypeFamily"
         ],
         "type": "object",
         "properties": {
@@ -5793,6 +6172,9 @@
             "nullable": true
           },
           "serialNumber": {
+            "type": "string"
+          },
+          "plugTypeFamily": {
             "type": "string"
           }
         }
@@ -5833,41 +6215,56 @@
             "type": "string"
           },
           "updateForce": {
-            "type": "string",
-            "nullable": true
+            "type": "boolean"
           }
         }
       },
       "GetAllUserCarsDto": {
         "required": [
-          "userAccount",
-          "car"
+          "carTypeId",
+          "carTypeName",
+          "carModels"
         ],
         "type": "object",
         "properties": {
-          "userAccount": {
-            "$ref": "#/components/schemas/UserAccountSummary2"
+          "carTypeId": {
+            "type": "integer",
+            "format": "int32"
           },
-          "car": {
-            "$ref": "#/components/schemas/CarSummary"
+          "carTypeName": {
+            "type": "string"
+          },
+          "carModels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CarModelWithPlugs"
+            }
           }
         }
       },
       "GetAllUsersDto": {
         "required": [
+          "id",
           "name",
           "phone",
           "userName",
           "email",
+          "isPhoneVerified",
           "role"
         ],
         "type": "object",
         "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
           "name": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "phone": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "userName": {
             "type": "string",
@@ -5877,8 +6274,11 @@
             "type": "string",
             "nullable": true
           },
+          "isPhoneVerified": {
+            "type": "boolean"
+          },
           "role": {
-            "$ref": "#/components/schemas/RoleSummary"
+            "$ref": "#/components/schemas/RoleSummary2"
           }
         }
       },
@@ -5886,24 +6286,33 @@
         "required": [
           "id",
           "name",
-          "note",
-          "countryName",
           "cityName",
+          "countryName",
           "phone",
-          "methodPayment",
-          "price",
+          "ownerPhone",
           "fromTime",
           "toTime",
-          "chargerSpeed",
-          "chargersCount",
           "latitude",
           "longitude",
+          "isVerified",
+          "hasOffer",
+          "service",
+          "offerDescription",
+          "address",
+          "avgChargingPointRate",
+          "iConUrl",
+          "rateCount",
+          "price",
+          "chargerSpeed",
+          "chargersCount",
           "visitorsCount",
-          "chargerPointType",
-          "status",
-          "owner",
-          "plugType",
-          "files"
+          "note",
+          "methodPayment",
+          "statusSummary",
+          "chargingPointType",
+          "stationType",
+          "images",
+          "plugTypeSummary"
         ],
         "type": "object",
         "properties": {
@@ -5914,7 +6323,7 @@
           "name": {
             "type": "string"
           },
-          "note": {
+          "cityName": {
             "type": "string",
             "nullable": true
           },
@@ -5922,23 +6331,13 @@
             "type": "string",
             "nullable": true
           },
-          "cityName": {
-            "type": "string",
-            "nullable": true
-          },
           "phone": {
             "type": "string",
             "nullable": true
           },
-          "methodPayment": {
+          "ownerPhone": {
             "type": "string",
             "nullable": true
-          },
-          "price": {
-            "type": "number",
-            "format": "double",
-            "nullable": true,
-            "example": null
           },
           "fromTime": {
             "type": "string",
@@ -5947,6 +6346,52 @@
           "toTime": {
             "type": "string",
             "nullable": true
+          },
+          "latitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "isVerified": {
+            "type": "boolean"
+          },
+          "hasOffer": {
+            "type": "boolean"
+          },
+          "service": {
+            "type": "string",
+            "nullable": true
+          },
+          "offerDescription": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "avgChargingPointRate": {
+            "type": "number",
+            "format": "double",
+            "nullable": true,
+            "example": null
+          },
+          "iConUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "rateCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "price": {
+            "type": "number",
+            "format": "double",
+            "nullable": true,
+            "example": null
           },
           "chargerSpeed": {
             "type": "integer",
@@ -5960,44 +6405,42 @@
             "nullable": true,
             "example": null
           },
-          "latitude": {
-            "type": "number",
-            "format": "double"
-          },
-          "longitude": {
-            "type": "number",
-            "format": "double"
-          },
           "visitorsCount": {
             "type": "integer",
-            "format": "int32"
+            "format": "int32",
+            "nullable": true,
+            "example": null
           },
-          "chargerPointType": {
-            "$ref": "#/components/schemas/ChargingPointTypeSummary"
+          "note": {
+            "type": "string",
+            "nullable": true
           },
-          "status": {
+          "methodPayment": {
+            "type": "string",
+            "nullable": true
+          },
+          "statusSummary": {
             "$ref": "#/components/schemas/StatusSummary"
           },
-          "owner": {
-            "$ref": "#/components/schemas/UserAccountSummary"
+          "chargingPointType": {
+            "$ref": "#/components/schemas/ChargingPointTypeSummary"
           },
-          "plugType": {
+          "stationType": {
+            "$ref": "#/components/schemas/StationTypeSummary"
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "plugTypeSummary": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/PlugTypeSummary"
             },
             "nullable": true
-          },
-          "files": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/UploadFile"
-            },
-            "nullable": true
-          },
-          "chargingPointAverage": {
-            "type": "number",
-            "format": "double"
           }
         }
       },
@@ -6012,7 +6455,9 @@
           "firebaseUId",
           "country",
           "city",
-          "role"
+          "isPhoneVerified",
+          "role",
+          "userCars"
         ],
         "type": "object",
         "properties": {
@@ -6021,7 +6466,8 @@
             "format": "int32"
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "phone": {
             "type": "string",
@@ -6050,8 +6496,17 @@
             "type": "string",
             "nullable": true
           },
+          "isPhoneVerified": {
+            "type": "boolean"
+          },
           "role": {
-            "$ref": "#/components/schemas/RoleSummary"
+            "$ref": "#/components/schemas/RoleSummary2"
+          },
+          "userCars": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserCarTypeDto"
+            }
           }
         }
       },
@@ -6072,10 +6527,46 @@
             "type": "string"
           },
           "userAccount": {
-            "$ref": "#/components/schemas/UserAccountSummary2"
+            "$ref": "#/components/schemas/UserAccountSummary"
           },
           "chargingPoint": {
             "$ref": "#/components/schemas/ChargingPointSummary"
+          }
+        }
+      },
+      "HttpValidationProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "example": null
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "instance": {
+            "type": "string",
+            "nullable": true
+          },
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
           }
         }
       },
@@ -6105,6 +6596,28 @@
         }
       },
       "PlugTypeSummary": {
+        "required": [
+          "id",
+          "name",
+          "serialNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "example": null
+          },
+          "name": {
+            "type": "string"
+          },
+          "serialNumber": {
+            "type": "string"
+          }
+        }
+      },
+      "PlugTypeSummary2": {
         "required": [
           "id",
           "name",
@@ -6196,9 +6709,253 @@
           "name": {
             "type": "string"
           }
+        },
+        "nullable": true
+      },
+      "RoleSummary2": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          }
         }
       },
-      "StatusSummary": {
+      "SendOtpRequest": {
+        "required": [
+          "phoneNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "phoneNumber": {
+            "type": "string"
+          }
+        }
+      },
+      "SendOtpResult": {
+        "required": [
+          "success",
+          "message",
+          "expiresAt"
+        ],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": null
+          }
+        }
+      },
+      "SharedLinkDto": {
+        "required": [
+          "id",
+          "linkToken",
+          "linkType",
+          "targetId",
+          "parameters",
+          "expiresAt",
+          "maxUsage",
+          "currentUsage",
+          "isActive",
+          "baseUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "linkToken": {
+            "type": "string"
+          },
+          "linkType": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "example": null
+          },
+          "parameters": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": null
+          },
+          "maxUsage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "currentUsage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "baseUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "nullable": true
+      },
+      "SharedLinkDto2": {
+        "required": [
+          "id",
+          "linkToken",
+          "linkType",
+          "targetId",
+          "parameters",
+          "expiresAt",
+          "maxUsage",
+          "currentUsage",
+          "isActive",
+          "baseUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "linkToken": {
+            "type": "string"
+          },
+          "linkType": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "example": null
+          },
+          "parameters": {
+            "type": "string",
+            "nullable": true
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": null
+          },
+          "maxUsage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "currentUsage": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "baseUrl": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "SharedLinkTypeDto": {
+        "required": [
+          "id",
+          "typeName",
+          "description",
+          "baseUrl",
+          "isActive"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "typeName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "baseUrl": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SharedLinkUsageDto": {
+        "required": [
+          "id",
+          "sharedLinkId",
+          "userId",
+          "deviceInfo",
+          "ipAddress",
+          "usedAt",
+          "isSuccessful",
+          "errorMessage"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sharedLinkId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "userId": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "example": null
+          },
+          "deviceInfo": {
+            "type": "string",
+            "nullable": true
+          },
+          "ipAddress": {
+            "type": "string",
+            "nullable": true
+          },
+          "usedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isSuccessful": {
+            "type": "boolean"
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "StationTypeSummary": {
         "required": [
           "id",
           "name"
@@ -6215,11 +6972,53 @@
         },
         "nullable": true
       },
+      "StatusSummary": {
+        "required": [
+          "id",
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "StringSegment": {
+        "type": "object",
+        "properties": {
+          "buffer": {
+            "type": "string",
+            "nullable": true
+          },
+          "offset": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "length": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "value": {
+            "type": "string",
+            "nullable": true
+          },
+          "hasValue": {
+            "type": "boolean"
+          }
+        }
+      },
       "UpdateBannerRequest": {
         "required": [
           "name",
           "phone",
           "email",
+          "actionType",
+          "actionUrl",
           "startDate",
           "endDate"
         ],
@@ -6233,6 +7032,16 @@
           },
           "email": {
             "type": "string"
+          },
+          "actionType": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "example": null
+          },
+          "actionUrl": {
+            "type": "string",
+            "nullable": true
           },
           "startDate": {
             "type": "string",
@@ -6259,18 +7068,6 @@
             "type": "string"
           },
           "carTypeId": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "UpdateCarRequest": {
-        "required": [
-          "carModelId"
-        ],
-        "type": "object",
-        "properties": {
-          "carModelId": {
             "type": "integer",
             "format": "int32"
           }
@@ -6317,7 +7114,18 @@
           "toTime",
           "chargerSpeed",
           "chargersCount",
-          "chargerPointTypeId"
+          "latitude",
+          "longitude",
+          "chargerPointTypeId",
+          "statusId",
+          "stationTypeId",
+          "ownerPhone",
+          "isVerified",
+          "hasOffer",
+          "service",
+          "offerDescription",
+          "address",
+          "plugTypeIds"
         ],
         "type": "object",
         "properties": {
@@ -6370,9 +7178,55 @@
             "nullable": true,
             "example": null
           },
+          "latitude": {
+            "type": "number",
+            "format": "double"
+          },
+          "longitude": {
+            "type": "number",
+            "format": "double"
+          },
           "chargerPointTypeId": {
             "type": "integer",
             "format": "int32"
+          },
+          "statusId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "stationTypeId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "ownerPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "isVerified": {
+            "type": "boolean"
+          },
+          "hasOffer": {
+            "type": "boolean"
+          },
+          "service": {
+            "type": "string",
+            "nullable": true
+          },
+          "offerDescription": {
+            "type": "string",
+            "nullable": true
+          },
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "plugTypeIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "nullable": true
           }
         }
       },
@@ -6391,7 +7245,8 @@
       "UpdatePlugTypeRequest": {
         "required": [
           "name",
-          "serialNumber"
+          "serialNumber",
+          "plugTypeFamily"
         ],
         "type": "object",
         "properties": {
@@ -6400,6 +7255,9 @@
             "nullable": true
           },
           "serialNumber": {
+            "type": "string"
+          },
+          "plugTypeFamily": {
             "type": "string"
           }
         }
@@ -6436,23 +7294,23 @@
             "type": "string"
           },
           "updateForce": {
-            "type": "string"
+            "type": "boolean"
           }
         }
       },
       "UpdateUserCarCommand": {
         "required": [
-          "userId",
-          "carId",
+          "id",
+          "carModelId",
           "plugTypeId"
         ],
         "type": "object",
         "properties": {
-          "userId": {
+          "id": {
             "type": "integer",
             "format": "int32"
           },
-          "carId": {
+          "carModelId": {
             "type": "integer",
             "format": "int32"
           },
@@ -6487,7 +7345,8 @@
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "userName": {
             "type": "string"
@@ -6503,7 +7362,8 @@
             "type": "boolean"
           },
           "email": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "country": {
             "type": "string",
@@ -6555,15 +7415,73 @@
             "format": "int32"
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           }
-        },
-        "nullable": true
+        }
       },
-      "UserAccountSummary2": {
+      "UserCarModelDto": {
+        "required": [
+          "userCarId",
+          "carModelId",
+          "carModelName",
+          "plugTypes"
+        ],
+        "type": "object",
+        "properties": {
+          "userCarId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "carModelId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "carModelName": {
+            "type": "string"
+          },
+          "plugTypes": {
+            "$ref": "#/components/schemas/UserPlugTypeDto"
+          }
+        }
+      },
+      "UserCarTypeDto": {
+        "required": [
+          "carTypeId",
+          "carTypeName",
+          "carModels"
+        ],
+        "type": "object",
+        "properties": {
+          "carTypeId": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "carTypeName": {
+            "type": "string"
+          },
+          "carModels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserCarModelDto"
+            }
+          }
+        }
+      },
+      "UserDetailsResult": {
         "required": [
           "id",
-          "name"
+          "name",
+          "phone",
+          "isActive",
+          "email",
+          "registrationProvider",
+          "firebaseUId",
+          "country",
+          "city",
+          "isPhoneVerified",
+          "role",
+          "userCars"
         ],
         "type": "object",
         "properties": {
@@ -6572,7 +7490,52 @@
             "format": "int32"
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "isActive": {
+            "type": "boolean",
+            "nullable": true,
+            "example": null
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "registrationProvider": {
+            "type": "string",
+            "nullable": true
+          },
+          "firebaseUId": {
+            "type": "string",
+            "nullable": true
+          },
+          "country": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "isPhoneVerified": {
+            "type": "boolean",
+            "nullable": true,
+            "example": null
+          },
+          "role": {
+            "$ref": "#/components/schemas/RoleSummary"
+          },
+          "userCars": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserCarTypeDto"
+            },
+            "nullable": true
           }
         }
       },
@@ -6589,7 +7552,8 @@
             "format": "int32"
           },
           "name": {
-            "type": "string"
+            "type": "string",
+            "nullable": true
           },
           "privileges": {
             "type": "array",
@@ -6601,9 +7565,7 @@
       },
       "UserLoginResult": {
         "required": [
-          "id",
-          "name",
-          "email",
+          "userDetails",
           "accessToken",
           "refreshToken",
           "isCompletedData",
@@ -6611,15 +7573,8 @@
         ],
         "type": "object",
         "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "name": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
+          "userDetails": {
+            "$ref": "#/components/schemas/UserDetailsResult"
           },
           "accessToken": {
             "type": "string"
@@ -6638,6 +7593,27 @@
           }
         }
       },
+      "UserPlugTypeDto": {
+        "required": [
+          "id",
+          "name",
+          "serialNumber"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "serialNumber": {
+            "type": "string"
+          }
+        }
+      },
       "UserToken": {
         "required": [
           "accessToken",
@@ -6649,6 +7625,41 @@
             "type": "string"
           },
           "refreshToken": {
+            "type": "string"
+          }
+        }
+      },
+      "ValidateSharedLinkResult": {
+        "required": [
+          "isValid",
+          "errorMessage",
+          "sharedLink"
+        ],
+        "type": "object",
+        "properties": {
+          "isValid": {
+            "type": "boolean"
+          },
+          "errorMessage": {
+            "type": "string",
+            "nullable": true
+          },
+          "sharedLink": {
+            "$ref": "#/components/schemas/SharedLinkDto"
+          }
+        }
+      },
+      "VerifyOtpRequest": {
+        "required": [
+          "phoneNumber",
+          "otpCode"
+        ],
+        "type": "object",
+        "properties": {
+          "phoneNumber": {
+            "type": "string"
+          },
+          "otpCode": {
             "type": "string"
           }
         }
@@ -6686,6 +7697,9 @@
       "name": "User Complaints"
     },
     {
+      "name": "charging Point Attachments"
+    },
+    {
       "name": "Banners"
     },
     {
@@ -6699,6 +7713,12 @@
     },
     {
       "name": "Notification-Token"
+    },
+    {
+      "name": "Files"
+    },
+    {
+      "name": "Shared Links"
     }
   ]
 }

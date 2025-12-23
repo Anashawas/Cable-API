@@ -3,16 +3,20 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Application.SystemVersions.Queries.CheckSystemVerison;
 
-public record CheckSystemVersionRequest(string Platform, string Version) : IRequest<bool>;
+public record CheckSystemVersionRequest(string Platform, string Version) : IRequest<CheckSystemVersionDto>;
 
 
 
-public class CheckSystemVersionQueryHandler(IApplicationDbContext applicationDbContext) : IRequestHandler<CheckSystemVersionRequest, bool>
+public record CheckSystemVersionDto(bool IsLatest,bool ForceUpdate );
+
+public class CheckSystemVersionQueryHandler(IApplicationDbContext applicationDbContext) : IRequestHandler<CheckSystemVersionRequest, CheckSystemVersionDto>
 {
-    public async Task<bool> Handle(CheckSystemVersionRequest request, CancellationToken cancellationToken)
+    public async Task<CheckSystemVersionDto> Handle(CheckSystemVersionRequest request, CancellationToken cancellationToken)
     {
        var systemVersion = await applicationDbContext.SystemVersions.FirstOrDefaultAsync(x=>x.Platform == request.Platform,cancellationToken)
                             ?? throw new NotFoundException($"Can not find platform {request.Platform}");
-       return systemVersion.Version == request.Version;
+       
+       
+       return new CheckSystemVersionDto(systemVersion.Version == request.Version,systemVersion.ForceUpdate );
     }
 }

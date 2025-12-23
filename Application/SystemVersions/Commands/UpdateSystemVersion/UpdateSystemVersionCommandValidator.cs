@@ -8,6 +8,6 @@ public class UpdateSystemVersionCommandValidator: AbstractValidator<UpdateSystem
     {
         RuleFor(x=>x.Platform).NotEmpty();
         RuleFor(x=>x.Version).NotEmpty();
-        RuleFor(x=>x.UpdateForce).NotEmpty();
+        RuleFor(x=>x.UpdateForce).NotNull();
     }
 }

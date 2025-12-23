@@ -135,4 +135,13 @@
   <data name="PlugTypeMustExist" xml:space="preserve">
     <value>نوع الشاحن المختار غير موجود</value>
   </data>
+  <data name="CheckCarModelInUse" xml:space="preserve">
+    <value>لا يمكن حذف السيارة لانها مرطبة في مستخدمين</value>
+  </data>
+  <data name="UserCarMustExist" xml:space="preserve">
+    <value>سيارة المستخدم غير موجودة</value>
+  </data>
+  <data name="StationTypeMustExist" xml:space="preserve">
+    <value>نوع المحطة غير موجود</value>
+  </data>
 </root>

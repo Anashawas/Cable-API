@@ -3,36 +3,44 @@
 public record GetChargingPointByIdDto(
     int Id,
     string Name,
-    string? Note,
-    string? CountryName,
     string? CityName,
+    string? CountryName,        
     string? Phone,
-    string? MethodPayment,
-    double? Price,
+    string? OwnerPhone,
     string? FromTime,
     string? ToTime,
-    int? ChargerSpeed,
-    int? ChargersCount,
     double Latitude,
     double Longitude,
-    int VisitorsCount,
-    ChargingPointTypeSummary? ChargerPointType,
-    StatusSummary? Status,
-    UserAccountSummary? Owner,
-    List<PlugTypeSummary>? PlugType,
-    List<UploadFile>? Files
-)
-{
-    public double ChargingPointAverage { get; set; }
-};
+    bool IsVerified,
+    bool HasOffer,
+    string? Service,
+    string? OfferDescription,
+    string? Address,
+    double? AvgChargingPointRate,
+    string? IConUrl,
+    int RateCount,
+    double? Price,             
+    int? ChargerSpeed,       
+    int? ChargersCount,         
+    int? VisitorsCount,         
+    string? Note,             
+    string? MethodPayment,
+    StatusSummary StatusSummary,
+    ChargingPointTypeSummary? ChargingPointType,
+    StationTypeSummary? StationType,
+    List<string>? Images,
+    List<PlugTypeSummary>? PlugTypeSummary
+);
 
 
 
 public record ChargingPointTypeSummary(int Id, string Name);
 
+public record StationTypeSummary(int Id, string Name);
+
 public record StatusSummary(int Id, string Name);
 
-public record UserAccountSummary(int Id, string Name);
+public record UserAccountSummary(int Id, string? Name);
 
-public record PlugTypeSummary(int Id, string? Name, string SerialNumber);
+public record PlugTypeSummary(int? Id, string Name, string SerialNumber);
 

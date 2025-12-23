@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Application.PlugTypes.Commands.UpdateplugType;
 
-public record UpdatePlugTypeCommand(int Id, string? Name, string SerialNumber) : IRequest;
+public record UpdatePlugTypeCommand(int Id, string? Name, string SerialNumber, string PlugTypeFamily) : IRequest;
 
 public class UpdatePlugTypeCommandHandler(IApplicationDbContext applicationDbContext)
     : IRequestHandler<UpdatePlugTypeCommand>
@@ -16,6 +16,7 @@ public class UpdatePlugTypeCommandHandler(IApplicationDbContext applicationDbCon
             ?? throw new NotFoundException($"can not find plug type with id {request.Id}");
         plugType.Name = request.Name;
         plugType.SerialNumber = request.SerialNumber;
+        plugType.PlugTypeFamily = request.PlugTypeFamily;
         await applicationDbContext.SaveChanges(cancellationToken);
     }
 }

@@ -25,13 +25,11 @@ public static class PlugTypesRoutes
         app.MapGet("/GetAllPlugTypes", async (IMediator mediator, CancellationToken cancellation) =>
                 Results.Ok(await mediator.Send(new GetAllPlugTypesRequest(), cancellation)))
             .Produces<List<GetAllPlugTypesDto>>()
+            .ProducesInternalServerError()
             .WithName("Get all plug types")
             .WithSummary(" Get all plug types of the application")
-            .ProducesForbidden()
-            .ProducesUnAuthorized()
-            .RequireAuthorization()
-            .ProducesInternalServerError()
             .WithOpenApi();
+
 
         app.MapPost("/AddPlugType", async (IMediator mediator, AddPlugTypeCommand request, CancellationToken cancellation) =>
                 Results.Ok(await mediator.Send(request, cancellation)))
@@ -50,7 +48,7 @@ public static class PlugTypesRoutes
             });
 
         app.MapPut("/UpdatePlugType/{id}", async (IMediator mediator,[FromRoute] int id ,UpdatePlugTypeRequest request, CancellationToken cancellation) =>
-               await mediator.Send(new UpdatePlugTypeCommand(id,request.Name,request.SerialNumber), cancellation))
+               await mediator.Send(new UpdatePlugTypeCommand(id,request.Name,request.SerialNumber, request.PlugTypeFamily), cancellation))
             .Produces<int>()
             .WithName("Update plug type")
             .WithSummary("Update a plug type")

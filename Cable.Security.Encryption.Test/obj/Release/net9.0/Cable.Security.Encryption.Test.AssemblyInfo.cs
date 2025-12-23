@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Cable.Security.Encryption.Test")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+56c22aa967dc8932de042040c7a7bcf783f61349")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a5445c5ad128ba7ff7716f1e0215411b02095da5")]
 [assembly: System.Reflection.AssemblyProductAttribute("Cable.Security.Encryption.Test")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Cable.Security.Encryption.Test")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

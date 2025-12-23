@@ -29,6 +29,17 @@ public partial class ChargingPoint : BaseAuditableEntity
     public int ChargerPointTypeId { get; set; }
     public int StatusId { get; set; }
 
+    public string? OwnerPhone { get; set; }
+    public bool IsVerified { get; set; } 
+    public bool HasOffer { get; set; } 
+    public string? Service { get; set; }
+    public string? OfferDescription { get; set; }
+    public string? Address { get; set; }
+    public string? Icon { get; set; }
+    public int StationTypeId { get; set; }
+        
+    
+        
     public virtual ICollection<ChargingPointAttachment> ChargingPointAttachments { get; set; } =
         new List<ChargingPointAttachment>();
 
@@ -41,6 +52,8 @@ public partial class ChargingPoint : BaseAuditableEntity
     public virtual ICollection<Rate> Rates { get; set; } = new List<Rate>();
 
     public virtual Status Status { get; set; } = null!;
+    public virtual StationType StationType { get; set; } = null!;
 
     public virtual ICollection<UserComplaint> UserComplaints { get; set; } = new List<UserComplaint>();
+    
 }

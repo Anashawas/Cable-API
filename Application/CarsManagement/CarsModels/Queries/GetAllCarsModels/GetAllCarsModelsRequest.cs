@@ -4,16 +4,26 @@ namespace Application.CarsManagement.CarsModels.Queries.GetAllCarsModels;
 
 public record GetAllCarsModelsRequest() : IRequest<List<GetAllCarsModelsDto>>;
 
-public record GetAllCarsModelsDto(string Name, CarTypeSummary CarType);
+public record GetAllCarsModelsDto(int Id, string Name, List<CarModelSummary> CarModels);
 
-public record CarTypeSummary(int Id, string Name);
+public record CarModelSummary(int Id, string Name);
 
 public class GetAllCarsModelsRequestHandler(IApplicationDbContext applicationDbContext)
     : IRequestHandler<GetAllCarsModelsRequest, List<GetAllCarsModelsDto>>
 {
     public async Task<List<GetAllCarsModelsDto>> Handle(GetAllCarsModelsRequest request,
         CancellationToken cancellationToken)
-        => await applicationDbContext.CarModels.Include(x => x.CarType).AsNoTracking()
-            .Select(x => new GetAllCarsModelsDto(x.Name, new CarTypeSummary(x.CarType.Id, x.CarType.Name)))
+    {
+        var carTypes = await applicationDbContext.CarTypes
+            .Include(x => x.CarModels)
+            .AsNoTracking()
+            .Select(x => new GetAllCarsModelsDto(
+                x.Id,
+                x.Name,
+                x.CarModels.Select(m => new CarModelSummary(m.Id, m.Name)).ToList()
+            ))
             .ToListAsync(cancellationToken);
+
+        return carTypes;
+    }
 }

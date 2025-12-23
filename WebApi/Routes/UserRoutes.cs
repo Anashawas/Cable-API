@@ -1,4 +1,6 @@
-﻿using Application.Common.Interfaces;
+﻿using Application.Authentication.Commands.SendOtp;
+using Application.Authentication.Commands.VerifyOtp;
+using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Users.Commands.AddUser;
 using Application.Users.Commands.ChangePassword;
@@ -7,12 +9,11 @@ using Application.Users.Commands.UpdateUser;
 using Application.Users.Queries.GetAllUsers;
 using Application.Users.Queries.GetUserById;
 using Cable.Requests.Identity;
+using Cable.Requests.OTP;
 using Cable.Requests.Users;
 using Cable.Responses.Identity;
-using Google.Apis.Auth;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Identity.Client.Internal;
 
 namespace Cable.Routes;
 
@@ -56,9 +57,7 @@ public static class UserRoutes
 
         app.MapPost("/AddUser", async (IMediator mediator, AddUserCommand request, CancellationToken cancellation) =>
                 Results.Ok(await mediator.Send(request, cancellation)))
-            .Produces<int>()
-            .ProducesUnAuthorized()
-            .ProducesForbidden()
+            .Produces<UserDetailsResult>()
             .ProducesInternalServerError()
             .WithName("Add User")
             .WithSummary("Adds a new user")
@@ -75,8 +74,7 @@ public static class UserRoutes
                 async (IMediator mediator, [FromRoute] int id, UpdateUserRequest request,
                         CancellationToken cancellation) =>
                     await mediator.Send(new
-                        UpdateUserCommand(id, request.Name, request.UserName,
-                            request.RoleId, request.Phone, request.Email,request.IsActive,request.Country, request.City), cancellation))
+                        UpdateUserCommand(id, request.Name, request.RoleId, request.Phone, request.Email, request.IsActive, request.Country, request.City), cancellation))
             .Produces(200)
             .RequireAuthorization()
             .ProducesUnAuthorized()
@@ -132,7 +130,7 @@ public static class UserRoutes
         ;
 
 
-        app.MapDelete("/{id}", async (int id, IMediator mediator, CancellationToken cancellation) =>
+        app.MapDelete("/{id:int}", async (int id, IMediator mediator, CancellationToken cancellation) =>
                 await mediator.Send(new DeleteUserCommand(id), cancellation))
             .Produces(200)
             .RequireAuthorization()
@@ -216,7 +214,33 @@ public static class UserRoutes
                 op.RequestBody.Required = true;
                 return op;
             });
-        ;
+
+        app.MapPost("/send-otp", async (IAuthenticationService authenticationService, SendOtpRequest request, IMediator mediator, CancellationToken cancellationToken) =>
+                Results.Ok(await authenticationService.SendOtpAsync(request.PhoneNumber, cancellationToken)))
+            .Produces<SendOtpResult>()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Send OTP")
+            .WithSummary("Send OTP to phone number for authentication")
+            .WithOpenApi(op =>
+            {
+                op.RequestBody.Required = true;
+                return op;
+            });
+
+        app.MapPost("/verify-otp", async (IAuthenticationService authenticationService,VerifyOtpRequest request, IMediator mediator, CancellationToken cancellationToken) =>
+                Results.Ok(await authenticationService.LoginWithOtpAsync(request.PhoneNumber, request.OtpCode, cancellationToken)))
+            .Produces<UserLoginResult>()
+            .ProducesValidationProblem()
+            .ProducesUnAuthorized()
+            .ProducesInternalServerError()
+            .WithName("Verify OTP")
+            .WithSummary("Verify OTP and authenticate user")
+            .WithOpenApi(op =>
+            {
+                op.RequestBody.Required = true;
+                return op;
+            });
 
         return app;
     }

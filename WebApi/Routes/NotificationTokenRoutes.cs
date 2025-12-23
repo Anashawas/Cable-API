@@ -20,9 +20,6 @@ public static class NotificationTokenRoutes
                 async (IMediator mediator, RegisterNotificationTokenCommand request, CancellationToken cancellation) =>
                     Results.Ok(await mediator.Send(request, cancellation)))
             .Produces<int>()
-            .ProducesForbidden()
-            .ProducesUnAuthorized()
-            .RequireAuthorization()
             .ProducesInternalServerError()
             .WithName("Register notification token")
             .WithSummary("Register notification token for specific user")
@@ -37,9 +34,6 @@ public static class NotificationTokenRoutes
                 async (IMediator mediator, RefreshNotificationTokenCommand request, CancellationToken cancellation) =>
                     await mediator.Send(request, cancellation))
             .Produces(200)
-            .ProducesForbidden()
-            .ProducesUnAuthorized()
-            .RequireAuthorization()
             .ProducesInternalServerError()
             .WithName("Refresh notification token")
             .WithSummary("Refresh notification token for specific user")

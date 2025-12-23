@@ -25,9 +25,6 @@ public static class UserComplaintsRoutes
                 async (IMediator mediator, CancellationToken cancellationToken) =>
                     Results.Ok(await mediator.Send(new GetAllUserComplaintsRequest(), cancellationToken)))
             .Produces<List<GetUserComplaintsDto>>()
-            .RequireAuthorization()
-            .ProducesForbidden()
-            .ProducesUnAuthorized()
             .ProducesInternalServerError()
             .WithSummary("Get all user complaints")
             .WithName("Get all user complaints")

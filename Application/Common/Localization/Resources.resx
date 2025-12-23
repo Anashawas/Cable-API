@@ -135,4 +135,13 @@
   <data name="PlugTypeMustExist" xml:space="preserve">
     <value>The selected plug type does not exist</value>
   </data>
+  <data name="CheckCarModelInUse" xml:space="preserve">
+    <value>Can not delete this car model  because it is currently connected to other users </value>
+  </data>
+  <data name="UserCarMustExist" xml:space="preserve">
+    <value>User car doesnot exist</value>
+  </data>
+  <data name="StationTypeMustExist" xml:space="preserve">
+    <value>Station type does not exist</value>
+  </data>
 </root>

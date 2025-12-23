@@ -2,8 +2,8 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Application;
-using Application.Common.Enums;
 using Application.Common.Interfaces;
+using Cable.Core.Emuns;
 using Cable.Identity;
 using Cable.Routes;
 using Cable.WebApi.Middlewares;
@@ -11,6 +11,7 @@ using Cable.WebApi.OpenAPI.Filters;
 using FluentValidation;
 using Hangfire;
 using Infrastructrue;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.FileProviders;
 using Scalar.AspNetCore;
 using static System.Enum;
@@ -19,6 +20,18 @@ string[] supportedCultures = ["en-us", "en", "ar-kw", "ar"];
 const string openApiPath = "/OpenApi/Cable-API/v1.json";
 var builder = WebApplication.CreateBuilder(args);
 
+builder.WebHost.ConfigureKestrel(serverOptions =>
+{
+    serverOptions.ConfigureHttpsDefaults(httpsOptions =>
+    {
+        httpsOptions.SslProtocols = System.Security.Authentication.SslProtocols.Tls12 |
+                                    System.Security.Authentication.SslProtocols.Tls13;
+    });
+    serverOptions.ConfigureEndpointDefaults(listenOptions =>
+    {
+        listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1AndHttp2AndHttp3;
+    });
+});
 builder.Logging.AddConsole();
 #pragma warning disable CA1416
 builder.Logging.AddEventLog(op =>
@@ -70,42 +83,53 @@ var app = builder.Build();
 
 var fileUploadPath = builder.Configuration.GetValue<string>("File:FileUploadPath");
 
-foreach (var folder in GetNames<UploadFileFolders>())
-{
-    var fullPath = Path.Combine(fileUploadPath!, folder);
-    if (!Directory.Exists(fullPath))
-        Directory.CreateDirectory(fullPath);
-    app.UseStaticFiles(new StaticFileOptions
-    {
-        FileProvider = new PhysicalFileProvider(fullPath),
-        RequestPath = $"/{folder}"
-    });
-}
-
-
-
+//foreach (var folder in GetNames<UploadFileFolders>())
+//{
+//    var fullPath = Path.Combine(fileUploadPath!, folder);
+//    if (!Directory.Exists(fullPath))
+//        Directory.CreateDirectory(fullPath);
+//}
 
 app.UseRequestLocalization(op =>
 {
-    op.SetDefaultCulture(supportedCultures[2]);
+    op.SetDefaultCulture(supportedCultures[3]);
     op.AddSupportedUICultures(supportedCultures);
     op.ApplyCurrentCultureToResponseHeaders = true;
 });
 
 app.UseCableExceptionHandlerMiddleware();
+
+
 if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
 {
     app.MapOpenApi(openApiPath);
     app.MapScalarApiReference("Cable-API/v1", opt =>
     {
         opt.WithOpenApiRoutePattern(openApiPath);
-        opt.WithPreferredScheme("Bearer");
+        opt.AddPreferredSecuritySchemes(JwtBearerDefaults.AuthenticationScheme);
 
         opt.Theme = ScalarTheme.BluePlanet;
-        opt.DefaultHttpClient = new KeyValuePair<ScalarTarget, ScalarClient>(ScalarTarget.Http, ScalarClient.Http11);
+        opt.DefaultHttpClient = new KeyValuePair<ScalarTarget, ScalarClient>(ScalarTarget.Dart, ScalarClient.Http);
         opt.ShowSidebar = true;
         opt.Title = "Cable API";
+        opt.WithDocumentDownloadType(DocumentDownloadType.Both);
     });
+}
+if (app.Environment.IsProduction())
+{
+    app.MapOpenApi(openApiPath);
+    app.MapScalarApiReference("Cable-API-Production/v1", opt =>
+    {
+        opt.WithOpenApiRoutePattern(openApiPath);
+        opt.AddPreferredSecuritySchemes(JwtBearerDefaults.AuthenticationScheme);
+
+        opt.Theme = ScalarTheme.BluePlanet;
+        opt.DefaultHttpClient = new KeyValuePair<ScalarTarget, ScalarClient>(ScalarTarget.Dart, ScalarClient.Http);
+        opt.ShowSidebar = true;
+        opt.Title = "Cable API";
+        opt.WithDocumentDownloadType(DocumentDownloadType.Both);
+    });
+
 }
 
 app.UseCors();
@@ -115,6 +139,7 @@ app.UseCors();
 app.UseCustomAuthenticationResponse();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseSecureFileServing();
 app.MapHangfireDashboard("/Cable-Jobs-Dashboard");
 
 app.MapUserRoutes()
@@ -129,8 +154,9 @@ app.MapUserRoutes()
     .MapBannerAttachmentRoutes()
     .MapSystemVersionRoutes()
     .MapCarManagementRoutes()
-    .MapNotificationTokenRoutes();
-
+    .MapNotificationTokenRoutes()
+    .MapFileRoutes()
+    .MapSharedLinksRoutes();
 app.Run();
 
 void ConfigureJsonSerliaizer(JsonSerializerOptions jsonSerializer)

@@ -12,6 +12,8 @@ public class GetAllComplaintsByChargingPointIdQueryHandler(IApplicationDbContext
     {
         return mapper.Map<List<UserComplaint>, List<GetUserComplaintsDto>>(
             await applicationDbContext.UserComplaints.AsNoTracking()
+                .Include(x=>x.User)
+                .Include(x=>x.ChargingPoint)
                 .Where(x => x.ChargingPointId == request.ChargingPointId && !x.IsDeleted)
                 .ToListAsync(cancellationToken)
         );

@@ -1,5 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
+using Application.ChargingPoints.Queries.GetChargingPointById;
+using Application.Common.Interfaces.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.ChargingPoints.Queries.GetAllChargingPointsByUser;
@@ -8,42 +10,11 @@ public record GetAllChargingPointsByUserRequest( int? ChargerPointTypeId, string
     : IRequest<IEnumerable<GetAllChargingPointsDto>>;
 
 public class GetAllChargingPointsByUserRequestHandler(
-    IApplicationDbContext applicationDbContext,
+    IChargingPointRepository chargingPointRepository,
     ICurrentUserService currentUserService)
     : IRequestHandler<GetAllChargingPointsByUserRequest, IEnumerable<GetAllChargingPointsDto>>
 {
     public async Task<IEnumerable<GetAllChargingPointsDto>> Handle(GetAllChargingPointsByUserRequest request,
         CancellationToken cancellationToken)
-    {
-        var user = await applicationDbContext.UserAccounts.AsNoTracking().FirstOrDefaultAsync(x=>x.Id== currentUserService.UserId,cancellationToken);
-
-        var query = from chargingPoint in applicationDbContext.ChargingPoints.AsNoTracking()
-            join chargingPlug in applicationDbContext.ChargingPlugs.AsNoTracking() on chargingPoint.Id equals
-                chargingPlug.ChargingPointId into chargingPlugGroup
-            from chargingPlug in chargingPlugGroup.DefaultIfEmpty()
-            join plugType in applicationDbContext.PlugTypes.AsNoTracking() on chargingPlug.PlugTypeId equals
-                plugType.Id into plugTypeGroup
-            from plugType in plugTypeGroup.DefaultIfEmpty()
-            where !chargingPoint.IsDeleted && chargingPoint.OwnerId == user.Id
-            select new GetAllChargingPointsDto(
-                chargingPoint.Id,
-                chargingPoint.Name,
-                chargingPoint.CityName,
-                chargingPoint.Phone,
-                chargingPoint.FromTime,
-                chargingPoint.ToTime,
-                chargingPoint.Latitude,
-                chargingPoint.Longitude,
-                chargingPoint.ChargerPointTypeId
-            );
-
-        if (!string.IsNullOrEmpty(request.CityName))
-            query = query.Where(x => x.CityName.Contains(request.CityName));
-        if (request.ChargerPointTypeId.HasValue)
-            query = query.Where(x => x.ChargerPointTypeId == request.ChargerPointTypeId);
-
-        var result = await query.ToListAsync(cancellationToken);
-
-        return result;
-    }
+   =>    await chargingPointRepository.GetAllChargingPoints(request.ChargerPointTypeId, request.CityName, cancellationToken);
 }

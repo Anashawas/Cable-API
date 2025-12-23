@@ -1,11 +1,10 @@
-﻿using Application.Common.Enums;
-using Application.Common.Extensions;
+﻿using Application.Common.Extensions;
+using Cable.Core.Emuns;
 using Cable.Core.Exceptions;
-using MediatR.Pipeline;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
-namespace Application.BannersAttachments.Commands;
+namespace Application.BannersAttachments.Commands.AddBannerAttachment;
 
 public record AddBannerAttachmentsCommand(int BannerId, IFormFileCollection Files) : IRequest<int[]>;
 

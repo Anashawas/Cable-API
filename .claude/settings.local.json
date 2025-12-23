@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(rg:*)",
+      "Bash(grep:*)",
+      "Bash(dotnet restore:*)",
+      "Bash(export PATH=\"$HOME/.dotnet:$PATH\")",
+      "Bash(dotnet --list-sdks)",
+      "Bash(git config:*)",
+      "Bash(test:*)"
+    ],
+    "deny": []
+  }
+}

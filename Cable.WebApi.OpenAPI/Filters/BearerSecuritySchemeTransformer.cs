@@ -1,10 +1,11 @@
 ﻿using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.OpenApi;
 using Microsoft.OpenApi.Models;
 
 namespace Cable.WebApi.OpenAPI.Filters;
-public sealed class BearerSecuritySchemeTransformer(IAuthenticationSchemeProvider authenticationSchemeProvider)
+public sealed class BearerSecuritySchemeTransformer(IHttpContextAccessor httpContextAccessor, IAuthenticationSchemeProvider authenticationSchemeProvider)
     : IOpenApiDocumentTransformer
 {
     public async Task TransformAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context,
@@ -40,7 +41,16 @@ public sealed class BearerSecuritySchemeTransformer(IAuthenticationSchemeProvide
             Version = "v1",
             Description = "This document describes the REST APIs used for Cable application",
         };
-        
+        var request = httpContextAccessor.HttpContext?.Request;
+        if (request != null)
+        {
+            var baseUrl = $"{request.Scheme}://{request.Host}";
+            document.ExternalDocs = new OpenApiExternalDocs()
+            {
+                Description = "Cable API Documentation",
+                Url = new Uri($"{baseUrl}/OpenApi/Cable-API/v1.json")
+            };
+        }
         foreach (var operation in document.Paths.Values.SelectMany(path => path.Operations))
         {
             operation.Value.Security.Add(new OpenApiSecurityRequirement

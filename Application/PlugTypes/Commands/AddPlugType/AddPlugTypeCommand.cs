@@ -1,6 +1,6 @@
 ﻿namespace Application.PlugTypes.Commands.AddPlugType;
 
-public record AddPlugTypeCommand(string? Name, string SerialNumber) : IRequest<int>;
+public record AddPlugTypeCommand(string? Name, string SerialNumber, string PlugTypeFamily) : IRequest<int>;
 
 public class AddPlugTypeCommandHandler(IApplicationDbContext applicationDbContext)
     : IRequestHandler<AddPlugTypeCommand, int>
@@ -10,7 +10,8 @@ public class AddPlugTypeCommandHandler(IApplicationDbContext applicationDbContex
         var plugType = new PlugType
         {
             Name = request.Name,
-            SerialNumber = request.SerialNumber
+            SerialNumber = request.SerialNumber,
+            PlugTypeFamily = request.PlugTypeFamily
         };
         
         applicationDbContext.PlugTypes.Add(plugType);

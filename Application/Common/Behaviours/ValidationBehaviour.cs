@@ -32,6 +32,6 @@ public class ValidationBehaviour<TRequest, TResponse> :  IPipelineBehavior<TRequ
             if (failures.Any())
                 throw new DataValidationException(failures.ToErrorsDictionary());
         }
-        return await next();
+        return await next(cancellationToken);
     }
 }

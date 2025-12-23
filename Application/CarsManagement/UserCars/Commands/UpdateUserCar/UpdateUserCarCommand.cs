@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Application.CarsManagement.UserCars.Commands.UpdateUserCar;
 
-public record UpdateUserCarCommand(int UserId, int CarId, int PlugTypeId) : IRequest;
+public record UpdateUserCarCommand(int Id, int CarModelId, int PlugTypeId) : IRequest;
 
 public class UpdateUserCarCommandHandler(IApplicationDbContext applicationDbContext)
     : IRequestHandler<UpdateUserCarCommand>
@@ -12,12 +12,10 @@ public class UpdateUserCarCommandHandler(IApplicationDbContext applicationDbCont
     {
         var userCar =
             await applicationDbContext.UserCars.FirstOrDefaultAsync(
-                x => x.Id == request.UserId && x.CarId == request.CarId, cancellationToken)
-            ?? throw new NotFoundException($"can not find user car with id {request.UserId} and id {request.CarId}");
-        userCar.UserId = request.UserId;
-        userCar.CarId = request.CarId;
+                x => x.Id == request.Id , cancellationToken)
+            ?? throw new NotFoundException($"can not find user car with id {request.Id} and id {request.CarModelId}");
+        userCar.CarModelId = request.CarModelId;
         userCar.PlugTypeId = request.PlugTypeId;
-        await applicationDbContext.SaveChanges(cancellationToken)
-            ;
+        await applicationDbContext.SaveChanges(cancellationToken);
     }
 }

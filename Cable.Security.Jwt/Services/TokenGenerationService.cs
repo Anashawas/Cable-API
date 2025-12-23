@@ -34,7 +34,7 @@ public class TokenGenerationService : ITokenGenerationService
             _tokenGenerationOptions.TokenValidationParameters.ValidAudience,
             claims,
             expires: expireAfter.HasValue
-                ? DateTime.UtcNow.AddTicks(expireAfter.Value.Ticks)
+                ? DateTime.Now.AddTicks(expireAfter.Value.Ticks)
                 : (DateTime?)null,
             signingCredentials: new SigningCredentials(
                 _tokenGenerationOptions.TokenValidationParameters.IssuerSigningKey,

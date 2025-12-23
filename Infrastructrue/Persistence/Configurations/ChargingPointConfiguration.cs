@@ -12,37 +12,45 @@ namespace Infrastructrue.Persistence.Configurations;
 
 public partial class ChargingPointConfiguration : IEntityTypeConfiguration<ChargingPoint>
 {
-    public void Configure(EntityTypeBuilder<ChargingPoint> entity)
+    public void Configure(EntityTypeBuilder<ChargingPoint> builder)
     {
-        entity.ToTable("ChargingPoint");
+        builder.ToTable("ChargingPoint");
 
-        entity.Property(e => e.CityName).HasMaxLength(500);
-        entity.Property(e => e.CountryName).HasMaxLength(500);
-        entity.Property(e => e.CreatedAt).HasColumnType("datetime");
-        entity.Property(e => e.FromTime).HasMaxLength(8);
-        entity.Property(e => e.MethodPayment).HasMaxLength(20);
-        entity.Property(e => e.Name).HasMaxLength(255);
-        entity.Property(e => e.Note).HasMaxLength(500);
-        entity.Property(e => e.Phone).HasMaxLength(20);
-        entity.Property(e => e.Price).HasColumnName("price");
-        entity.Property(e => e.ToTime).HasMaxLength(8);
+        builder.Property(e => e.CityName).HasMaxLength(500);
+        builder.Property(e => e.CountryName).HasMaxLength(500);
+        builder.Property(e => e.CreatedAt).HasColumnType("datetime");
+        builder.Property(e => e.FromTime).HasMaxLength(8);
+        builder.Property(e => e.MethodPayment).HasMaxLength(20);
+        builder.Property(e => e.Name).HasMaxLength(255);
+        builder.Property(e => e.Address).HasMaxLength(500);
+        builder.Property(e => e.Note).HasMaxLength(500);
+        builder.Property(e => e.Phone).HasMaxLength(20);
+        builder.Property(e => e.OwnerPhone).HasMaxLength(20);
+        builder.Property(e => e.Price).HasColumnName("price");
+        builder.Property(e => e.ToTime).HasMaxLength(8);
+        
 
-        entity.HasOne(d => d.ChargerPointType).WithMany(p => p.ChargingPoints)
+        builder.HasOne(d => d.ChargerPointType).WithMany(p => p.ChargingPoints)
             .HasForeignKey(d => d.ChargerPointTypeId)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("FK_ChargingPoint_ChargingPointType");
 
-        entity.HasOne(d => d.Owner).WithMany(p => p.ChargingPoints)
+        builder.HasOne(d => d.Owner).WithMany(p => p.ChargingPoints)
             .HasForeignKey(d => d.OwnerId)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("FK_ChargingPoint_UserAccount");
 
-        entity.HasOne(d => d.Status).WithMany(p => p.ChargingPoints)
+        builder.HasOne(d => d.Status).WithMany(p => p.ChargingPoints)
             .HasForeignKey(d => d.StatusId)
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("FK_ChargingPoint_Status");
 
-        OnConfigurePartial(entity);
+        builder.HasOne(d => d.StationType).WithMany(p => p.ChargingPoints)
+            .HasForeignKey(d => d.StationTypeId)
+            .OnDelete(DeleteBehavior.ClientSetNull)
+            .HasConstraintName("ChargingPoint_StationType_Id_fk");
+
+        OnConfigurePartial(builder);
     }
 
     partial void OnConfigurePartial(EntityTypeBuilder<ChargingPoint> entity);

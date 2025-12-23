@@ -3,7 +3,7 @@
 public record AddSystemVersionCommand(
     string Platform,
     string Version,
-    string? ForceUpdate) : IRequest<int>;
+    bool ForceUpdate) : IRequest<int>;
 
 public class AddSystemVersionCommandHandler(IApplicationDbContext applicationDbContext)
     : IRequestHandler<AddSystemVersionCommand, int>

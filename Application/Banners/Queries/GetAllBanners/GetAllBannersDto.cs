@@ -4,6 +4,8 @@ public record GetAllBannersDto(
     int Id,
     string Name,
     string Phone,
+    int? ActionType,
+    string? ActionUrl,
     List<BannerDurationSummery> BannerDurations,
     List<BannerAttachmentSummery> BannerAttachments);
 

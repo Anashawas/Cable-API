@@ -1,3 +1,3 @@
 ﻿namespace Cable.Requests.PlugTypes;
 
-public record UpdatePlugTypeRequest(string? Name, string SerialNumber);
+public record UpdatePlugTypeRequest(string? Name, string SerialNumber, string PlugTypeFamily);

@@ -11,15 +11,15 @@ public class AddUserCarCommandValidator:  AbstractValidator<AddUserCarCommand>
     {
         _applicationDbContext = applicationDbContext;
         RuleFor(x=>x.UserId).NotEmpty().MustAsync(UserMustExist).WithMessage(Resources.UserMustExist);
-        RuleFor(x=>x.CarId).NotEmpty().MustAsync(CarMustExist).WithMessage(Resources.CarMustExist);
+        RuleFor(x=>x.CarModelId).NotEmpty().MustAsync(CarModelMustExist).WithMessage(Resources.CarMustExist);
         RuleFor(x => x.PlugTypeId)
             .NotEmpty()
             .MustAsync(PlugTypeMustExist).WithMessage(Resources.PlugTypeMustExist);
     }
     private async Task<bool> UserMustExist(int userId, CancellationToken cancellationToken)
         => await _applicationDbContext.UserAccounts.AnyAsync(x => x.Id == userId && !x.IsDeleted && x.IsActive , cancellationToken);
-    private async Task<bool> CarMustExist(int carId, CancellationToken cancellationToken)
-        => await _applicationDbContext.Cars.AnyAsync(x => x.Id == carId  , cancellationToken);
+    private async Task<bool> CarModelMustExist(int carModelId, CancellationToken cancellationToken)
+        => await _applicationDbContext.CarModels.AnyAsync(x => x.Id == carModelId  , cancellationToken);
     private async Task<bool> PlugTypeMustExist(int plugTypeId, CancellationToken cancellationToken)
         => await _applicationDbContext.PlugTypes.AnyAsync(x => x.Id == plugTypeId, cancellationToken);
 }

@@ -123,6 +123,15 @@ namespace Application.Common.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to لا يمكن حذف السيارة لانها مرطبة في مستخدمين.
+        /// </summary>
+        public static string CheckCarModelInUse {
+            get {
+                return ResourceManager.GetString("CheckCarModelInUse", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to كلمة السر الحالية.
         /// </summary>
         public static string CurrentPassword {
@@ -366,6 +375,15 @@ namespace Application.Common.Localization {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to نوع المحطة غير موجود.
+        /// </summary>
+        public static string StationTypeMustExist {
+            get {
+                return ResourceManager.GetString("StationTypeMustExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to الحالة غير موجودة.
         /// </summary>
         public static string StatusMustExist {
@@ -389,6 +407,15 @@ namespace Application.Common.Localization {
         public static string UserBannerAlreadyExist {
             get {
                 return ResourceManager.GetString("UserBannerAlreadyExist", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to سيارة المستخدم غير موجودة.
+        /// </summary>
+        public static string UserCarMustExist {
+            get {
+                return ResourceManager.GetString("UserCarMustExist", resourceCulture);
             }
         }
         

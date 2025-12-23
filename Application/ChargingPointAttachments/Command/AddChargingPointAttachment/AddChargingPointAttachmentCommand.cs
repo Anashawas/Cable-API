@@ -1,5 +1,6 @@
-﻿using Application.Common.Enums;
+﻿
 using Application.Common.Extensions;
+using Cable.Core.Emuns;
 using Cable.Core.Exceptions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
