@@ -1,8 +1,10 @@
 ﻿using Application.UserComplaints.Command.AddUserComplaint;
 using Application.UserComplaints.Command.DeleteUserComplaint;
 using Application.UserComplaints.Command.UpdateUserComplaint;
+using Application.UserComplaints.Command.UpdateUserComplaintStatus;
 using Application.UserComplaints.Queries.GetAllComplaintsByChargingPointId;
 using Application.UserComplaints.Queries.GetAllUserComplaints;
+using Application.UserComplaints.Queries.GetComplaintsByUser;
 using Cable.Requests.UserComplaints;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -30,16 +32,33 @@ public static class UserComplaintsRoutes
             .WithName("Get all user complaints")
             .WithOpenApi();
 
-        app.MapGet("/GetUserComplaintsById/{id:int}",
-                async (IMediator mediator, [FromRoute] int id, CancellationToken cancellationToken) =>
-                Results.Ok(await mediator.Send(new GetAllComplaintsByChargingPointIdRequest(id), cancellationToken)))
+        app.MapGet("/GetComplaintsByChargingPointId/{chargingPointId:int}",
+                async (IMediator mediator, [FromRoute] int chargingPointId, CancellationToken cancellationToken) =>
+                Results.Ok(await mediator.Send(new GetAllComplaintsByChargingPointIdRequest(chargingPointId), cancellationToken)))
             .Produces<List<GetUserComplaintsDto>>()
             .RequireAuthorization()
             .ProducesForbidden()
             .ProducesUnAuthorized()
             .ProducesInternalServerError()
-            .WithSummary("Get user complaints by id")
-            .WithName("Get user complaints by id")
+            .WithSummary("Get all complaints for a specific charging point")
+            .WithName("Get Complaints By Charging Point ID")
+            .WithOpenApi(op =>
+            {
+                op.Parameters[0].Required = true;
+                op.Parameters[0].Description = "The ID of the charging point";
+                return op;
+            });
+
+        app.MapGet("/GetMyComplaints",
+                async (IMediator mediator, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new GetComplaintsByUserRequest(), cancellationToken)))
+            .Produces<List<GetUserComplaintsDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesInternalServerError()
+            .WithSummary("Get all complaints submitted by the current user")
+            .WithName("Get My Complaints")
+            .WithDescription("Returns all complaints submitted by the currently logged-in user, ordered by creation date (newest first).")
             .WithOpenApi();
 
         app.MapPost("/AddUserComplaint",
@@ -76,6 +95,29 @@ public static class UserComplaintsRoutes
                 op.Parameters[0].Required = true;
                 op.RequestBody.Required = true;
                 op.Responses["200"].Description = "The id of the user complaint";
+                return op;
+            });
+
+        app.MapPatch("/UpdateUserComplaintStatus/{id:int}",
+                async (IMediator mediator, [FromRoute] int id,
+                        [FromBody] UpdateUserComplaintStatusRequest request,
+                        CancellationToken cancellationToken) =>
+                {
+                    await mediator.Send(new UpdateUserComplaintStatusCommand(id, request.Status), cancellationToken);
+                    return Results.Ok();
+                })
+            .Produces(200)
+            .RequireAuthorization()
+            .ProducesForbidden()
+            .ProducesUnAuthorized()
+            .ProducesNotFound()
+            .ProducesInternalServerError()
+            .WithSummary("Update user complaint status")
+            .WithName("Update user complaint status")
+            .WithOpenApi(op =>
+            {
+                op.Parameters[0].Required = true;
+                op.RequestBody.Required = true;
                 return op;
             });
 

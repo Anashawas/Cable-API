@@ -12,4 +12,6 @@ public partial class Status
     public string Name { get; set; } = null!;
 
     public virtual ICollection<ChargingPoint> ChargingPoints { get; set; } = new List<ChargingPoint>();
+
+    public virtual ICollection<ServiceProvider> ServiceProviders { get; set; } = new List<ServiceProvider>();
 }

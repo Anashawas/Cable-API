@@ -14,13 +14,6 @@ public class AddUserCommandValidator : AbstractValidator<AddUserCommand>
         _applicationDbContext = applicationDbContext;
         RuleFor(x => x.Name).MaximumLength(255).When(x => !string.IsNullOrEmpty(x.Name));
 
-        RuleFor(x => x.Phone)
-            .NotEmpty()
-            .Must(PhoneNumberUtility.IsValidJordanPhoneNumber)
-            .WithMessage($"Phone number must be a valid Jordan mobile number. Supported formats: {string.Join(", ", PhoneNumberUtility.GetSupportedFormats())}")
-            .MustAsync(CheckPhoneUnique)
-            .WithMessage("Phone number must be unique");
-
         RuleFor(x => x.RoleId).NotEmpty().MustAsync(CheckRoleExists).WithMessage(Resources.RoleMustExist);
         RuleFor(x => x.Email)
             .MustAsync(CheckEmailUnique)
@@ -36,20 +29,9 @@ public class AddUserCommandValidator : AbstractValidator<AddUserCommand>
     {
         if (string.IsNullOrEmpty(email))
             return true; // Null/empty emails are allowed
-            
-        return !await _applicationDbContext.UserAccounts.AnyAsync(
-            x => x.Email != null && x.Email.ToLower() == email.ToLower(), 
-            cancellationToken);
-    }
 
-    private async Task<bool> CheckPhoneUnique(string phone, CancellationToken cancellationToken)
-    {
-        var normalizedPhone = PhoneNumberUtility.NormalizePhoneNumber(phone);
-        if (normalizedPhone == null)
-            return false; // Invalid phone format
-            
         return !await _applicationDbContext.UserAccounts.AnyAsync(
-            x => x.Phone == normalizedPhone && !x.IsDeleted, 
+            x => x.Email != null && x.Email.ToLower() == email.ToLower(),
             cancellationToken);
     }
 }

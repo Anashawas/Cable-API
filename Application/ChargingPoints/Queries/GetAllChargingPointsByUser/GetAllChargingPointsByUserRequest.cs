@@ -16,5 +16,5 @@ public class GetAllChargingPointsByUserRequestHandler(
 {
     public async Task<IEnumerable<GetAllChargingPointsDto>> Handle(GetAllChargingPointsByUserRequest request,
         CancellationToken cancellationToken)
-   =>    await chargingPointRepository.GetAllChargingPoints(request.ChargerPointTypeId, request.CityName, cancellationToken);
+   =>    await chargingPointRepository.GetAllChargingPoints(request.ChargerPointTypeId, request.CityName, currentUserService.UserId, cancellationToken);
 }

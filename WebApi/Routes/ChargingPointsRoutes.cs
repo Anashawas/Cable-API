@@ -9,8 +9,8 @@ using Application.ChargingPoints.Queries;
 using Application.ChargingPoints.Queries.GetAllChargingPoints;
 using Application.ChargingPoints.Queries.GetAllChargingPointsByUser;
 using Application.ChargingPoints.Queries.GetChargingPointById;
+using Application.ChargingPoints.Queries.GetMyChargingPoints;
 using Cable.Requests.ChargingPoints;
-using Hangfire;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -47,8 +47,21 @@ public static class ChargingPointsRoutes
             .WithName("Get all charging points by user id")
             .WithSummary("Get all charging points by user id of the application")
             .WithOpenApi();
-        
-        
+
+        app.MapPost("GetMyChargingPoints",
+                async (IMediator mediator, GetMyChargingPointsRequest request,
+                        CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(request, cancellationToken)))
+            .Produces<List<GetAllChargingPointsDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesInternalServerError()
+            .WithName("Get my charging points")
+            .WithSummary("Get all charging points owned by the currently logged-in user")
+            .WithDescription("Returns all charging points where the current user is the owner. Optional filters for charger point type and city name.")
+            .WithOpenApi();
+
+
         app.MapPost("UploadChargingPoint/{id:int}",
                 async (IMediator mediator,[FromForm] IFormFile file,[FromRoute] int id,
                         CancellationToken cancellationToken) =>
@@ -111,7 +124,7 @@ public static class ChargingPointsRoutes
                             request.Price, request.FromTime, request.ToTime, request.ChargerSpeed,
                             request.ChargersCount, request.Latitude, request.Longitude,
                             request.ChargerPointTypeId, request.StatusId,
-                            request.StationTypeId, request.OwnerPhone,request.IsVerified, request.HasOffer, request.Service, request.OfferDescription,request.Address, request.PlugTypeIds ),
+                            request.StationTypeId, request.OwnerPhone,request.IsVerified, request.HasOffer, request.Service, request.OfferDescription,request.Address, request.ChargerBrand, request.PlugTypeIds ),
                         cancellationToken))
             .Produces(200)
             .RequireAuthorization()
@@ -190,4 +203,5 @@ public static class ChargingPointsRoutes
 
         return app;
     }
+
 }

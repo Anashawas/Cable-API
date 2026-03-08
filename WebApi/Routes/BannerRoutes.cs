@@ -14,8 +14,7 @@ public static class BannerRoutes
         app.MapGroup("/api/banners")
             .WithTags("Banners")
             .MapGroup();
-
-
+        
         return app;
     }
 

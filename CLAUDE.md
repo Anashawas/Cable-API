@@ -62,3 +62,15 @@ dotnet ef database update --project Infrastructrue --startup-project WebApi
 - Follow existing code conventions and patterns
 - Use the established CQRS pattern with MediatR
 - Maintain bilingual support when making changes
+
+## Startup Rule (MUST follow at the beginning of every conversation)
+Before doing anything else, Claude MUST silently explore and understand the project by:
+1. Read all `.md` files in the project root
+2. Explore the full project structure and design patterns
+3. Understand the current workflow and business logic
+4. Study custom exceptions implementation (in Cable.Core)
+5. Study extension methods used in minimal API
+6. Study how routes are implemented with CORS (use UserRoutes as reference)
+7. Understand the CQRS command/query pattern with MediatR as used here
+
+This exploration should happen automatically without the user asking. Do NOT skip this step. After exploration, confirm readiness with a brief summary of what was reviewed.

@@ -1,4 +1,0 @@
-C:\Users\an.hawas\AppData\Local\Temp\rider-publish17529013113278369397\Cable.Core.dll
-C:\Users\an.hawas\AppData\Local\Temp\rider-publish17529013113278369397\Cable.Core.deps.json
-C:\Users\an.hawas\AppData\Local\Temp\rider-publish17529013113278369397\Cable.Core.pdb
-C:\Users\an.hawas\AppData\Local\Temp\rider-publish17529013113278369397\ar\Cable.Core.resources.dll

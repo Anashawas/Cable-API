@@ -13,6 +13,8 @@ public partial class UserComplaint:BaseAuditableEntity
 
     public string Note { get; set; } = null!;
 
+    public int Status { get; set; }
+
     public virtual ChargingPoint ChargingPoint { get; set; } = null!;
 
     public virtual UserAccount User { get; set; } = null!;

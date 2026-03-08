@@ -7,7 +7,7 @@ public record CheckSystemVersionRequest(string Platform, string Version) : IRequ
 
 
 
-public record CheckSystemVersionDto(bool IsLatest,bool ForceUpdate );
+public record CheckSystemVersionDto(bool latestVersion,bool ForceUpdate );
 
 public class CheckSystemVersionQueryHandler(IApplicationDbContext applicationDbContext) : IRequestHandler<CheckSystemVersionRequest, CheckSystemVersionDto>
 {

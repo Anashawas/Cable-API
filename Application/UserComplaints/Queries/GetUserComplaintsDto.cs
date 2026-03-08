@@ -5,6 +5,7 @@ namespace Application.UserComplaints.Queries.GetAllUserComplaints;
 public record GetUserComplaintsDto(
     int Id,
     string Note,
+    int Status,
     UserAccountSummary UserAccount,
     ChargingPointSummary ChargingPoint);
 

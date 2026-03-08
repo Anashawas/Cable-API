@@ -14,6 +14,9 @@ using Infrastructrue.Options;
 using Infrastructrue.Persistence;
 using Infrastructrue.Persistence.Interceptors;
 using Infrastructrue.Persistence.Repositories;
+using Infrastructrue.Loyalty;
+using Infrastructrue.BackgroundJobs;
+using Infrastructrue.Reports.Services;
 using Infrastructrue.UploadFiles;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
@@ -36,6 +39,19 @@ public static class DependencyInjection
 
         services.AddHttpClient();
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
+
+        // Register HybridCache (.NET 9 feature)
+        services.AddHybridCache(options =>
+        {
+            options.MaximumPayloadBytes = 1024 * 1024; // 1 MB max payload
+            options.MaximumKeyLength = 1024; // 1 KB max key length
+            options.DefaultEntryOptions = new Microsoft.Extensions.Caching.Hybrid.HybridCacheEntryOptions
+            {
+                Expiration = TimeSpan.FromMinutes(10), // Default expiration
+                LocalCacheExpiration = TimeSpan.FromMinutes(5) // L1 cache expiration
+            };
+        });
+
         services.RegisterDbContext(configurations)
             .RegisterIdentity(configurations)
             .RegisterUploadFiles(configurations)
@@ -44,12 +60,25 @@ public static class DependencyInjection
             .RegisterHangFire(configurations)
             .RegisterSharedLink(configurations)
             .RegisterOtpServices(configurations)
+            .RegisterEmailServices(configurations)
+            .RegisterReportsProvider(configurations)
+            .RegisterBackgroundJobServices()
             .RegisterRepositories();
 
         return services;
     }
 
 
+    private static IServiceCollection RegisterReportsProvider(this IServiceCollection services, IConfiguration configuration)
+    {
+        FastReport.Utils.RegisteredObjects.AddConnection(typeof(FastReport.Data.MsSqlDataConnection));
+        services.Configure<ReportsOptions>(configuration.GetSection(ReportsOptions.ConfigName));
+        services.AddScoped<IReportService, ReportService>();
+        return services;
+    }
+
+    
+    
     private static IServiceCollection RegisterGoogleService(this IServiceCollection services,
         IConfiguration configurations)
     {
@@ -64,9 +93,9 @@ public static class DependencyInjection
         var firebaseOption = configurations.GetSection(FirebaseOption.ConfigName);
         services.Configure<FirebaseOption>(firebaseOption);
         services.AddSingleton<IFirebaseService, FirebaseService>();
-        services.AddScoped<INotificationService, NotificationService>();      
+        services.AddScoped<INotificationService, NotificationService>();
         return services;
-        
+
     }
 
     private static IServiceCollection RegisterSharedLink(this IServiceCollection services,
@@ -106,11 +135,29 @@ public static class DependencyInjection
         // Configure OTP options
         services.Configure<OtpOptions>(configurations.GetSection(OtpOptions.ConfigName));
         services.Configure<SmsOptions>(configurations.GetSection(SmsOptions.ConfigName));
-        
+
         // Register services
         services.AddScoped<IOtpService, Services.OtpService>();
         services.AddScoped<ISmsService, Services.SmsService>();
-        
+
+        return services;
+    }
+
+    private static IServiceCollection RegisterEmailServices(this IServiceCollection services, IConfiguration configurations)
+    {
+        // Configure Email options
+        services.Configure<EmailOptions>(configurations.GetSection(EmailOptions.ConfigName));
+
+        // Register services
+        services.AddScoped<IEmailService, Services.EmailService>();
+        services.AddScoped<IEmailTemplateService, Services.EmailTemplateService>();
+
+        return services;
+    }
+
+    private static IServiceCollection RegisterBackgroundJobServices(this IServiceCollection services)
+    {
+        services.AddScoped<IBackgroundJobService, BackgroundJobService>();
         return services;
     }
 
@@ -120,6 +167,7 @@ public static class DependencyInjection
         services.AddScoped<IUserAccountRepository, UserAccountRepository>();
         services.AddScoped<IChargingPointRepository, ChargingPointRepository>();
         services.AddScoped<ISharedLinkRepository, SharedLinkRepository>();
+        services.AddScoped<ILoyaltyPointService, LoyaltyPointService>();
         return services;
     }
 

@@ -37,9 +37,21 @@ public partial class ChargingPoint : BaseAuditableEntity
     public string? Address { get; set; }
     public string? Icon { get; set; }
     public int StationTypeId { get; set; }
-        
-    
-        
+
+    public string? ChargerBrand { get; set; }
+
+    // Loyalty Blocking
+    public bool IsLoyaltyBlocked { get; set; }
+    public DateTime? LoyaltyBlockedAt { get; set; }
+    public DateTime? LoyaltyBlockedUntil { get; set; }
+    public string? LoyaltyBlockReason { get; set; }
+    public int? LoyaltyBlockedByUserId { get; set; }
+    public virtual UserAccount? LoyaltyBlockedByUser { get; set; }
+
+    // Loyalty Credit Limit
+    public decimal? LoyaltyCreditLimit { get; set; }
+    public decimal LoyaltyCurrentBalance { get; set; }
+
     public virtual ICollection<ChargingPointAttachment> ChargingPointAttachments { get; set; } =
         new List<ChargingPointAttachment>();
 
@@ -55,5 +67,6 @@ public partial class ChargingPoint : BaseAuditableEntity
     public virtual StationType StationType { get; set; } = null!;
 
     public virtual ICollection<UserComplaint> UserComplaints { get; set; } = new List<UserComplaint>();
-    
+    public virtual ICollection<UserFavoriteChargingPoint> UserFavorites { get; set; } = new List<UserFavoriteChargingPoint>();
+
 }

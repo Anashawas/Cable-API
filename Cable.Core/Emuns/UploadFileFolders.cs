@@ -4,5 +4,7 @@ public enum UploadFileFolders
 {
     CableAttachments =1,
     CableBanners,
-    CableChargingPoint
+    CableChargingPoint,
+    CableEmergencyService,
+    CableServiceProvider
 }

@@ -30,6 +30,7 @@ public record AddChargingPointCommand(
     string? Service,
     string? OfferDescription,
     string? Address,
+    string? ChargerBrand,
     List<int>? PlugTypeIds
 ) : IRequest<int>;
 
@@ -44,8 +45,7 @@ public class AddChargingPointCommandHandler(
         var user = await applicationDbContext.UserAccounts.AsNoTracking()
                        .FirstOrDefaultAsync(x => !x.IsDeleted && x.Id == currentUserService.UserId, cancellationToken)
                    ?? throw new NotFoundException($"can not find user with id {currentUserService.UserId}");
-
-        // Normalize phone numbers if provided
+        
         var normalizedPhone = !string.IsNullOrEmpty(request.Phone) 
             ? PhoneNumberUtility.NormalizePhoneNumber(request.Phone) ?? request.Phone 
             : request.Phone;
@@ -81,6 +81,7 @@ public class AddChargingPointCommandHandler(
             Service = request.Service,
             OfferDescription = request.OfferDescription,
             Address = request.Address,
+            ChargerBrand = request.ChargerBrand,
         };
         applicationDbContext.ChargingPoints.Add(chargingPoint);
         

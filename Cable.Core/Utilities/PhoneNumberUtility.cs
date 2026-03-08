@@ -33,8 +33,7 @@ public static class PhoneNumberUtility
     {
         if (string.IsNullOrWhiteSpace(phoneNumber))
             return null;
-
-        // Remove all non-digit characters (spaces, +, -, etc.)
+        
         var cleaned = PhoneCleanupRegex.Replace(phoneNumber.Trim(), "");
 
         if (string.IsNullOrEmpty(cleaned))
@@ -106,14 +105,13 @@ public static class PhoneNumberUtility
         if (mobileNumber.Length != 9 || !mobileNumber.StartsWith("7"))
             return false;
 
-        // Jordan mobile numbers typically start with:
-        // 77, 78, 79 
+        // Jordan mobile numbers start with:
+        // 76 (Umniah), 77 (Orange), 78 (Zain), 79 (Zain/Umniah)
         var prefix = mobileNumber.Substring(0, 2);
-        
+
         return prefix switch
         {
-        
-            "77" or "78" or "79" => true, 
+            "76" or "77" or "78" or "79" => true,
             _ => false
         };
     }

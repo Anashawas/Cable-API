@@ -1,17 +1,16 @@
 ﻿using Application.Common.Interfaces;
-using FirebaseAdmin;
+using Cable.Core.Enums;
 using FirebaseAdmin.Messaging;
-using Google.Apis.Auth.OAuth2;
-using infrastructrue.Options;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Options;
 
 namespace Infrastructrue.Firebase.NotificationService;
 
 public class NotificationService(IFirebaseService firebaseService) : INotificationService
 {
-    
-    public async Task<string> SendMessageAsync(string token, string title, string body)
+    public async Task<string> SendMessageAsync(
+        string token,
+        string title,
+        string body,
+        FirebaseAppType appType = FirebaseAppType.UserApp)
     {
         var message = new Message()
         {
@@ -22,13 +21,22 @@ public class NotificationService(IFirebaseService firebaseService) : INotificati
                 Body = body
             }
         };
-        var response = await firebaseService.FirebaseMessaging.SendAsync(message);
+
+        var messaging = firebaseService.GetFirebaseMessaging(appType);
+        var response = await messaging.SendAsync(message);
         return response;
     }
-    public async Task SendMessagesAsync(IEnumerable<string> tokens, string title, string body)
+
+    public async Task<NotificationSendResult> SendMessagesAsync(
+        IEnumerable<string> tokens,
+        string title,
+        string body,
+        FirebaseAppType appType = FirebaseAppType.UserApp)
     {
+        var tokenList = tokens.ToList();
         var messages = new List<Message>();
-        foreach (var token in tokens)
+
+        foreach (var token in tokenList)
         {
             messages.Add(new Message()
             {
@@ -40,6 +48,32 @@ public class NotificationService(IFirebaseService firebaseService) : INotificati
                 }
             });
         }
-        var response = await firebaseService.FirebaseMessaging.SendEachAsync(messages);
+
+        var messaging = firebaseService.GetFirebaseMessaging(appType);
+        var batchResponse = await messaging.SendEachAsync(messages);
+
+        var result = new NotificationSendResult
+        {
+            TotalCount = tokenList.Count,
+            SuccessCount = batchResponse.SuccessCount,
+            FailureCount = batchResponse.FailureCount
+        };
+
+        for (int i = 0; i < batchResponse.Responses.Count; i++)
+        {
+            var response = batchResponse.Responses[i];
+            var token = tokenList[i];
+
+            if (response.IsSuccess)
+            {
+                result.SuccessfulTokens.Add(token);
+            }
+            else
+            {
+                result.FailedTokens.Add(token);
+            }
+        }
+
+        return result;
     }
 }

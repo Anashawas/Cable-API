@@ -54,6 +54,42 @@ public partial class ApplicationDbContext(
     public DbSet<SharedLinkUsage> SharedLinkUsages { get; set; }
     public DbSet<OtpRateLimit> OtpRateLimits { get; set; }
     public DbSet<PhoneVerification> PhoneVerifications { get; set; }
+    public DbSet<UserFavoriteChargingPoint> UserFavoriteChargingPoints { get; set; }
+    public DbSet<NotificationType> NotificationTypes { get; set; }
+    public DbSet<Domain.Enitites.NotificationInbox> NotificationInboxes { get; set; }
+    public DbSet<PasswordReset> PasswordResets { get; set; }
+    public DbSet<ChargingPointUpdateRequest> ChargingPointUpdateRequests { get; set; }
+    public DbSet<ChargingPointUpdateRequestAttachment> ChargingPointUpdateRequestAttachments { get; set; }
+    public DbSet<EmergencyService> EmergencyServices { get; set; }
+    public DbSet<EmergencyServiceAttachment> EmergencyServiceAttachments { get; set; }
+
+    // Service Provider DbSets
+    public DbSet<ServiceCategory> ServiceCategories { get; set; }
+    public DbSet<ServiceProvider> ServiceProviders { get; set; }
+    public DbSet<ServiceProviderAttachment> ServiceProviderAttachments { get; set; }
+    public DbSet<ServiceProviderRate> ServiceProviderRates { get; set; }
+    public DbSet<UserFavoriteServiceProvider> UserFavoriteServiceProviders { get; set; }
+
+    // Offers & Transactions DbSets
+    public DbSet<PointsConversionRate> PointsConversionRates { get; set; }
+    public DbSet<ProviderOffer> ProviderOffers { get; set; }
+    public DbSet<OfferTransaction> OfferTransactions { get; set; }
+    public DbSet<ProviderSettlement> ProviderSettlements { get; set; }
+    public DbSet<ProviderPayment> ProviderPayments { get; set; }
+
+    // Partner Transactions DbSets
+    public DbSet<PartnerAgreement> PartnerAgreements { get; set; }
+    public DbSet<PartnerTransaction> PartnerTransactions { get; set; }
+
+    // Loyalty System DbSets
+    public DbSet<LoyaltyPointAction> LoyaltyPointActions { get; set; }
+    public DbSet<LoyaltyTier> LoyaltyTiers { get; set; }
+    public DbSet<LoyaltySeason> LoyaltySeasons { get; set; }
+    public DbSet<UserSeasonProgress> UserSeasonProgresses { get; set; }
+    public DbSet<UserLoyaltyAccount> UserLoyaltyAccounts { get; set; }
+    public DbSet<LoyaltyPointTransaction> LoyaltyPointTransactions { get; set; }
+    public DbSet<LoyaltyReward> LoyaltyRewards { get; set; }
+    public DbSet<UserRewardRedemption> UserRewardRedemptions { get; set; }
 
     #endregion
 

@@ -1,4 +1,4 @@
-﻿namespace Application.Users.Queries.GetAllUsers;
+namespace Application.Users.Queries.GetAllUsers;
 
 public record GetAllUsersDto(
     int Id,
@@ -7,7 +7,9 @@ public record GetAllUsersDto(
     string? UserName,
     string? Email,
     bool IsPhoneVerified,
-    RoleSummary Role);
+    DateTime CreatedAt,
+    RoleSummary Role,
+    List<UserCarSummaryDto> UserCars);
 
 /// <summary>
 /// The summary of the role
@@ -16,3 +18,9 @@ public record GetAllUsersDto(
 /// <param name="Name">The name of the role</param>
 public record RoleSummary(int Id, string Name);
 
+public record UserCarSummaryDto(
+    int Id,
+    string CarTypeName,
+    string CarModelName,
+    string? PlugTypeName,
+    DateTime CreatedAt);

@@ -6,6 +6,7 @@ using Application.Common.Interfaces;
 using Cable.Core.Emuns;
 using Cable.Identity;
 using Cable.Routes;
+using Cable.Middlewares;
 using Cable.WebApi.Middlewares;
 using Cable.WebApi.OpenAPI.Filters;
 using FluentValidation;
@@ -138,9 +139,83 @@ app.UseCors();
 
 app.UseCustomAuthenticationResponse();
 app.UseAuthentication();
+app.UseSecurityStampValidation();
 app.UseAuthorization();
 app.UseSecureFileServing();
 app.MapHangfireDashboard("/Cable-Jobs-Dashboard");
+
+// ==========================================
+// Register Hangfire Recurring Jobs
+// ==========================================
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "expire-offer-transaction-codes",
+    service => service.ExpireOfferTransactionCodesAsync(CancellationToken.None),
+    "*/5 * * * *");
+
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "expire-partner-transaction-codes",
+    service => service.ExpirePartnerTransactionCodesAsync(CancellationToken.None),
+    "*/5 * * * *");
+
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "generate-monthly-settlements",
+    service => service.GenerateMonthlySettlementsAsync(
+        DateTime.UtcNow.AddMonths(-1).Year,
+        DateTime.UtcNow.AddMonths(-1).Month,
+        CancellationToken.None),
+    "30 0 1 * *");
+
+// Critical: Security Cleanup (daily at 02:00 UTC)
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "cleanup-expired-phone-verifications",
+    service => service.CleanupExpiredPhoneVerificationsAsync(CancellationToken.None),
+    "0 2 * * *");
+
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "cleanup-expired-password-resets",
+    service => service.CleanupExpiredPasswordResetsAsync(CancellationToken.None),
+    "0 2 * * *");
+
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "cleanup-expired-otp-rate-limits",
+    service => service.CleanupExpiredOtpRateLimitsAsync(CancellationToken.None),
+    "0 2 * * *");
+
+// Important: Business Expiry
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "deactivate-expired-offers",
+    service => service.DeactivateExpiredOffersAsync(CancellationToken.None),
+    "*/30 * * * *"); // Every 30 minutes
+
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "deactivate-expired-shared-links",
+    service => service.DeactivateExpiredSharedLinksAsync(CancellationToken.None),
+    "*/30 * * * *"); // Every 30 minutes
+
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "end-expired-loyalty-seasons",
+    service => service.EndExpiredLoyaltySeasonsAsync(CancellationToken.None),
+    "0 0 * * *"); // Daily at midnight UTC
+
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "expire-loyalty-points",
+    service => service.ExpireLoyaltyPointsAsync(CancellationToken.None),
+    "0 1 * * *"); // Daily at 01:00 UTC
+
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "deactivate-expired-rewards",
+    service => service.DeactivateExpiredRewardsAsync(CancellationToken.None),
+    "0 0 * * *"); // Daily at midnight UTC
+
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "unblock-expired-loyalty-blocks",
+    service => service.UnblockExpiredLoyaltyBlocksAsync(CancellationToken.None),
+    "0 */4 * * *"); // Every 4 hours
+
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "unblock-expired-provider-loyalty-blocks",
+    service => service.UnblockExpiredProviderLoyaltyBlocksAsync(CancellationToken.None),
+    "0 */4 * * *"); // Every 4 hours
 
 app.MapUserRoutes()
     .MapChargingPointsRoutes()
@@ -156,7 +231,20 @@ app.MapUserRoutes()
     .MapCarManagementRoutes()
     .MapNotificationTokenRoutes()
     .MapFileRoutes()
-    .MapSharedLinksRoutes();
+    .MapFavoritesRoutes()
+    .MapSharedLinksRoutes()
+    .MapNotificationInboxRoutes()
+    .MapNotificationTypeRoutes()
+    .MapEmergencyServiceRoutes()
+    .MapEmergencyServiceAttachmentsRoutes()
+    .MapReportRoutes()
+    .MapServiceProviderRoutes()
+    .MapServiceCategoryRoutes()
+    .MapOfferRoutes()
+    .MapConversionRateRoutes()
+    .MapLoyaltyRoutes()
+    .MapPartnerRoutes()
+    .MapProviderRoutes();
 app.Run();
 
 void ConfigureJsonSerliaizer(JsonSerializerOptions jsonSerializer)

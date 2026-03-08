@@ -1,5 +1,5 @@
 ﻿using Application.NotificationTokens.Commands.RefreshNotificationToken;
-using Application.NotificationTokens.Commands.RegisterNotificationToken;
+using Cable.WebApi.OpenAPI;
 using MediatR;
 
 namespace Cable.Routes;
@@ -9,40 +9,36 @@ public static class NotificationTokenRoutes
     public static IEndpointRouteBuilder MapNotificationTokenRoutes(this IEndpointRouteBuilder app)
     {
         app.MapGroup("/api/notification-token")
-            .WithTags("Notification-Token")
+            .WithTags("Notification Token")
             .MapRoutes();
         return app;
     }
 
     private static RouteGroupBuilder MapRoutes(this RouteGroupBuilder app)
     {
-        app.MapPost("/RegisterNotificationToken",
-                async (IMediator mediator, RegisterNotificationTokenCommand request, CancellationToken cancellation) =>
-                    Results.Ok(await mediator.Send(request, cancellation)))
-            .Produces<int>()
-            .ProducesInternalServerError()
-            .WithName("Register notification token")
-            .WithSummary("Register notification token for specific user")
-            .WithOpenApi(op =>
+        // Upsert notification token (register or update)
+        app.MapPut("/", async (
+                IMediator mediator,
+                RefreshNotificationTokenCommand request,
+                CancellationToken cancellationToken) =>
             {
-                op.RequestBody.Required = true;
-                op.Responses["200"].Description = "The id of the register token";
-                return op;
-            });
-
-        app.MapPut("/RefreshNotificationToken",
-                async (IMediator mediator, RefreshNotificationTokenCommand request, CancellationToken cancellation) =>
-                    await mediator.Send(request, cancellation))
+                await mediator.Send(request, cancellationToken);
+                return Results.Ok();
+            })
             .Produces(200)
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesValidationProblem()
             .ProducesInternalServerError()
-            .WithName("Refresh notification token")
-            .WithSummary("Refresh notification token for specific user")
+            .WithName("Upsert Notification Token")
+            .WithSummary("Register or update FCM notification token for authenticated user")
+            .WithDescription("If user doesn't have a token for the specified app type, it will be created. If user already has a token for the app type, it will be updated. Each user can have one active FCM token per app type (UserApp or StationApp).")
             .WithOpenApi(op =>
             {
                 op.RequestBody.Required = true;
+                op.RequestBody.Description = "FCM token, device information, and app type (1 = UserApp, 2 = StationApp)";
                 return op;
             });
-
 
         return app;
     }

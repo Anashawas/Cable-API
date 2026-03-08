@@ -4,7 +4,7 @@ public record GetChargingPointByIdDto(
     int Id,
     string Name,
     string? CityName,
-    string? CountryName,        
+    string? CountryName,
     string? Phone,
     string? OwnerPhone,
     string? FromTime,
@@ -19,17 +19,20 @@ public record GetChargingPointByIdDto(
     double? AvgChargingPointRate,
     string? IConUrl,
     int RateCount,
-    double? Price,             
-    int? ChargerSpeed,       
-    int? ChargersCount,         
-    int? VisitorsCount,         
-    string? Note,             
+    double? Price,
+    int? ChargerSpeed,
+    int? ChargersCount,
+    int? VisitorsCount,
+    string? Note,
     string? MethodPayment,
+    string? ChargerBrand,
     StatusSummary StatusSummary,
     ChargingPointTypeSummary? ChargingPointType,
     StationTypeSummary? StationType,
     List<string>? Images,
-    List<PlugTypeSummary>? PlugTypeSummary
+    List<PlugTypeSummary>? PlugTypeSummary,
+    bool IsFavorite,
+    bool IsPartner
 );
 
 

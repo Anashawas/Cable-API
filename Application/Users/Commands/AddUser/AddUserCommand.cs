@@ -9,12 +9,11 @@ namespace Application.Users.Commands.AddUser;
 
 public record AddUserCommand(
     string? Name,
-    string Phone,
     int RoleId,
     string? Email,
     string? Password,
-    string ? Country, 
-    string ? City 
+    string ? Country,
+    string ? City
 )
     : IRequest<UserDetailsResult>;
 
@@ -23,17 +22,10 @@ public class AddUserCommandHandler(IApplicationDbContext applicationDbContext,IU
 {
     public async Task<UserDetailsResult> Handle(AddUserCommand request, CancellationToken cancellationToken)
     {
-        // Normalize phone number using PhoneNumberUtility
-        var normalizedPhone = PhoneNumberUtility.NormalizePhoneNumber(request.Phone);
-        if (normalizedPhone == null)
-        {
-            throw new DataValidationException("Phone", "Invalid phone number format. Please use a valid Jordan mobile number.");
-        }
-
         var user = new UserAccount()
         {
             Name = request.Name,
-            Phone = normalizedPhone,
+            Phone = null,
             RoleId = request.RoleId,
             Password = string.IsNullOrEmpty(request.Password) ? null : passwordHasher.HashPassword(request.Password),
             IsDeleted = false,

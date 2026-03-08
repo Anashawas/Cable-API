@@ -176,3 +176,15 @@ credentials.json
 
 # Connection strings
 connectionstrings.config
+
+# Staging config
+appsettings.Staging.json
+
+# Local settings
+.claude/settings.local.json
+*.DotSettings.user
+
+# Screenshots and images in project root
+Screenshot*.png
+WhatsApp*.jpeg
+WhatsApp*.jpg

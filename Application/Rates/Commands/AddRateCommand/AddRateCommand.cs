@@ -9,7 +9,8 @@ public record AddRateCommand(int ChargingPointId, int ChargingPointRate) : IRequ
 public class AddRateCommandHandler(
     IApplicationDbContext applicationDbContext,
     ICurrentUserService currentUserService,
-    IRateRepository rateRepository)
+    IRateRepository rateRepository,
+    ILoyaltyPointService loyaltyPointService)
     : IRequestHandler<AddRateCommand, int>
 {
     public async Task<int> Handle(AddRateCommand request, CancellationToken cancellationToken)
@@ -28,6 +29,9 @@ public class AddRateCommandHandler(
 
         applicationDbContext.Rates.Add(rate);
         await applicationDbContext.SaveChanges(cancellationToken);
+
+        // Award loyalty points
+        await loyaltyPointService.AwardPointsAsync(user.Id, "RATE_STATION", "ChargingPoint", request.ChargingPointId, cancellationToken: cancellationToken);
 
         return rate.Id;
     }

@@ -23,6 +23,7 @@ public record UpdateChargingPointRequest(
     string? Service,
     string? OfferDescription,
     string? Address,
+    string? ChargerBrand,
     List<int>? PlugTypeIds
     );
 

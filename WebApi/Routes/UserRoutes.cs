@@ -6,6 +6,11 @@ using Application.Users.Commands.AddUser;
 using Application.Users.Commands.ChangePassword;
 using Application.Users.Commands.DeleteUser;
 using Application.Users.Commands.UpdateUser;
+using Application.Users.Commands.RequestPasswordReset;
+using Application.Users.Commands.ResetPasswordWithCode;
+using Application.Users.Commands.ValidateResetCode;
+using Application.Users.Commands.VerifyPhone.SendPhoneVerificationOtp;
+using Application.Users.Commands.VerifyPhone.VerifyUserPhone;
 using Application.Users.Queries.GetAllUsers;
 using Application.Users.Queries.GetUserById;
 using Cable.Requests.Identity;
@@ -60,7 +65,7 @@ public static class UserRoutes
             .Produces<UserDetailsResult>()
             .ProducesInternalServerError()
             .WithName("Add User")
-            .WithSummary("Adds a new user")
+            .WithSummary("Adds a new user without phone. Phone must be added via verify-phone endpoints.")
             .WithOpenApi(op =>
             {
                 op.RequestBody.Required = true;
@@ -74,7 +79,7 @@ public static class UserRoutes
                 async (IMediator mediator, [FromRoute] int id, UpdateUserRequest request,
                         CancellationToken cancellation) =>
                     await mediator.Send(new
-                        UpdateUserCommand(id, request.Name, request.RoleId, request.Phone, request.Email, request.IsActive, request.Country, request.City), cancellation))
+                        UpdateUserCommand(id, request.Name, request.RoleId, request.Email, request.IsActive, request.Country, request.City), cancellation))
             .Produces(200)
             .RequireAuthorization()
             .ProducesUnAuthorized()
@@ -82,7 +87,7 @@ public static class UserRoutes
             .ProducesNotFound()
             .ProducesInternalServerError()
             .WithName("Update User")
-            .WithSummary("Updates an existing user")
+            .WithSummary("Updates an existing user. Phone is managed separately via verify-phone endpoints.")
             .WithOpenApi(op =>
             {
                 op.Parameters[0].Required = true;
@@ -122,6 +127,92 @@ public static class UserRoutes
             .ProducesInternalServerError()
             .WithName("Change My Password")
             .WithSummary("Changes the logged in user password")
+            .WithOpenApi(op =>
+            {
+                op.RequestBody.Required = true;
+                return op;
+            });
+        ;
+
+        app.MapPost("/request-password-reset", async (IMediator mediator,
+                    RequestPasswordResetRequest request, CancellationToken cancellation) =>
+                Results.Ok(await mediator.Send(new RequestPasswordResetCommand(request.Email), cancellation)))
+            .Produces<RequestPasswordResetDto>()
+            .ProducesValidationProblem()
+            .ProducesNotFound()
+            .ProducesInternalServerError()
+            .WithName("Request Password Reset")
+            .WithSummary("Sends a 6-digit reset code to the user's email")
+            .WithOpenApi(op =>
+            {
+                op.RequestBody.Required = true;
+                return op;
+            });
+        ;
+
+        app.MapPost("/validate-reset-code", async (IMediator mediator,
+                    ValidateResetCodeRequest request, CancellationToken cancellation) =>
+                Results.Ok(await mediator.Send(new ValidateResetCodeCommand(request.Email, request.Code), cancellation)))
+            .Produces<ValidateResetCodeDto>()
+            .ProducesValidationProblem()
+            .ProducesNotFound()
+            .ProducesInternalServerError()
+            .WithName("Validate Reset Code")
+            .WithSummary("Validates the 6-digit reset code before changing password")
+            .WithOpenApi(op =>
+            {
+                op.RequestBody.Required = true;
+                return op;
+            });
+        ;
+
+        app.MapPost("/reset-password", async (IMediator mediator,
+                    ResetPasswordWithCodeRequest request, CancellationToken cancellation) =>
+                Results.Ok(await mediator.Send(new ResetPasswordWithCodeCommand(request.Email, request.Code, request.NewPassword), cancellation)))
+            .Produces<ResetPasswordWithCodeDto>()
+            .ProducesValidationProblem()
+            .ProducesNotFound()
+            .ProducesInternalServerError()
+            .WithName("Reset Password With Code")
+            .WithSummary("Resets the user's password using the 6-digit code sent via email")
+            .WithOpenApi(op =>
+            {
+                op.RequestBody.Required = true;
+                return op;
+            });
+        ;
+
+        app.MapPost("/verify-phone/send-otp", async (IMediator mediator,
+                    SendPhoneVerificationOtpRequest request, CancellationToken cancellation) =>
+                Results.Ok(await mediator.Send(new SendPhoneVerificationOtpCommand(request.PhoneNumber), cancellation)))
+            .RequireAuthorization()
+            .Produces<SendPhoneVerificationOtpDto>()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesValidationProblem()
+            .ProducesNotFound()
+            .ProducesInternalServerError()
+            .WithName("Send Phone Verification OTP")
+            .WithSummary("Sends OTP to verify and link phone number to current user's account")
+            .WithOpenApi(op =>
+            {
+                op.RequestBody.Required = true;
+                return op;
+            });
+        ;
+
+        app.MapPost("/verify-phone/verify-otp", async (IMediator mediator,
+                    VerifyUserPhoneRequest request, CancellationToken cancellation) =>
+                Results.Ok(await mediator.Send(new VerifyUserPhoneCommand(request.PhoneNumber, request.OtpCode), cancellation)))
+            .RequireAuthorization()
+            .Produces<VerifyUserPhoneDto>()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesValidationProblem()
+            .ProducesNotFound()
+            .ProducesInternalServerError()
+            .WithName("Verify User Phone")
+            .WithSummary("Verifies OTP and links phone number to current user's account")
             .WithOpenApi(op =>
             {
                 op.RequestBody.Required = true;
@@ -241,6 +332,19 @@ public static class UserRoutes
                 op.RequestBody.Required = true;
                 return op;
             });
+
+        app.MapPost("/logout", async (IAuthenticationService authenticationService,
+                    ICurrentUserService currentUserService, CancellationToken cancellationToken) =>
+                {
+                    await authenticationService.Logout(currentUserService.UserId!.Value, cancellationToken);
+                    return Results.Ok();
+                })
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesInternalServerError()
+            .WithName("Logout")
+            .WithSummary("Logs out the user by invalidating all active sessions")
+            .WithOpenApi();
 
         return app;
     }

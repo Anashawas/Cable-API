@@ -50,6 +50,35 @@ public partial class ChargingPointConfiguration : IEntityTypeConfiguration<Charg
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("ChargingPoint_StationType_Id_fk");
 
+        // Loyalty Blocking
+        builder.Property(e => e.IsLoyaltyBlocked)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(e => e.LoyaltyBlockedAt)
+            .HasColumnType("datetime");
+
+        builder.Property(e => e.LoyaltyBlockedUntil)
+            .HasColumnType("datetime");
+
+        builder.Property(e => e.LoyaltyBlockReason)
+            .HasMaxLength(500);
+
+        builder.HasOne(d => d.LoyaltyBlockedByUser)
+            .WithMany()
+            .HasForeignKey(d => d.LoyaltyBlockedByUserId)
+            .OnDelete(DeleteBehavior.ClientSetNull)
+            .HasConstraintName("FK_ChargingPoint_LoyaltyBlockedByUser");
+
+        // Loyalty Credit Limit
+        builder.Property(e => e.LoyaltyCreditLimit)
+            .HasColumnType("decimal(18,3)");
+
+        builder.Property(e => e.LoyaltyCurrentBalance)
+            .IsRequired()
+            .HasDefaultValue(0m)
+            .HasColumnType("decimal(18,3)");
+
         OnConfigurePartial(builder);
     }
 

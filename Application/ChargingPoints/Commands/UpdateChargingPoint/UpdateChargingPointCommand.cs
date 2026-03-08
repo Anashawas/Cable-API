@@ -31,6 +31,7 @@ public record UpdateChargingPointCommand(
     string? Service,
     string? OfferDescription,
     string? Address,
+    string? ChargerBrand,
     List<int>? PlugTypeIds
 ) : IRequest;
 
@@ -69,10 +70,10 @@ public class UpdateChargingPointCommandHandler(
         chargingPoint.ToTime = request.ToTime;
         chargingPoint.ChargerSpeed = request.ChargerSpeed;
         chargingPoint.ChargersCount = request.ChargersCount;
-        chargingPoint.Latitude = request.Latitude; 
-        chargingPoint.Longitude = request.Longitude; 
+        chargingPoint.Latitude = request.Latitude;
+        chargingPoint.Longitude = request.Longitude;
         chargingPoint.ChargerPointTypeId = request.ChargerPointTypeId;
-        chargingPoint.StatusId = request.StatusId;  
+        chargingPoint.StatusId = request.StatusId;
         chargingPoint.StationTypeId = request.StationTypeId;
         chargingPoint.OwnerPhone = normalizedOwnerPhone;
         chargingPoint.IsVerified = request.IsVerified;
@@ -80,6 +81,7 @@ public class UpdateChargingPointCommandHandler(
         chargingPoint.Service = request.Service;
         chargingPoint.OfferDescription = request.OfferDescription;
         chargingPoint.Address = request.Address;
+        chargingPoint.ChargerBrand = request.ChargerBrand;
 
 
         var existingChargingPlugs = await applicationDbContext.ChargingPlugs
