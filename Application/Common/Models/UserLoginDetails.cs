@@ -32,6 +32,7 @@ public record UserDetailsResult(
     string? Country,
     string? City,
     bool? IsPhoneVerified,
+    bool HasReadUpdateNotes,
     RoleSummary? Role,
     List<UserCarTypeDto>? UserCars
 );

@@ -1,20 +1,34 @@
+using Application.Common.Models;
 using Application.Common.Interfaces;
 using Application.ServiceProviders.Queries.GetAllServiceProviders;
+using Cable.Core.Emuns;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.ServiceProviders.Queries.GetMyServiceProviders;
 
-public record GetMyServiceProvidersRequest(int? CategoryId = null)
-    : IRequest<List<ServiceProviderDto>>;
+public record GetMyServiceProvidersRequest(int? CategoryId = null, int? Page = null, int? PageSize = null)
+    : IRequest<PagedResult<ServiceProviderDto>>;
 
 public class GetMyServiceProvidersRequestHandler(
     IApplicationDbContext applicationDbContext,
-    ICurrentUserService currentUserService)
-    : IRequestHandler<GetMyServiceProvidersRequest, List<ServiceProviderDto>>
+    ICurrentUserService currentUserService,
+    IUploadFileService uploadFileService)
+    : IRequestHandler<GetMyServiceProvidersRequest, PagedResult<ServiceProviderDto>>
 {
-    public async Task<List<ServiceProviderDto>> Handle(GetMyServiceProvidersRequest request,
+    public async Task<PagedResult<ServiceProviderDto>> Handle(GetMyServiceProvidersRequest request,
         CancellationToken cancellationToken)
     {
+        var userId = currentUserService.UserId!.Value;
+
+        // Providers this user is an active worker for (in addition to ones they own).
+        var workerProviderIds = await applicationDbContext.ProviderManagers
+            .AsNoTracking()
+            .Where(pm => pm.ProviderType == "ServiceProvider"
+                      && pm.UserId == userId
+                      && pm.IsActive && !pm.IsDeleted)
+            .Select(pm => pm.ProviderId)
+            .ToListAsync(cancellationToken);
+
         var query = applicationDbContext.ServiceProviders
             .AsNoTracking()
             .Include(x => x.Owner)
@@ -22,7 +36,7 @@ public class GetMyServiceProvidersRequestHandler(
             .Include(x => x.Status)
             .Include(x => x.ServiceProviderRates.Where(r => !r.IsDeleted))
             .Include(x => x.ServiceProviderAttachments.Where(a => !a.IsDeleted))
-            .Where(x => !x.IsDeleted && x.OwnerId == currentUserService.UserId!.Value);
+            .Where(x => !x.IsDeleted && (x.OwnerId == userId || workerProviderIds.Contains(x.Id)));
 
         if (request.CategoryId.HasValue)
             query = query.Where(x => x.ServiceCategoryId == request.CategoryId.Value);
@@ -39,6 +53,13 @@ public class GetMyServiceProvidersRequestHandler(
             .Select(pa => pa.ProviderId)
             .ToListAsync(cancellationToken);
         var partnerSet = partnerProviderIds.ToHashSet();
+
+        var favCounts = await applicationDbContext.UserFavoriteServiceProviders
+            .AsNoTracking()
+            .Where(f => !f.IsDeleted && providerIds.Contains(f.ServiceProviderId))
+            .GroupBy(f => f.ServiceProviderId)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Count, cancellationToken);
 
         return providers.Select(x => new ServiceProviderDto(
             x.Id,
@@ -67,14 +88,18 @@ public class GetMyServiceProvidersRequestHandler(
             x.HasOffer,
             x.OfferDescription,
             x.Service,
-            x.Icon,
+            !string.IsNullOrEmpty(x.Icon)
+                ? uploadFileService.GetFilePath(UploadFileFolders.CableServiceProvider, x.Icon)
+                : null,
             x.WhatsAppNumber,
             x.WebsiteUrl,
             x.ServiceProviderRates.Any() ? x.ServiceProviderRates.Average(r => r.Rating) : 0,
             x.ServiceProviderRates.Count,
-            x.ServiceProviderAttachments.Select(a => a.FileName).ToList(),
+            x.ServiceProviderAttachments.Select(a =>
+                uploadFileService.GetFilePath(UploadFileFolders.CableServiceProvider, a.FileName)).ToList(),
             x.CreatedAt,
-            partnerSet.Contains(x.Id)
-        )).ToList();
+            partnerSet.Contains(x.Id),
+            favCounts.GetValueOrDefault(x.Id, 0)
+        )).ToList().ToOptionallyPaginated(request.Page, request.PageSize);
     }
 }

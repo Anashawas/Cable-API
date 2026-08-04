@@ -1,3 +1,4 @@
+using Application.Common.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Loyalty.Queries.GetAvailableRewards;
@@ -22,14 +23,16 @@ public record RewardDto(
 public record GetAvailableRewardsRequest(
     string? ProviderType,
     int? ProviderId,
-    int? CategoryId
-) : IRequest<List<RewardDto>>;
+    int? CategoryId,
+    int? Page = null,
+    int? PageSize = null
+) : IRequest<PagedResult<RewardDto>>;
 
 public class GetAvailableRewardsRequestHandler(
     IApplicationDbContext applicationDbContext)
-    : IRequestHandler<GetAvailableRewardsRequest, List<RewardDto>>
+    : IRequestHandler<GetAvailableRewardsRequest, PagedResult<RewardDto>>
 {
-    public async Task<List<RewardDto>> Handle(GetAvailableRewardsRequest request, CancellationToken cancellationToken)
+    public async Task<PagedResult<RewardDto>> Handle(GetAvailableRewardsRequest request, CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
 
@@ -55,6 +58,6 @@ public class GetAvailableRewardsRequestHandler(
                 r.RewardValue, r.ProviderType, r.ProviderId, r.ServiceCategoryId,
                 r.MaxRedemptions, r.CurrentRedemptions, r.ImageUrl,
                 r.ValidFrom, r.ValidTo))
-            .ToListAsync(cancellationToken);
+            .ToOptionallyPaginatedAsync(request.Page, request.PageSize, cancellationToken: cancellationToken);
     }
 }

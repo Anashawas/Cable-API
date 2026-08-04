@@ -1,3 +1,3 @@
-﻿namespace Cable.Requests.CarsManagement;
+namespace Cable.Requests.CarsManagement;
 
-public record UpdateCarModelRequest( string Name, int CarTypeId );
+public record UpdateCarModelRequest( string Name, int CarTypeId, int? SizeId = null );

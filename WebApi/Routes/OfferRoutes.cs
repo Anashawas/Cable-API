@@ -2,21 +2,30 @@ using Application.Offers.Commands.ApproveOffer;
 using Application.Offers.Commands.CancelOfferTransaction;
 using Application.Offers.Commands.ConfirmOfferTransaction;
 using Application.Offers.Commands.DeactivateOffer;
-using Application.Offers.Commands.GenerateSettlement;
 using Application.Offers.Commands.InitiateOfferTransaction;
 using Application.Offers.Commands.ProposeOffer;
+using Application.Offers.Commands.UploadOfferImage;
 using Application.Offers.Commands.RejectOffer;
 using Application.Offers.Commands.UpdateOffer;
+using Application.Offers.Commands.AddWalletDeposit;
 using Application.Offers.Commands.UpdateSettlementStatus;
 using Application.Offers.Queries.GetActiveOffers;
 using Application.Offers.Queries.GetMyOfferTransactions;
 using Application.Offers.Queries.GetOfferById;
 using Application.Offers.Queries.GetOffersForProvider;
 using Application.Offers.Queries.GetPendingOffers;
+using Application.Offers.Queries.GetWalletBalance;
+using Application.Offers.Queries.GetWalletHistory;
 using Application.Offers.Queries.GetProviderSettlement;
+using Application.Offers.Queries.GetProviderSettlements;
+using Application.Common.Models;
+using Application.Offers.Commands.UpdateSettlementStatusBatch;
 using Application.Offers.Queries.GetProviderTransactions;
 using Application.Offers.Queries.GetSettlements;
+using Application.Offers.Queries.GetSettlementsCsv;
+using Application.Offers.Queries.GetSettlementsPaged;
 using Application.Offers.Queries.GetSettlementSummary;
+using Application.Offers.Queries.GetSettlementTransactions;
 using Cable.Requests.Offers;
 using Cable.WebApi.OpenAPI;
 using MediatR;
@@ -43,9 +52,14 @@ public static class OfferRoutes
 
         // Get active offers
         app.MapGet("/GetActiveOffers",
-                async (IMediator mediator, [FromQuery] string? providerType, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetActiveOffersRequest(providerType), cancellationToken)))
+                async (IMediator mediator, [FromQuery] string? providerType,
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetActiveOffersRequest(providerType, page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<OfferDto>>()
+            .Produces<PagedResult<OfferDto>>()
             .ProducesInternalServerError()
             .WithName("Get Active Offers")
             .WithSummary("Get all active approved offers")
@@ -90,9 +104,14 @@ public static class OfferRoutes
 
         // Get my transactions
         app.MapGet("/GetMyTransactions",
-                async (IMediator mediator, [FromQuery] int? status, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetMyOfferTransactionsRequest(status), cancellationToken)))
+                async (IMediator mediator, [FromQuery] int? status,
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetMyOfferTransactionsRequest(status, page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<OfferTransactionDto>>()
+            .Produces<PagedResult<OfferTransactionDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesInternalServerError()
@@ -112,8 +131,8 @@ public static class OfferRoutes
                         request.Title, request.TitleAr, request.Description, request.DescriptionAr,
                         request.ProviderType, request.ProviderId,
                         request.PointsCost, request.MonetaryValue, request.CurrencyCode,
-                        request.MaxUsesPerUser, request.MaxTotalUses, request.OfferCodeExpiryMinutes,
-                        request.ImageUrl, request.ValidFrom, request.ValidTo
+                        request.MaxUsesPerUser, request.MaxTotalUses, request.OfferCodeExpirySeconds,
+                        request.ImageUrl, request.ValidFrom, request.ValidTo, request.PointsPriceValue
                     ), cancellationToken)))
             .Produces<int>()
             .RequireAuthorization()
@@ -129,13 +148,30 @@ public static class OfferRoutes
                 return op;
             });
 
+        // Upload offer image
+        app.MapPost("UploadOfferImage/{id:int}",
+                async (IMediator mediator, [FromForm] IFormFile file, [FromRoute] int id,
+                        CancellationToken cancellationToken) =>
+                    await mediator.Send(new UploadOfferImageCommand(file, id), cancellationToken))
+            .Produces(200)
+            .RequireAuthorization()
+            .ProducesInternalServerError()
+            .WithName("Upload offer image")
+            .WithSummary("Upload or replace offer image")
+            .WithOpenApi()
+            .DisableAntiforgery();
+
         // Get offers for my provider
         app.MapGet("/GetOffersForProvider",
                 async (IMediator mediator, [FromQuery] string providerType, [FromQuery] int providerId,
-                        CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetOffersForProviderRequest(providerType, providerId),
-                        cancellationToken)))
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetOffersForProviderRequest(providerType, providerId, page, pageSize),
+                        cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<OfferDto>>()
+            .Produces<PagedResult<OfferDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesInternalServerError()
@@ -189,11 +225,16 @@ public static class OfferRoutes
         // Get provider transactions
         app.MapGet("/GetProviderTransactions",
                 async (IMediator mediator, [FromQuery] string providerType, [FromQuery] int providerId,
-                        [FromQuery] int? month, [FromQuery] int? year, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(
-                        new GetProviderTransactionsRequest(providerType, providerId, month, year),
-                        cancellationToken)))
+                        [FromQuery] int? month, [FromQuery] int? year,
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(
+                        new GetProviderTransactionsRequest(providerType, providerId, month, year, page, pageSize),
+                        cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<OfferTransactionDto>>()
+            .Produces<PagedResult<OfferTransactionDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesInternalServerError()
@@ -204,9 +245,11 @@ public static class OfferRoutes
         // Get provider settlement
         app.MapGet("/GetProviderSettlement",
                 async (IMediator mediator, [FromQuery] string providerType, [FromQuery] int providerId,
-                        [FromQuery] int year, [FromQuery] int month, CancellationToken cancellationToken) =>
+                        [FromQuery] int year, [FromQuery] int month,
+                        [FromQuery] int periodType, [FromQuery] int week,
+                        CancellationToken cancellationToken) =>
                     Results.Ok(await mediator.Send(
-                        new GetProviderSettlementRequest(providerType, providerId, year, month),
+                        new GetProviderSettlementRequest(providerType, providerId, year, month, periodType, week),
                         cancellationToken)))
             .Produces<ProviderSettlementDto>()
             .RequireAuthorization()
@@ -214,7 +257,8 @@ public static class OfferRoutes
             .ProducesNotFound()
             .ProducesInternalServerError()
             .WithName("Get Provider Settlement")
-            .WithSummary("Get settlement details for a provider in a specific month")
+            .WithSummary("Get settlement details for a provider in a specific period")
+            .WithDescription("PeriodType: 1=Monthly, 2=Weekly. For monthly: provide year+month. For weekly: provide year+week.")
             .WithOpenApi();
 
         // ==========================================
@@ -276,8 +320,8 @@ public static class OfferRoutes
                         id, request.Title, request.TitleAr, request.Description, request.DescriptionAr,
                         request.ProviderType, request.ProviderId,
                         request.PointsCost, request.MonetaryValue, request.CurrencyCode,
-                        request.MaxUsesPerUser, request.MaxTotalUses, request.OfferCodeExpiryMinutes,
-                        request.ImageUrl, request.ValidFrom, request.ValidTo, request.IsActive
+                        request.MaxUsesPerUser, request.MaxTotalUses, request.OfferCodeExpirySeconds,
+                        request.ImageUrl, request.ValidFrom, request.ValidTo, request.IsActive, request.PointsPriceValue
                     ), cancellationToken);
                     return Results.Ok();
                 })
@@ -322,9 +366,14 @@ public static class OfferRoutes
 
         // Get pending offers
         app.MapGet("/GetPendingOffers",
-                async (IMediator mediator, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetPendingOffersRequest(), cancellationToken)))
+                async (IMediator mediator, [FromQuery] int? page, [FromQuery] int? pageSize,
+                        CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetPendingOffersRequest(page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<OfferDto>>()
+            .Produces<PagedResult<OfferDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesForbidden()
@@ -336,24 +385,87 @@ public static class OfferRoutes
         // Get all settlements
         app.MapGet("/GetSettlements",
                 async (IMediator mediator, [FromQuery] int? status, [FromQuery] int? month,
-                        [FromQuery] int? year, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetSettlementsRequest(status, month, year),
-                        cancellationToken)))
+                        [FromQuery] int? year, [FromQuery] int? periodType, [FromQuery] int? week,
+                        [FromQuery] string? search, [FromQuery] int? page, [FromQuery] int? pageSize,
+                        CancellationToken cancellationToken) =>
+                {
+                    // Opt-in server-side search/paging (C6): any new param switches to
+                    // the paged envelope. Legacy calls keep the plain array unchanged.
+                    if (search != null || page.HasValue || pageSize.HasValue)
+                        return Results.Ok(await mediator.Send(new GetSettlementsPagedRequest(
+                            status, month, year, periodType, week, search, page, pageSize), cancellationToken));
+
+                    return Results.Ok(await mediator.Send(new GetSettlementsRequest(status, month, year, periodType, week),
+                        cancellationToken));
+                })
             .Produces<List<ProviderSettlementDto>>()
+            .Produces<PagedResult<ProviderSettlementDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesForbidden()
             .ProducesInternalServerError()
             .WithName("Get Settlements")
             .WithSummary("Get all settlements (admin)")
-            .WithDescription("Returns all settlements. Optional filter by status, month, year.")
+            .WithDescription("Filters: status, month, year, periodType (1=Monthly, 2=Weekly), week. Adding search/page/pageSize returns { items, totalCount, page, pageSize }. Rows include currentWalletBalance.")
             .WithOpenApi();
+
+        // C4 — CSV export honoring the same filters
+        app.MapGet("/GetSettlementsCsv",
+                async (IMediator mediator, [FromQuery] int? status, [FromQuery] int? month,
+                        [FromQuery] int? year, [FromQuery] int? periodType, [FromQuery] int? week,
+                        [FromQuery] string? search, CancellationToken cancellationToken) =>
+                {
+                    var csv = await mediator.Send(new GetSettlementsCsvRequest(
+                        status, month, year, periodType, week, search), cancellationToken);
+                    return Results.File(System.Text.Encoding.UTF8.GetBytes(csv), "text/csv", "settlements.csv");
+                })
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Export Settlements Csv")
+            .WithSummary("Export settlements as CSV (admin) honoring the same filters as GetSettlements")
+            .WithOpenApi();
+
+        // C1 — the transaction line-items behind one settlement
+        app.MapGet("/GetSettlementTransactions",
+                async (IMediator mediator, [FromQuery] int settlementId, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new GetSettlementTransactionsRequest(settlementId), cancellationToken)))
+            .Produces<SettlementTransactionsDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Get Settlement Transactions")
+            .WithSummary("Admin: the completed offer/partner transactions behind one settlement (for verification and dispute resolution)")
+            .WithOpenApi();
+
+        // C3 — bulk settlement status update
+        app.MapPut("/UpdateSettlementStatusBatch",
+                async (IMediator mediator, UpdateSettlementStatusBatchCommand request, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(request, cancellationToken)))
+            .Produces<UpdateSettlementStatusBatchResult>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Update Settlement Status Batch")
+            .WithSummary("Admin marks multiple settlements Paid/Disputed/Pending in one call; per-id failures are reported, Paid stays locked")
+            .WithOpenApi(op =>
+            {
+                op.RequestBody.Required = true;
+                return op;
+            });
 
         // Get settlement summary
         app.MapGet("/GetSettlementSummary",
                 async (IMediator mediator, [FromQuery] int? month, [FromQuery] int? year,
+                        [FromQuery] int? periodType, [FromQuery] int? week,
                         CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetSettlementSummaryRequest(month, year),
+                    Results.Ok(await mediator.Send(new GetSettlementSummaryRequest(month, year, periodType, week),
                         cancellationToken)))
             .Produces<SettlementSummaryDto>()
             .RequireAuthorization()
@@ -362,6 +474,33 @@ public static class OfferRoutes
             .ProducesInternalServerError()
             .WithName("Get Settlement Summary")
             .WithSummary("Get settlement summary dashboard (admin)")
+            .WithDescription("Optional filters: month, year, periodType (1=Monthly, 2=Weekly), week.")
+            .WithOpenApi();
+
+        // Get settlements for a specific provider
+        app.MapGet("/GetProviderSettlements",
+                async (IMediator mediator,
+                        [FromQuery] string providerType, [FromQuery] int providerId,
+                        [FromQuery] int? status, [FromQuery] int? year, [FromQuery] int? week,
+                        [FromQuery] bool unpaidOnly, [FromQuery] bool hasDebt,
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(
+                        new GetProviderSettlementsRequest(providerType, providerId, status, year, week, unpaidOnly, hasDebt, page, pageSize),
+                        cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
+            .Produces<List<ProviderSettlementDto>>()
+            .Produces<PagedResult<ProviderSettlementDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Get Provider Settlements")
+            .WithSummary("Get all settlements for a specific provider")
+            .WithDescription("Returns all settlements for a provider. Filters: status (1=Pending, 3=Paid, 4=Disputed), year, week, unpaidOnly (true = only Pending/Disputed settlements).")
             .WithOpenApi();
 
         // Update settlement status
@@ -369,8 +508,8 @@ public static class OfferRoutes
                 async (IMediator mediator, [FromRoute] int id, UpdateSettlementStatusRequest request,
                     CancellationToken cancellationToken) =>
                 {
-                    await mediator.Send(new UpdateSettlementStatusCommand(id, request.Status, request.PaidAmount,
-                        request.Note), cancellationToken);
+                    await mediator.Send(new UpdateSettlementStatusCommand(id, request.Status, request.Note),
+                        cancellationToken);
                     return Results.Ok();
                 })
             .Produces(200)
@@ -381,7 +520,7 @@ public static class OfferRoutes
             .ProducesInternalServerError()
             .WithName("Update Settlement Status")
             .WithSummary("Update settlement status (admin)")
-            .WithDescription("Mark settlement as Invoiced, Paid, or Disputed.")
+            .WithDescription("Mark settlement as Paid or Disputed. When marking as Paid, full commission is deducted from WalletBalance (can go negative = debt). Cannot mark as Paid while settlement week is still active. Once Paid, settlement is locked.")
             .WithOpenApi(op =>
             {
                 op.Parameters[0].Required = true;
@@ -390,24 +529,62 @@ public static class OfferRoutes
                 return op;
             });
 
-        // Generate settlement
-        app.MapPost("/GenerateSettlement",
-                async (IMediator mediator, GenerateSettlementRequest request, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GenerateSettlementCommand(request.Year, request.Month),
-                        cancellationToken)))
-            .Produces<int>()
+        // Add Wallet Deposit (admin records payment to provider wallet)
+        app.MapPost("/AddWalletDeposit",
+                async (IMediator mediator, AddWalletDepositRequest request, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new AddWalletDepositCommand(
+                        request.ProviderType, request.ProviderId, request.Amount,
+                        request.TransactionType, request.Note), cancellationToken)))
+            .Produces<AddWalletDepositResult>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
             .ProducesInternalServerError()
-            .WithName("Generate Settlement")
-            .WithSummary("Generate monthly settlements (admin)")
-            .WithDescription("Generates settlement records for all providers with completed transactions in the given month.")
+            .WithName("Add Wallet Deposit")
+            .WithSummary("Record provider wallet deposit (admin)")
+            .WithDescription("Records a deposit, refund, or adjustment to a provider's wallet balance. TransactionType: 1=Deposit, 3=Refund, 4=Adjustment. Positive balance = credit, negative = debt.")
             .WithOpenApi(op =>
             {
                 op.RequestBody.Required = true;
                 return op;
             });
+
+        // Get Wallet balance
+        app.MapGet("/GetWalletBalance",
+                async (IMediator mediator, [FromQuery] string providerType, [FromQuery] int providerId,
+                        CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(
+                        new GetWalletBalanceRequest(providerType, providerId), cancellationToken)))
+            .Produces<WalletBalanceDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesNotFound()
+            .ProducesInternalServerError()
+            .WithName("Get Wallet Balance")
+            .WithSummary("Get provider's wallet balance")
+            .WithDescription("Returns the current wallet balance (positive = credit, negative = debt), total deposited, and total deducted for a provider.")
+            .WithOpenApi();
+
+        // Get Wallet history
+        app.MapGet("/GetWalletHistory",
+                async (IMediator mediator, [FromQuery] string providerType, [FromQuery] int providerId,
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(
+                        new GetWalletHistoryRequest(providerType, providerId, page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
+            .Produces<List<WalletTransactionDto>>()
+            .Produces<PagedResult<WalletTransactionDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesInternalServerError()
+            .WithName("Get Wallet History")
+            .WithSummary("Get provider's wallet transaction history")
+            .WithDescription("Returns all wallet transactions (deposits, deductions, refunds, adjustments) for a provider.")
+            .WithOpenApi();
 
         return app;
     }

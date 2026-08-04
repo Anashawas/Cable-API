@@ -4,7 +4,8 @@ public record UpdatePartnerAgreementRequest(
     double CommissionPercentage,
     double PointsRewardPercentage,
     int? PointsConversionRateId,
-    int CodeExpiryMinutes,
+    int CodeExpirySeconds,
+    decimal? MinimumTransactionAmount,
     string? Note,
     bool IsActive
 );

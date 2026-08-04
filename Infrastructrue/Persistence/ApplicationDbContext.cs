@@ -70,12 +70,21 @@ public partial class ApplicationDbContext(
     public DbSet<ServiceProviderRate> ServiceProviderRates { get; set; }
     public DbSet<UserFavoriteServiceProvider> UserFavoriteServiceProviders { get; set; }
 
+    // Social Media DbSets
+    public DbSet<SocialMediaPlatform> SocialMediaPlatforms { get; set; }
+    public DbSet<SocialLink>          SocialLinks          { get; set; }
+
+    // Provider managers (workers)
+    public DbSet<ProviderManager> ProviderManagers { get; set; }
+
     // Offers & Transactions DbSets
     public DbSet<PointsConversionRate> PointsConversionRates { get; set; }
     public DbSet<ProviderOffer> ProviderOffers { get; set; }
+    public DbSet<OfferAttachment> OfferAttachments { get; set; }
     public DbSet<OfferTransaction> OfferTransactions { get; set; }
     public DbSet<ProviderSettlement> ProviderSettlements { get; set; }
     public DbSet<ProviderPayment> ProviderPayments { get; set; }
+    public DbSet<ProviderWalletTransaction> ProviderWalletTransactions { get; set; }
 
     // Partner Transactions DbSets
     public DbSet<PartnerAgreement> PartnerAgreements { get; set; }
@@ -90,6 +99,35 @@ public partial class ApplicationDbContext(
     public DbSet<LoyaltyPointTransaction> LoyaltyPointTransactions { get; set; }
     public DbSet<LoyaltyReward> LoyaltyRewards { get; set; }
     public DbSet<UserRewardRedemption> UserRewardRedemptions { get; set; }
+
+    // Analytics engine DbSets
+    public DbSet<AnalyticsEvent> AnalyticsEvents { get; set; }
+    public DbSet<AnalyticsDailyRollup> AnalyticsDailyRollups { get; set; }
+
+    // Premium station subscriptions
+    public DbSet<StationPremiumSubscription> StationPremiumSubscriptions { get; set; }
+
+    // Lookups
+    public DbSet<ChargerBrand> ChargerBrands { get; set; }
+    public DbSet<ChargingPointChargerBrand> ChargingPointChargerBrands { get; set; }
+    public DbSet<CarModelSize> CarModelSizes { get; set; }
+
+    // Terms & conditions
+    public DbSet<TermsVersion> TermsVersions { get; set; }
+    public DbSet<UserTermsAcceptance> UserTermsAcceptances { get; set; }
+
+    // Provider announcements to favorites
+    public DbSet<ProviderFavoriteNotification> ProviderFavoriteNotifications { get; set; }
+
+    // Notification body suggestions (admin-managed, Part B F5)
+    public DbSet<NotificationTemplate> NotificationTemplates { get; set; }
+
+    // Home-screen ads (advertisers, campaigns, settings, welcome messages)
+    public DbSet<Advertiser> Advertisers { get; set; }
+    public DbSet<Campaign> Campaigns { get; set; }
+    public DbSet<AppSetting> AppSettings { get; set; }
+    public DbSet<Announcement> Announcements { get; set; }
+    public DbSet<AnnouncementUserState> AnnouncementUserStates { get; set; }
 
     #endregion
 

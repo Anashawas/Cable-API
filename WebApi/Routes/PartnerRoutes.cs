@@ -1,9 +1,9 @@
+using Application.Common.Models;
 using Application.Partners.Commands.CancelPartnerTransaction;
 using Application.Partners.Commands.ConfirmPartnerTransaction;
 using Application.Partners.Commands.CreatePartnerAgreement;
 using Application.Partners.Commands.DeactivatePartnerAgreement;
 using Application.Partners.Commands.InitiatePartnerTransaction;
-using Application.Partners.Commands.RecordProviderPayment;
 using Application.Partners.Commands.SetProviderCreditLimit;
 using Application.Partners.Commands.UpdatePartnerAgreement;
 using Application.Partners.Queries.GetActivePartners;
@@ -41,9 +41,14 @@ public static class PartnerRoutes
 
         // Get active partners
         app.MapGet("/GetActivePartners",
-                async (IMediator mediator, [FromQuery] string? providerType, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetActivePartnersRequest(providerType), cancellationToken)))
+                async (IMediator mediator, [FromQuery] string? providerType,
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetActivePartnersRequest(providerType, page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<PartnerDto>>()
+            .Produces<PagedResult<PartnerDto>>()
             .ProducesInternalServerError()
             .WithName("Get Active Partners")
             .WithSummary("Get all active partner locations")
@@ -83,9 +88,14 @@ public static class PartnerRoutes
 
         // Get my partner transactions
         app.MapGet("/GetMyTransactions",
-                async (IMediator mediator, [FromQuery] int? status, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetMyPartnerTransactionsRequest(status), cancellationToken)))
+                async (IMediator mediator, [FromQuery] int? status,
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetMyPartnerTransactionsRequest(status, page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<PartnerTransactionDto>>()
+            .Produces<PagedResult<PartnerTransactionDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesInternalServerError()
@@ -164,11 +174,16 @@ public static class PartnerRoutes
         // Get provider partner transactions
         app.MapGet("/provider/GetProviderTransactions",
                 async (IMediator mediator, [FromQuery] string providerType, [FromQuery] int providerId,
-                        [FromQuery] int? month, [FromQuery] int? year, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(
-                        new GetProviderPartnerTransactionsRequest(providerType, providerId, month, year),
-                        cancellationToken)))
+                        [FromQuery] int? month, [FromQuery] int? year,
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(
+                        new GetProviderPartnerTransactionsRequest(providerType, providerId, month, year, page, pageSize),
+                        cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<ProviderPartnerTransactionDto>>()
+            .Produces<PagedResult<ProviderPartnerTransactionDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesInternalServerError()
@@ -222,8 +237,8 @@ public static class PartnerRoutes
                     Results.Ok(await mediator.Send(new CreatePartnerAgreementCommand(
                         request.ProviderType, request.ProviderId,
                         request.CommissionPercentage, request.PointsRewardPercentage,
-                        request.PointsConversionRateId, request.CodeExpiryMinutes,
-                        request.Note
+                        request.PointsConversionRateId, request.CodeExpirySeconds,
+                        request.MinimumTransactionAmount, request.Note
                     ), cancellationToken)))
             .Produces<int>()
             .RequireAuthorization()
@@ -247,8 +262,8 @@ public static class PartnerRoutes
                 {
                     await mediator.Send(new UpdatePartnerAgreementCommand(
                         id, request.CommissionPercentage, request.PointsRewardPercentage,
-                        request.PointsConversionRateId, request.CodeExpiryMinutes,
-                        request.Note, request.IsActive
+                        request.PointsConversionRateId, request.CodeExpirySeconds,
+                        request.MinimumTransactionAmount, request.Note, request.IsActive
                     ), cancellationToken);
                     return Results.Ok();
                 })
@@ -292,9 +307,14 @@ public static class PartnerRoutes
 
         // Get all partner agreements (admin)
         app.MapGet("/admin/GetAllPartnerAgreements",
-                async (IMediator mediator, [FromQuery] bool? isActive, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetAllPartnerAgreementsRequest(isActive), cancellationToken)))
+                async (IMediator mediator, [FromQuery] bool? isActive,
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetAllPartnerAgreementsRequest(isActive, page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<AdminPartnerAgreementDto>>()
+            .Produces<PagedResult<AdminPartnerAgreementDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesForbidden()
@@ -303,31 +323,6 @@ public static class PartnerRoutes
             .WithSummary("Get all partner agreements (admin)")
             .WithDescription("Returns all partner agreements. Optional filter by active status.")
             .WithOpenApi();
-
-        // Record provider payment (admin)
-        app.MapPost("/admin/RecordProviderPayment",
-                async (IMediator mediator, RecordProviderPaymentRequest request,
-                    CancellationToken cancellationToken) =>
-                {
-                    await mediator.Send(new RecordProviderPaymentCommand(
-                        request.ProviderType, request.ProviderId, request.Amount, request.Note
-                    ), cancellationToken);
-                    return Results.Ok();
-                })
-            .Produces(200)
-            .RequireAuthorization()
-            .ProducesUnAuthorized()
-            .ProducesForbidden()
-            .ProducesNotFound()
-            .ProducesValidationProblem()
-            .ProducesInternalServerError()
-            .WithName("Record Provider Payment")
-            .WithSummary("Admin records a payment from a provider (advance payment or debt settlement)")
-            .WithOpenApi(op =>
-            {
-                op.RequestBody.Required = true;
-                return op;
-            });
 
         // Set provider credit limit (admin)
         app.MapPut("/admin/SetCreditLimit",

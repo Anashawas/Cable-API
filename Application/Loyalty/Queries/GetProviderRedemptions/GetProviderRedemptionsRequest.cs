@@ -1,9 +1,11 @@
+using Application.Common.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Loyalty.Queries.GetProviderRedemptions;
 
 public record ProviderRedemptionDto(
     int Id,
+    int UserId,
     string? UserName,
     string RewardName,
     int PointsSpent,
@@ -15,14 +17,16 @@ public record ProviderRedemptionDto(
 
 public record GetProviderRedemptionsRequest(
     string? ProviderType,
-    int? ProviderId
-) : IRequest<List<ProviderRedemptionDto>>;
+    int? ProviderId,
+    int? Page = null,
+    int? PageSize = null
+) : IRequest<PagedResult<ProviderRedemptionDto>>;
 
 public class GetProviderRedemptionsRequestHandler(
     IApplicationDbContext applicationDbContext)
-    : IRequestHandler<GetProviderRedemptionsRequest, List<ProviderRedemptionDto>>
+    : IRequestHandler<GetProviderRedemptionsRequest, PagedResult<ProviderRedemptionDto>>
 {
-    public async Task<List<ProviderRedemptionDto>> Handle(GetProviderRedemptionsRequest request, CancellationToken cancellationToken)
+    public async Task<PagedResult<ProviderRedemptionDto>> Handle(GetProviderRedemptionsRequest request, CancellationToken cancellationToken)
     {
         var query = applicationDbContext.UserRewardRedemptions
             .Include(r => r.User)
@@ -38,8 +42,8 @@ public class GetProviderRedemptionsRequestHandler(
         return await query
             .OrderByDescending(r => r.RedeemedAt)
             .Select(r => new ProviderRedemptionDto(
-                r.Id, r.User.Name, r.Reward.Name, r.PointsSpent,
+                r.Id, r.UserId, r.User.Name, r.Reward.Name, r.PointsSpent,
                 r.Status, r.RedemptionCode, r.RedeemedAt, r.FulfilledAt))
-            .ToListAsync(cancellationToken);
+            .ToOptionallyPaginatedAsync(request.Page, request.PageSize, cancellationToken: cancellationToken);
     }
 }

@@ -14,7 +14,9 @@ public record ApproveUpdateRequestCommand(int UpdateRequestId) : IRequest;
 public class ApproveUpdateRequestCommandHandler(
     IApplicationDbContext context,
     ICurrentUserService currentUserService,
-    IUploadFileService uploadFileService)
+    IUploadFileService uploadFileService,
+    INotificationService notificationService,
+    Microsoft.Extensions.Logging.ILogger<ApproveUpdateRequestCommandHandler> logger)
     : IRequestHandler<ApproveUpdateRequestCommand>
 {
     public async Task Handle(ApproveUpdateRequestCommand request, CancellationToken cancellationToken)
@@ -49,14 +51,11 @@ public class ApproveUpdateRequestCommandHandler(
         if (updateRequest.ChargersCount.HasValue) chargingPoint.ChargersCount = updateRequest.ChargersCount;
         if (updateRequest.Latitude.HasValue) chargingPoint.Latitude = updateRequest.Latitude.Value;
         if (updateRequest.Longitude.HasValue) chargingPoint.Longitude = updateRequest.Longitude.Value;
-        if (updateRequest.ChargerPointTypeId.HasValue) chargingPoint.ChargerPointTypeId = updateRequest.ChargerPointTypeId.Value;
-        if (updateRequest.StationTypeId.HasValue) chargingPoint.StationTypeId = updateRequest.StationTypeId.Value;
+        if (updateRequest.StatusId.HasValue) chargingPoint.StatusId = updateRequest.StatusId.Value;
         if (updateRequest.OwnerPhone != null) chargingPoint.OwnerPhone = updateRequest.OwnerPhone;
-        if (updateRequest.HasOffer.HasValue) chargingPoint.HasOffer = updateRequest.HasOffer.Value;
         if (updateRequest.Service != null) chargingPoint.Service = updateRequest.Service;
         if (updateRequest.OfferDescription != null) chargingPoint.OfferDescription = updateRequest.OfferDescription;
         if (updateRequest.Address != null) chargingPoint.Address = updateRequest.Address;
-        if (updateRequest.ChargerBrand != null) chargingPoint.ChargerBrand = updateRequest.ChargerBrand;
 
         // 4. Apply icon change
         if (!string.IsNullOrEmpty(updateRequest.NewIcon))
@@ -130,5 +129,11 @@ public class ApproveUpdateRequestCommandHandler(
         updateRequest.ReviewedAt = DateTime.UtcNow;
 
         await context.SaveChanges(cancellationToken);
+
+        // Best-effort: tell the owner their changes were applied.
+        await UpdateRequestNotifier.NotifyOwnerDecisionAsync(
+            context, notificationService, logger,
+            updateRequest.Id, updateRequest.ChargingPointId, updateRequest.RequestedByUserId,
+            approved: true, rejectionReason: null, cancellationToken);
     }
 }

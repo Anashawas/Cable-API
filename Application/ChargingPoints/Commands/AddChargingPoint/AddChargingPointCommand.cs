@@ -1,4 +1,5 @@
-﻿using Cable.Core.Emuns;
+﻿using Cable.Core;
+using Cable.Core.Emuns;
 using Cable.Core.Exceptions;
 using Cable.Core.Utilities;
 using Microsoft.AspNetCore.Http;
@@ -30,8 +31,9 @@ public record AddChargingPointCommand(
     string? Service,
     string? OfferDescription,
     string? Address,
-    string? ChargerBrand,
-    List<int>? PlugTypeIds
+    List<int>? PlugTypeIds,
+    int? OwnerId = null,
+    List<ChargerBrandCountInput>? ChargerBrands = null
 ) : IRequest<int>;
 
 public class AddChargingPointCommandHandler(
@@ -45,14 +47,34 @@ public class AddChargingPointCommandHandler(
         var user = await applicationDbContext.UserAccounts.AsNoTracking()
                        .FirstOrDefaultAsync(x => !x.IsDeleted && x.Id == currentUserService.UserId, cancellationToken)
                    ?? throw new NotFoundException($"can not find user with id {currentUserService.UserId}");
-        
-        var normalizedPhone = !string.IsNullOrEmpty(request.Phone) 
+
+        // Owner defaults to the caller; an explicit OwnerId lets an admin create
+        // the station on behalf of a provider.
+        var ownerId = user.Id;
+        if (request.OwnerId.HasValue)
+        {
+            var owner = await applicationDbContext.UserAccounts.AsNoTracking()
+                            .FirstOrDefaultAsync(x => !x.IsDeleted && x.Id == request.OwnerId.Value, cancellationToken)
+                        ?? throw new NotFoundException($"can not find user with id {request.OwnerId}");
+
+            if (owner.RoleId != 4)
+                throw new DataValidationException("OwnerId", "Owner must have Provider role");
+
+            ownerId = owner.Id;
+        }
+
+        var normalizedPhone = !string.IsNullOrEmpty(request.Phone)
             ? PhoneNumberUtility.NormalizePhoneNumber(request.Phone) ?? request.Phone 
             : request.Phone;
             
-        var normalizedOwnerPhone = !string.IsNullOrEmpty(request.OwnerPhone) 
-            ? PhoneNumberUtility.NormalizePhoneNumber(request.OwnerPhone) ?? request.OwnerPhone 
+        var normalizedOwnerPhone = !string.IsNullOrEmpty(request.OwnerPhone)
+            ? PhoneNumberUtility.NormalizePhoneNumber(request.OwnerPhone) ?? request.OwnerPhone
             : request.OwnerPhone;
+
+        // Brands (many-to-many with counts) — the only brand storage.
+        ChargingPointBrandHelper.ResolvedBrands? brands = null;
+        if (request.ChargerBrands is { Count: > 0 })
+            brands = await ChargingPointBrandHelper.ResolveAsync(applicationDbContext, request.ChargerBrands, cancellationToken);
 
         var chargingPoint = new ChargingPoint()
         {
@@ -66,7 +88,7 @@ public class AddChargingPointCommandHandler(
             FromTime = request.FromTime,
             ToTime = request.ToTime,
             ChargerSpeed = request.ChargerSpeed,
-            ChargersCount = request.ChargersCount,
+            ChargersCount = brands?.TotalChargers ?? request.ChargersCount,  // auto-sum when brands given
             Latitude = request.Latitude,
             Longitude = request.Longitude,
             VisitorsCount = 0,
@@ -74,15 +96,18 @@ public class AddChargingPointCommandHandler(
             StatusId = request.StatusId,
             StationTypeId = request.StationTypeId,
             OwnerPhone = normalizedOwnerPhone,
-            OwnerId = user.Id,
+            OwnerId = ownerId,
             IsDeleted = false,
             IsVerified = request.IsVerified,
             HasOffer = request.HasOffer,
             Service = request.Service,
             OfferDescription = request.OfferDescription,
             Address = request.Address,
-            ChargerBrand = request.ChargerBrand,
         };
+
+        if (brands != null)
+            foreach (var row in brands.Rows)
+                chargingPoint.ChargerBrands.Add(row);
         applicationDbContext.ChargingPoints.Add(chargingPoint);
         
         if (request.PlugTypeIds?.Any() == true)

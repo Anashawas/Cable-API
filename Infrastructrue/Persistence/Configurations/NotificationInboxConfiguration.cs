@@ -31,6 +31,12 @@ public partial class NotificationInboxConfiguration : IEntityTypeConfiguration<N
 
         entity.Property(e => e.Data);
 
+        entity.Property(e => e.BatchId)
+            .HasColumnType("uniqueidentifier");
+
+        entity.HasIndex(e => e.BatchId)
+            .HasDatabaseName("IX_NotificationInbox_BatchId");
+
         entity.Property(e => e.IsRead)
             .IsRequired();
 

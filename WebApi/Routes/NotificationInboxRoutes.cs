@@ -3,6 +3,8 @@ using Application.NotificationInbox.Commands.DeleteNotification;
 using Application.NotificationInbox.Commands.MarkAllAsRead;
 using Application.NotificationInbox.Commands.MarkAsRead;
 using Application.NotificationInbox.Commands.SendNotificationByFilter;
+using Application.NotificationInbox.Queries.GetNotificationBatchById;
+using Application.NotificationInbox.Queries.GetNotificationBatches;
 using Application.NotificationInbox.Queries.GetNotificationById;
 using Application.NotificationInbox.Queries.GetUnreadCount;
 using Application.NotificationInbox.Queries.GetUserNotifications;
@@ -166,6 +168,57 @@ public static class NotificationInboxRoutes
                 op.RequestBody.Required = true;
                 op.RequestBody.Description = "Notification details with UserIds, AppType (1=UserApp/Cable, 2=StationApp/CableStation), and optional DeepLink/Data";
                 op.Responses["200"].Description = "Returns the number of notifications successfully sent and saved to inbox for the specified app type";
+                return op;
+            });
+
+        // Admin-only endpoint: Paginated list of notification sends (batches) with statistics
+        app.MapGet("/batches", async (
+                IMediator mediator,
+                [FromQuery] int pageNumber = 1,
+                [FromQuery] int pageSize = 20,
+                [FromQuery] int? notificationTypeId = null,
+                [FromQuery] DateTime? fromDate = null,
+                [FromQuery] DateTime? toDate = null,
+                CancellationToken cancellationToken = default) =>
+                Results.Ok(await mediator.Send(
+                    new GetNotificationBatchesRequest(pageNumber, pageSize, notificationTypeId, fromDate, toDate),
+                    cancellationToken)))
+            .Produces<GetNotificationBatchesDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesInternalServerError()
+            .WithName("Get Notification Batches")
+            .WithSummary("Admin: list notification sends with recipients/read statistics")
+            .WithDescription("Returns paginated list of notification sends grouped by BatchId. For each send you get: title, body, type, sent-at, total recipients, read count, unread count, and read rate (%). Optional filters: notificationTypeId, fromDate, toDate.")
+            .WithOpenApi(op =>
+            {
+                op.Parameters[0].Description = "Page number (default: 1)";
+                op.Parameters[1].Description = "Page size (default: 20, max: 100)";
+                op.Parameters[2].Description = "Filter by NotificationTypeId (optional)";
+                op.Parameters[3].Description = "Filter: sent-at >= fromDate (optional)";
+                op.Parameters[4].Description = "Filter: sent-at <= toDate (optional)";
+                return op;
+            });
+
+        // Admin-only endpoint: Details + recipient breakdown for a single batch
+        app.MapGet("/batches/{batchId:guid}", async (
+                IMediator mediator,
+                [FromRoute] Guid batchId,
+                CancellationToken cancellationToken) =>
+                Results.Ok(await mediator.Send(
+                    new GetNotificationBatchByIdRequest(batchId),
+                    cancellationToken)))
+            .Produces<NotificationBatchDetailDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesNotFound()
+            .ProducesInternalServerError()
+            .WithName("Get Notification Batch By Id")
+            .WithSummary("Admin: details + recipient breakdown for a single notification send")
+            .WithDescription("Returns the notification content, aggregate statistics, and the list of recipient users with per-user IsRead state.")
+            .WithOpenApi(op =>
+            {
+                op.Parameters[0].Description = "Batch GUID returned by the list endpoint";
                 return op;
             });
 

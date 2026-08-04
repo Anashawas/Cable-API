@@ -54,6 +54,11 @@ public class PartnerTransactionConfiguration : IEntityTypeConfiguration<PartnerT
         builder.Property(e => e.CompletedAt)
             .HasColumnType("datetime");
 
+        builder.Property(e => e.WalletCoveredAmount)
+            .IsRequired()
+            .HasDefaultValue(0m)
+            .HasColumnType("decimal(18,3)");
+
         builder.Property(e => e.IsDeleted)
             .IsRequired()
             .HasDefaultValue(false);

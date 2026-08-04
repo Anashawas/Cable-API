@@ -16,12 +16,16 @@ public class ProviderOffer : BaseAuditableEntity
     public string? ApprovalNote { get; set; }
     public DateTime? ApprovedAt { get; set; }
     public int PointsCost { get; set; }
+
+    /// <summary>Cash value of the points (pointsCost ÷ conversion rate) — distinct from MonetaryValue (what Cable pays the provider).</summary>
+    public decimal? PointsPriceValue { get; set; }
+
     public decimal MonetaryValue { get; set; }
-    public string CurrencyCode { get; set; } = "KWD";
+    public string CurrencyCode { get; set; } = "JOD";
     public int? MaxUsesPerUser { get; set; }
     public int? MaxTotalUses { get; set; }
     public int CurrentTotalUses { get; set; }
-    public int OfferCodeExpiryMinutes { get; set; } = 30;
+    public int OfferCodeExpirySeconds { get; set; } = 60;
     public string? ImageUrl { get; set; }
     public DateTime ValidFrom { get; set; }
     public DateTime? ValidTo { get; set; }
@@ -30,4 +34,5 @@ public class ProviderOffer : BaseAuditableEntity
     public virtual UserAccount ProposedByUser { get; set; } = null!;
     public virtual UserAccount? ApprovedByUser { get; set; }
     public virtual ICollection<OfferTransaction> Transactions { get; set; } = new List<OfferTransaction>();
+    public virtual ICollection<OfferAttachment> OfferAttachments { get; set; } = new List<OfferAttachment>();
 }

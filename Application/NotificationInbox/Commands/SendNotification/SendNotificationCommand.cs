@@ -14,7 +14,9 @@ public record SendNotificationCommand(
     bool IsForAll = false,
     string? DeepLink = null,
     string? Data = null,
-    FirebaseAppType AppType = FirebaseAppType.UserApp
+    FirebaseAppType AppType = FirebaseAppType.UserApp,
+    string? TargetType = null,   // R4: "charging-point" | "service-provider" | "none"
+    int? TargetId = null
 ) : IRequest<int>;
 
 public class SendNotificationCommandHandler(
@@ -25,6 +27,17 @@ public class SendNotificationCommandHandler(
     public async Task<int> Handle(SendNotificationCommand request, CancellationToken cancellationToken)
     {
         var notificationCount = 0;
+
+        // R4: the sender gives a TARGET, we build the routing — inbox deepLink for the
+        // in-app tap and FCM data (type + chargerId + deepLink) for the push tap, so both
+        // land on the same screen. A raw DeepLink is still accepted for advanced cases.
+        var deepLink = NotificationRouting.BuildDeepLink(request.TargetType, request.TargetId) ?? request.DeepLink;
+        var fcmData = NotificationRouting.BuildFcmData(request.TargetType, request.TargetId);
+        if (deepLink is not null && !fcmData.ContainsKey("deepLink"))
+            fcmData["deepLink"] = deepLink;
+
+        // One BatchId per send so we can later ask "how many users received this push, how many read it".
+        var batchId = Guid.NewGuid();
 
         if (request.IsForAll)
         {
@@ -44,9 +57,10 @@ public class SendNotificationCommandHandler(
                     request.NotificationTypeId,
                     request.Title,
                     request.Body,
-                    request.DeepLink,
+                    deepLink,
                     request.Data,
-                    cancellationToken);
+                    cancellationToken,
+                    batchId);
             }
 
             return notificationCount;
@@ -68,7 +82,8 @@ public class SendNotificationCommandHandler(
                 allTokens,
                 request.Title,
                 request.Body,
-                request.AppType);
+                request.AppType,
+                fcmData);
 
             var successfulUserIds = userTokens
                 .Where(ut => sendResult.SuccessfulTokens.Contains(ut.Token))
@@ -84,9 +99,10 @@ public class SendNotificationCommandHandler(
                     request.NotificationTypeId,
                     request.Title,
                     request.Body,
-                    request.DeepLink,
+                    deepLink,
                     request.Data,
-                    cancellationToken);
+                    cancellationToken,
+                    batchId);
             }
         }
 

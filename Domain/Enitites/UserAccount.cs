@@ -25,6 +25,13 @@ public partial class UserAccount :BaseAuditableEntity
 
     // Single-device session enforcement
     public string? SecurityStamp { get; set; }
+
+    // Update notes
+    public bool HasReadUpdateNotes { get; set; }
+
+    // Terms & conditions (denormalized current state; history in UserTermsAcceptance)
+    public int? AcceptedTermsVersionId { get; set; }
+    public DateTime? TermsAcceptedAt { get; set; }
     
     public virtual ICollection<ChargingPoint> ChargingPoints { get; set; } = new List<ChargingPoint>();
 

@@ -1,3 +1,4 @@
+using Application.Common.Models;
 using Application.EmergencyServices.Commands.AddEmergencyService;
 using Application.EmergencyServices.Commands.DeleteEmergencyService;
 using Application.EmergencyServices.Commands.UpdateEmergencyService;
@@ -22,9 +23,14 @@ public static class EmergencyServiceRoutes
     private static RouteGroupBuilder MapRoutes(this RouteGroupBuilder app)
     {
         app.MapGet("/GetAllEmergencyServices",
-                async (IMediator mediator, [FromQuery] bool? isActive, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetAllEmergencyServicesRequest(isActive), cancellationToken)))
+                async (IMediator mediator, [FromQuery] bool? isActive,
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetAllEmergencyServicesRequest(isActive, page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<GetAllEmergencyServicesDto>>()
+            .Produces<PagedResult<GetAllEmergencyServicesDto>>()
             .ProducesInternalServerError()
             .WithName("Get All Emergency Services")
             .WithSummary("Get all emergency services")

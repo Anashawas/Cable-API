@@ -70,13 +70,8 @@ public partial class ChargingPointConfiguration : IEntityTypeConfiguration<Charg
             .OnDelete(DeleteBehavior.ClientSetNull)
             .HasConstraintName("FK_ChargingPoint_LoyaltyBlockedByUser");
 
-        // Loyalty Credit Limit
-        builder.Property(e => e.LoyaltyCreditLimit)
-            .HasColumnType("decimal(18,3)");
-
-        builder.Property(e => e.LoyaltyCurrentBalance)
-            .IsRequired()
-            .HasDefaultValue(0m)
+        // Wallet Credit Limit
+        builder.Property(e => e.WalletCreditLimit)
             .HasColumnType("decimal(18,3)");
 
         OnConfigurePartial(builder);

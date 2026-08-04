@@ -4,15 +4,23 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Users.Commands.AddUser;
 using Application.Users.Commands.ChangePassword;
+using Application.Users.Commands.AdminChangePhone;
 using Application.Users.Commands.DeleteUser;
+using Application.Users.Commands.RestoreUsers;
 using Application.Users.Commands.UpdateUser;
 using Application.Users.Commands.RequestPasswordReset;
 using Application.Users.Commands.ResetPasswordWithCode;
 using Application.Users.Commands.ValidateResetCode;
+using Application.Users.Commands.MarkUpdateNotesRead;
 using Application.Users.Commands.VerifyPhone.SendPhoneVerificationOtp;
 using Application.Users.Commands.VerifyPhone.VerifyUserPhone;
+using Application.Providers.Queries.GetMyProviderAssets;
+using Application.Providers.Queries.GetProviderAssetsByUserId;
+using Application.Common.Models;
 using Application.Users.Queries.GetAllUsers;
 using Application.Users.Queries.GetUserById;
+using Application.Users.Queries.GetUsersPaged;
+using Application.Users.Queries.GetUsersSummary;
 using Cable.Requests.Identity;
 using Cable.Requests.OTP;
 using Cable.Requests.Users;
@@ -36,15 +44,50 @@ public static class UserRoutes
 
     private static RouteGroupBuilder MapAdministrationRoutes(this RouteGroupBuilder app)
     {
-        app.MapGet("/GetAllUsers", async (IMediator mediator, CancellationToken cancellation) =>
-                Results.Ok(await mediator.Send(new GetAllUsersRequest(), cancellation)))
+        app.MapGet("/GetAllUsers", async (IMediator mediator,
+                    [FromQuery] bool? includeDeleted,
+                    [FromQuery] bool? deletedOnly,
+                    [FromQuery] string? search,
+                    [FromQuery] int? roleId,
+                    [FromQuery] string? city,
+                    [FromQuery] bool? isDeleted,
+                    [FromQuery] string? sort,
+                    [FromQuery] int? page,
+                    [FromQuery] int? pageSize,
+                    CancellationToken cancellation) =>
+                {
+                    // Opt-in server-side filtering/paging (A2a): any new param switches to
+                    // the paged envelope. Legacy calls keep the plain array unchanged.
+                    var usePaged = search != null || roleId.HasValue || city != null
+                                   || isDeleted.HasValue || sort != null
+                                   || page.HasValue || pageSize.HasValue;
+
+                    if (usePaged)
+                        return Results.Ok(await mediator.Send(new GetUsersPagedRequest(
+                            search, roleId, city, isDeleted, sort, page, pageSize), cancellation));
+
+                    return Results.Ok(await mediator.Send(new GetAllUsersRequest(includeDeleted, deletedOnly), cancellation));
+                })
             .RequireAuthorization()
             .Produces<List<GetAllUsersDto>>()
+            .Produces<PagedResult<GetAllUsersDto>>()
             .ProducesUnAuthorized()
             .ProducesForbidden()
             .ProducesInternalServerError()
             .WithName("List Users")
-            .WithSummary("Lists all users")
+            .WithSummary("Lists users. Legacy: deletedOnly/includeDeleted return a plain array. New (admin): search/roleId/city/isDeleted/sort/page/pageSize return { items, totalCount, page, pageSize }.")
+            .WithOpenApi();
+
+        // A1 — users summary aggregate for the admin header/insights
+        app.MapGet("/summary", async (IMediator mediator, CancellationToken cancellation) =>
+                Results.Ok(await mediator.Send(new GetUsersSummaryRequest(), cancellation)))
+            .RequireAuthorization()
+            .Produces<UsersSummaryDto>()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Users Summary")
+            .WithSummary("Admin users dashboard aggregate: totals, growth, byRole, byCity, registration trend")
             .WithOpenApi();
 
         app.MapGet("/GetUserById/{id:int}",
@@ -221,6 +264,45 @@ public static class UserRoutes
         ;
 
 
+        app.MapPatch("/{id:int}/change-phone",
+                async (IMediator mediator, [FromRoute] int id, AdminChangePhoneRequest request,
+                        CancellationToken cancellation) =>
+                    Results.Ok(await mediator.Send(new AdminChangePhoneCommand(id, request.PhoneNumber), cancellation)))
+            .Produces<AdminChangePhoneDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Admin Change User Phone")
+            .WithSummary("Admin changes a user's phone number with validation")
+            .WithOpenApi(op =>
+            {
+                op.Parameters[0].Required = true;
+                op.Parameters[0].Description = "The id of the user";
+                op.RequestBody.Required = true;
+                return op;
+            });
+
+        app.MapGet("/{id:int}/provider-assets",
+                async ([FromRoute] int id, IMediator mediator, CancellationToken cancellation) =>
+                    Results.Ok(await mediator.Send(new GetProviderAssetsByUserIdRequest(id), cancellation)))
+            .Produces<ProviderAssetsDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesInternalServerError()
+            .WithName("Get Provider Assets By User Id")
+            .WithSummary("Admin gets all charging points and service providers owned by a specific user")
+            .WithOpenApi(op =>
+            {
+                op.Parameters[0].Required = true;
+                op.Parameters[0].Description = "The id of the user";
+                return op;
+            });
+
         app.MapDelete("/{id:int}", async (int id, IMediator mediator, CancellationToken cancellation) =>
                 await mediator.Send(new DeleteUserCommand(id), cancellation))
             .Produces(200)
@@ -237,7 +319,36 @@ public static class UserRoutes
                 op.Parameters[0].Description = "The id of the user";
                 return op;
             });
-        ;
+
+        app.MapPatch("/restore", async (IMediator mediator,
+                    [FromBody] RestoreUsersCommand request,
+                    CancellationToken cancellation) =>
+                Results.Ok(await mediator.Send(request, cancellation)))
+            .Produces<RestoreUsersResult>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Restore Deleted Users")
+            .WithSummary("Restores deleted user accounts. Accepts an array of user IDs.")
+            .WithOpenApi();
+
+        // Mark update notes as read
+        app.MapPatch("/mark-update-notes-read",
+                async (IMediator mediator, CancellationToken cancellationToken) =>
+                {
+                    await mediator.Send(new MarkUpdateNotesReadCommand(), cancellationToken);
+                    return Results.Ok();
+                })
+            .Produces(200)
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesInternalServerError()
+            .WithName("Mark Update Notes Read")
+            .WithSummary("Marks the current user as having read the update notes")
+            .WithDescription("Sets HasReadUpdateNotes to true for the authenticated user. Reset manually via DB when new update is released.")
+            .WithOpenApi();
 
         return app;
     }

@@ -10,7 +10,8 @@ public record CreatePartnerAgreementCommand(
     double CommissionPercentage,
     double PointsRewardPercentage,
     int? PointsConversionRateId,
-    int CodeExpiryMinutes,
+    int CodeExpirySeconds,
+    decimal? MinimumTransactionAmount,
     string? Note
 ) : IRequest<int>;
 
@@ -24,7 +25,10 @@ public class CreatePartnerAgreementCommandValidator : AbstractValidator<CreatePa
         RuleFor(x => x.ProviderId).GreaterThan(0);
         RuleFor(x => x.CommissionPercentage).GreaterThan(0).LessThanOrEqualTo(100);
         RuleFor(x => x.PointsRewardPercentage).GreaterThanOrEqualTo(0).LessThanOrEqualTo(100);
-        RuleFor(x => x.CodeExpiryMinutes).GreaterThan(0);
+        RuleFor(x => x.CodeExpirySeconds).GreaterThan(0);
+        RuleFor(x => x.MinimumTransactionAmount).GreaterThan(0)
+            .When(x => x.MinimumTransactionAmount.HasValue)
+            .WithMessage("MinimumTransactionAmount must be greater than 0");
     }
 }
 
@@ -37,6 +41,26 @@ public class CreatePartnerAgreementCommandHandler(
     {
         var userId = currentUserService.UserId
                      ?? throw new NotAuthorizedAccessException("User not authenticated");
+
+        // A partner agreement needs an owner as the commission/settlement counterparty —
+        // block agreements on unassigned providers.
+        var providerOwner = request.ProviderType == "ChargingPoint"
+            ? await applicationDbContext.ChargingPoints
+                .Where(x => x.Id == request.ProviderId && !x.IsDeleted)
+                .Select(x => new { x.OwnerId })
+                .FirstOrDefaultAsync(cancellationToken)
+            : await applicationDbContext.ServiceProviders
+                .Where(x => x.Id == request.ProviderId && !x.IsDeleted)
+                .Select(x => new { x.OwnerId })
+                .FirstOrDefaultAsync(cancellationToken);
+
+        if (providerOwner == null)
+            throw new Cable.Core.Exceptions.NotFoundException(
+                $"{request.ProviderType} with id {request.ProviderId} not found");
+
+        if (providerOwner.OwnerId == null)
+            throw new DataValidationException("ProviderId",
+                "This provider has no owner assigned. Assign an owner before creating a partner agreement.");
 
         // Check if an active agreement already exists for this provider
         var existingAgreement = await applicationDbContext.PartnerAgreements
@@ -56,7 +80,8 @@ public class CreatePartnerAgreementCommandHandler(
             CommissionPercentage = request.CommissionPercentage,
             PointsRewardPercentage = request.PointsRewardPercentage,
             PointsConversionRateId = request.PointsConversionRateId,
-            CodeExpiryMinutes = request.CodeExpiryMinutes,
+            CodeExpirySeconds = request.CodeExpirySeconds,
+            MinimumTransactionAmount = request.MinimumTransactionAmount,
             IsActive = true,
             Note = request.Note
         };

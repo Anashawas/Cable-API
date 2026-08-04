@@ -15,8 +15,13 @@ public partial class UserComplaintConfiguration : IEntityTypeConfiguration<UserC
     public void Configure(EntityTypeBuilder<UserComplaint> builder)
     {
         builder.HasKey(e => e.Id).HasName("PK_NewTable");
-        
+
         builder.Property(e => e.Note).HasMaxLength(500);
+
+        // Default status for new complaints = ComplaintStatus.New (0).
+        builder.Property(e => e.Status)
+            .IsRequired()
+            .HasDefaultValue(0);
 
         builder.HasOne(d => d.ChargingPoint).WithMany(p => p.UserComplaints)
             .HasForeignKey(d => d.ChargingPointId)

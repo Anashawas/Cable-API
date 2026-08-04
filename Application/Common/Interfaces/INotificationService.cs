@@ -11,12 +11,14 @@ public interface INotificationService
     /// <param name="title">Notification title</param>
     /// <param name="body">Notification body</param>
     /// <param name="appType">Firebase app type (UserApp or StationApp)</param>
+    /// <param name="data">Optional FCM data payload (routing: type, chargerId, deepLink…)</param>
     /// <returns>Message ID from Firebase</returns>
     Task<string> SendMessageAsync(
         string token,
         string title,
         string body,
-        FirebaseAppType appType = FirebaseAppType.UserApp);
+        FirebaseAppType appType = FirebaseAppType.UserApp,
+        IReadOnlyDictionary<string, string>? data = null);
 
     /// <summary>
     /// Sends push notifications to multiple devices
@@ -25,12 +27,14 @@ public interface INotificationService
     /// <param name="title">Notification title</param>
     /// <param name="body">Notification body</param>
     /// <param name="appType">Firebase app type (UserApp or StationApp)</param>
+    /// <param name="data">Optional FCM data payload (routing: type, chargerId, deepLink…)</param>
     /// <returns>Notification send result with success/failure counts</returns>
     Task<NotificationSendResult> SendMessagesAsync(
         IEnumerable<string> tokens,
         string title,
         string body,
-        FirebaseAppType appType = FirebaseAppType.UserApp);
+        FirebaseAppType appType = FirebaseAppType.UserApp,
+        IReadOnlyDictionary<string, string>? data = null);
 }
 
 public class NotificationSendResult

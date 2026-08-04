@@ -14,5 +14,5 @@ public record UtilityInvoiceRequest(
     string?PrivacyName
     )
 {
-    public int Year =>   DateTime.Now.Year;   
+    public int Year =>   DateTime.UtcNow.Year;   
 }

@@ -18,10 +18,11 @@ public record OfferDto(
     int? MaxUsesPerUser,
     int? MaxTotalUses,
     int CurrentTotalUses,
-    int OfferCodeExpiryMinutes,
+    int OfferCodeExpirySeconds,
     string? ImageUrl,
     DateTime ValidFrom,
     DateTime? ValidTo,
     bool IsActive,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    decimal? PointsPriceValue = null
 );

@@ -9,7 +9,8 @@ public record UpdatePartnerAgreementCommand(
     double CommissionPercentage,
     double PointsRewardPercentage,
     int? PointsConversionRateId,
-    int CodeExpiryMinutes,
+    int CodeExpirySeconds,
+    decimal? MinimumTransactionAmount,
     string? Note,
     bool IsActive
 ) : IRequest;
@@ -31,7 +32,8 @@ public class UpdatePartnerAgreementCommandHandler(
         agreement.CommissionPercentage = request.CommissionPercentage;
         agreement.PointsRewardPercentage = request.PointsRewardPercentage;
         agreement.PointsConversionRateId = request.PointsConversionRateId;
-        agreement.CodeExpiryMinutes = request.CodeExpiryMinutes;
+        agreement.CodeExpirySeconds = request.CodeExpirySeconds;
+        agreement.MinimumTransactionAmount = request.MinimumTransactionAmount;
         agreement.Note = request.Note;
         agreement.IsActive = request.IsActive;
         agreement.ModifiedAt = DateTime.UtcNow;

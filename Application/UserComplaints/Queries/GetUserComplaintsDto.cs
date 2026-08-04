@@ -7,7 +7,9 @@ public record GetUserComplaintsDto(
     string Note,
     int Status,
     UserAccountSummary UserAccount,
-    ChargingPointSummary ChargingPoint);
+    ChargingPointSummary ChargingPoint,
+    DateTime? CreatedAt = null,
+    DateTime? ModifiedAt = null);
 
 public record ChargingPointSummary(int Id, string Name);
 

@@ -4,19 +4,22 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Application.Partners.Queries.GetProviderBalance;
 
-public record ProviderPaymentDto(
+public record WalletTransactionSummaryDto(
     int Id,
+    int TransactionType,
     decimal Amount,
+    decimal BalanceAfter,
+    string? ReferenceType,
     string? Note,
     string? RecordedByUserName,
     DateTime CreatedAt
 );
 
 public record ProviderBalanceDto(
-    decimal? CreditLimit,
-    decimal CurrentBalance,
+    decimal? WalletCreditLimit,
+    decimal WalletBalance,
     decimal? AvailableCredit,
-    List<ProviderPaymentDto> RecentPayments
+    List<WalletTransactionSummaryDto> RecentTransactions
 );
 
 public record GetProviderBalanceRequest(
@@ -35,31 +38,31 @@ public class GetProviderBalanceRequestHandler(
             ?? throw new NotAuthorizedAccessException("User not authenticated");
 
         decimal? creditLimit;
-        decimal currentBalance;
+        decimal walletBalance;
 
         if (request.ProviderType == "ChargingPoint")
         {
             var cp = await applicationDbContext.ChargingPoints
                          .AsNoTracking()
                          .Where(x => x.Id == request.ProviderId && !x.IsDeleted)
-                         .Select(x => new { x.LoyaltyCreditLimit, x.LoyaltyCurrentBalance })
+                         .Select(x => new { x.WalletCreditLimit, x.WalletBalance })
                          .FirstOrDefaultAsync(cancellationToken)
                      ?? throw new NotFoundException($"ChargingPoint with Id '{request.ProviderId}' not found");
 
-            creditLimit = cp.LoyaltyCreditLimit;
-            currentBalance = cp.LoyaltyCurrentBalance;
+            creditLimit = cp.WalletCreditLimit;
+            walletBalance = cp.WalletBalance;
         }
         else if (request.ProviderType == "ServiceProvider")
         {
             var sp = await applicationDbContext.ServiceProviders
                          .AsNoTracking()
                          .Where(x => x.Id == request.ProviderId && !x.IsDeleted)
-                         .Select(x => new { x.LoyaltyCreditLimit, x.LoyaltyCurrentBalance })
+                         .Select(x => new { x.WalletCreditLimit, x.WalletBalance })
                          .FirstOrDefaultAsync(cancellationToken)
                      ?? throw new NotFoundException($"ServiceProvider with Id '{request.ProviderId}' not found");
 
-            creditLimit = sp.LoyaltyCreditLimit;
-            currentBalance = sp.LoyaltyCurrentBalance;
+            creditLimit = sp.WalletCreditLimit;
+            walletBalance = sp.WalletBalance;
         }
         else
         {
@@ -67,25 +70,28 @@ public class GetProviderBalanceRequestHandler(
                 "ProviderType must be 'ChargingPoint' or 'ServiceProvider'");
         }
 
-        var recentPayments = await applicationDbContext.ProviderPayments
+        var recentTransactions = await applicationDbContext.ProviderWalletTransactions
             .AsNoTracking()
-            .Where(p => p.ProviderType == request.ProviderType
-                        && p.ProviderId == request.ProviderId
-                        && !p.IsDeleted)
-            .OrderByDescending(p => p.CreatedAt)
+            .Where(t => t.ProviderType == request.ProviderType
+                        && t.ProviderId == request.ProviderId
+                        && !t.IsDeleted)
+            .OrderByDescending(t => t.CreatedAt)
             .Take(10)
-            .Select(p => new ProviderPaymentDto(
-                p.Id,
-                p.Amount,
-                p.Note,
-                p.RecordedByUser.Name,
-                p.CreatedAt))
+            .Select(t => new WalletTransactionSummaryDto(
+                t.Id,
+                t.TransactionType,
+                t.Amount,
+                t.BalanceAfter,
+                t.ReferenceType,
+                t.Note,
+                t.RecordedByUser != null ? t.RecordedByUser.Name : null,
+                t.CreatedAt))
             .ToListAsync(cancellationToken);
 
         var availableCredit = creditLimit.HasValue
-            ? creditLimit.Value + currentBalance
+            ? creditLimit.Value + walletBalance
             : (decimal?)null;
 
-        return new ProviderBalanceDto(creditLimit, currentBalance, availableCredit, recentPayments);
+        return new ProviderBalanceDto(creditLimit, walletBalance, availableCredit, recentTransactions);
     }
 }

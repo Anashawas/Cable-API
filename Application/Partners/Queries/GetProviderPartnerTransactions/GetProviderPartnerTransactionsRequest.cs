@@ -1,3 +1,4 @@
+using Application.Common.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Partners.Queries.GetProviderPartnerTransactions;
@@ -21,14 +22,16 @@ public record GetProviderPartnerTransactionsRequest(
     string ProviderType,
     int ProviderId,
     int? Month,
-    int? Year
-) : IRequest<List<ProviderPartnerTransactionDto>>;
+    int? Year,
+    int? Page = null,
+    int? PageSize = null
+) : IRequest<PagedResult<ProviderPartnerTransactionDto>>;
 
 public class GetProviderPartnerTransactionsRequestHandler(
     IApplicationDbContext applicationDbContext)
-    : IRequestHandler<GetProviderPartnerTransactionsRequest, List<ProviderPartnerTransactionDto>>
+    : IRequestHandler<GetProviderPartnerTransactionsRequest, PagedResult<ProviderPartnerTransactionDto>>
 {
-    public async Task<List<ProviderPartnerTransactionDto>> Handle(
+    public async Task<PagedResult<ProviderPartnerTransactionDto>> Handle(
         GetProviderPartnerTransactionsRequest request, CancellationToken cancellationToken)
     {
         var query = applicationDbContext.PartnerTransactions
@@ -47,10 +50,10 @@ public class GetProviderPartnerTransactionsRequestHandler(
         return await query
             .OrderByDescending(x => x.CreatedAt)
             .Select(x => new ProviderPartnerTransactionDto(
-                x.Id, x.UserId, x.User.Name, x.TransactionCode,
+                x.Id, x.UserId, x.User != null ? x.User.Name : null, x.TransactionCode,
                 x.Status, x.TransactionAmount, x.CurrencyCode,
                 x.CommissionAmount, x.PointsAwarded,
                 x.CodeExpiresAt, x.CompletedAt, x.CreatedAt))
-            .ToListAsync(cancellationToken);
+            .ToOptionallyPaginatedAsync(request.Page, request.PageSize, cancellationToken: cancellationToken);
     }
 }

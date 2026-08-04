@@ -22,6 +22,7 @@ public static class UserAccountExtensions
             userAccount.Country,
             userAccount.City,
             userAccount.IsPhoneVerified,
+            userAccount.HasReadUpdateNotes,
             new RoleSummary(userAccount.RoleId, userAccount?.Role?.Name ?? string.Empty),
             userAccount?.UserCars?.GroupBy(uc => new { uc.CarModel.CarType.Id, uc.CarModel.CarType.Name })
                 .Select(carTypeGroup => new UserCarTypeDto(

@@ -1,3 +1,4 @@
+using Application.Common.Security;
 using Cable.Core;
 using Cable.Core.Emuns;
 using Cable.Core.Exceptions;
@@ -16,6 +17,8 @@ public class EndSeasonCommandHandler(
 {
     public async Task<EndSeasonResult> Handle(EndSeasonCommand request, CancellationToken cancellationToken)
     {
+        await AdminRoleGuard.EnsureAdminAsync(applicationDbContext, currentUserService, cancellationToken);
+
         var adminId = currentUserService.UserId
                       ?? throw new NotAuthorizedAccessException("User not authenticated");
 
@@ -33,47 +36,59 @@ public class EndSeasonCommandHandler(
 
         var totalBonusPoints = 0;
 
-        foreach (var progress in userProgresses)
+        // Wrap entire bulk operation in a transaction
+        await using var dbTransaction = await applicationDbContext.Database.BeginTransactionAsync(cancellationToken);
+        try
         {
-            var bonusPoints = progress.Tier.BonusPoints;
-            if (bonusPoints <= 0) continue;
-
-            // Get wallet
-            var wallet = await applicationDbContext.UserLoyaltyAccounts
-                .FirstOrDefaultAsync(w => w.UserId == progress.UserId && !w.IsDeleted, cancellationToken);
-
-            if (wallet == null) continue;
-
-            // Award bonus points
-            wallet.CurrentBalance += bonusPoints;
-            wallet.TotalPointsEarned += bonusPoints;
-            wallet.ModifiedAt = now;
-            wallet.ModifiedBy = adminId;
-
-            // Create bonus transaction
-            var transaction = new LoyaltyPointTransaction
+            foreach (var progress in userProgresses)
             {
-                UserLoyaltyAccountId = wallet.Id,
-                LoyaltySeasonId = activeSeason.Id,
-                TransactionType = (int)TransactionType.SeasonBonus,
-                Points = bonusPoints,
-                BalanceAfter = wallet.CurrentBalance,
-                Note = $"Season-end bonus ({progress.Tier.Name} tier) for {activeSeason.Name}",
-                CreatedAt = now,
-                CreatedBy = adminId
-            };
-            applicationDbContext.LoyaltyPointTransactions.Add(transaction);
+                var bonusPoints = progress.Tier.BonusPoints;
+                if (bonusPoints <= 0) continue;
 
-            totalBonusPoints += bonusPoints;
+                // Get wallet with row lock
+                var wallet = await applicationDbContext.UserLoyaltyAccounts
+                    .FromSqlRaw("SELECT * FROM [UserLoyaltyAccount] WITH (UPDLOCK, ROWLOCK) WHERE UserId = {0} AND IsDeleted = 0", progress.UserId)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (wallet == null) continue;
+
+                // Award bonus points
+                wallet.CurrentBalance += bonusPoints;
+                wallet.TotalPointsEarned += bonusPoints;
+                wallet.ModifiedAt = now;
+                wallet.ModifiedBy = adminId;
+
+                // Create bonus transaction
+                var transaction = new LoyaltyPointTransaction
+                {
+                    UserLoyaltyAccountId = wallet.Id,
+                    LoyaltySeasonId = activeSeason.Id,
+                    TransactionType = (int)TransactionType.SeasonBonus,
+                    Points = bonusPoints,
+                    BalanceAfter = wallet.CurrentBalance,
+                    Note = $"Season-end bonus ({progress.Tier.Name} tier) for {activeSeason.Name}",
+                    CreatedAt = now,
+                    CreatedBy = adminId
+                };
+                applicationDbContext.LoyaltyPointTransactions.Add(transaction);
+
+                totalBonusPoints += bonusPoints;
+            }
+
+            // Deactivate the season
+            activeSeason.IsActive = false;
+            activeSeason.ModifiedAt = now;
+            activeSeason.ModifiedBy = adminId;
+
+            await applicationDbContext.SaveChanges(cancellationToken);
+            await dbTransaction.CommitAsync(cancellationToken);
+
+            return new EndSeasonResult(userProgresses.Count, totalBonusPoints);
         }
-
-        // Deactivate the season
-        activeSeason.IsActive = false;
-        activeSeason.ModifiedAt = now;
-        activeSeason.ModifiedBy = adminId;
-
-        await applicationDbContext.SaveChanges(cancellationToken);
-
-        return new EndSeasonResult(userProgresses.Count, totalBonusPoints);
+        catch
+        {
+            await dbTransaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 }

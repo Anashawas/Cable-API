@@ -25,6 +25,13 @@ public class ProviderSettlementConfiguration : IEntityTypeConfiguration<Provider
         builder.Property(e => e.PeriodMonth)
             .IsRequired();
 
+        builder.Property(e => e.PeriodType)
+            .IsRequired()
+            .HasDefaultValue(2); // Weekly (Sun-Sat)
+
+        builder.Property(e => e.PeriodWeek)
+            .IsRequired();
+
         // Partner Transaction fields
         builder.Property(e => e.PartnerTransactionCount)
             .IsRequired()
@@ -50,8 +57,14 @@ public class ProviderSettlementConfiguration : IEntityTypeConfiguration<Provider
             .HasColumnType("decimal(18,3)")
             .HasDefaultValue(0m);
 
-        // Net settlement
-        builder.Property(e => e.NetAmountDueToProvider)
+        // Net balance: OfferPaymentAmount - PartnerCommissionAmount
+        builder.Property(e => e.NetBalance)
+            .IsRequired()
+            .HasColumnType("decimal(18,3)")
+            .HasDefaultValue(0m)
+            .HasColumnName("NetBalance");
+
+        builder.Property(e => e.WalletApplied)
             .IsRequired()
             .HasColumnType("decimal(18,3)")
             .HasDefaultValue(0m);
@@ -67,14 +80,8 @@ public class ProviderSettlementConfiguration : IEntityTypeConfiguration<Provider
         builder.Property(e => e.SettlementStatus)
             .IsRequired();
 
-        builder.Property(e => e.InvoicedAt)
-            .HasColumnType("datetime");
-
         builder.Property(e => e.PaidAt)
             .HasColumnType("datetime");
-
-        builder.Property(e => e.PaidAmount)
-            .HasColumnType("decimal(18,3)");
 
         builder.Property(e => e.AdminNote)
             .HasMaxLength(1000);
@@ -97,8 +104,9 @@ public class ProviderSettlementConfiguration : IEntityTypeConfiguration<Provider
             .HasConstraintName("FK_ProviderSettlement_ProviderOwner");
 
         // Indexes
-        builder.HasIndex(e => new { e.ProviderType, e.ProviderId, e.PeriodYear, e.PeriodMonth })
+        builder.HasIndex(e => new { e.ProviderType, e.ProviderId, e.PeriodType, e.PeriodYear, e.PeriodMonth, e.PeriodWeek })
             .IsUnique()
+            .HasFilter("IsDeleted = 0")
             .HasDatabaseName("IX_ProviderSettlement_Provider_Period");
 
         builder.HasIndex(e => e.SettlementStatus)
@@ -107,7 +115,7 @@ public class ProviderSettlementConfiguration : IEntityTypeConfiguration<Provider
         builder.HasIndex(e => e.ProviderOwnerId)
             .HasDatabaseName("IX_ProviderSettlement_ProviderOwnerId");
 
-        builder.HasIndex(e => new { e.PeriodYear, e.PeriodMonth })
-            .HasDatabaseName("IX_ProviderSettlement_PeriodYear_PeriodMonth");
+        builder.HasIndex(e => new { e.PeriodType, e.PeriodYear, e.PeriodMonth, e.PeriodWeek })
+            .HasDatabaseName("IX_ProviderSettlement_Period");
     }
 }

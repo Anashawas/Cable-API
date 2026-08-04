@@ -12,14 +12,18 @@ public record SettlementSummaryDto(
     int TotalOfferTransactions,
     decimal TotalOfferPaymentAmount,
     int TotalPointsDeducted,
-    decimal TotalNetAmountDueToProviders,
+    decimal TotalNetBalance,
+    decimal TotalWalletApplied,
     int PendingCount,
-    int InvoicedCount,
     int PaidCount,
-    int DisputedCount
+    int DisputedCount,
+    decimal TotalOutstandingAmount = 0,   // Σ (commission - walletApplied) — what providers still owe
+    decimal TotalDisputedAmount = 0       // Σ |netBalance| of Disputed settlements
 );
 
-public record GetSettlementSummaryRequest(int? Month = null, int? Year = null) : IRequest<SettlementSummaryDto>;
+public record GetSettlementSummaryRequest(
+    int? Month = null, int? Year = null,
+    int? PeriodType = null, int? Week = null) : IRequest<SettlementSummaryDto>;
 
 public class GetSettlementSummaryRequestHandler(
     IApplicationDbContext applicationDbContext)
@@ -38,6 +42,12 @@ public class GetSettlementSummaryRequestHandler(
         if (request.Month.HasValue)
             query = query.Where(x => x.PeriodMonth == request.Month.Value);
 
+        if (request.PeriodType.HasValue)
+            query = query.Where(x => x.PeriodType == request.PeriodType.Value);
+
+        if (request.Week.HasValue)
+            query = query.Where(x => x.PeriodWeek == request.Week.Value);
+
         var settlements = await query.ToListAsync(cancellationToken);
 
         return new SettlementSummaryDto(
@@ -49,11 +59,15 @@ public class GetSettlementSummaryRequestHandler(
             TotalOfferTransactions: settlements.Sum(x => x.OfferTransactionCount),
             TotalOfferPaymentAmount: settlements.Sum(x => x.OfferPaymentAmount),
             TotalPointsDeducted: settlements.Sum(x => x.TotalPointsDeducted),
-            TotalNetAmountDueToProviders: settlements.Sum(x => x.NetAmountDueToProvider),
+            TotalNetBalance: settlements.Sum(x => x.NetBalance),
+            TotalWalletApplied: settlements.Sum(x => x.WalletApplied),
             PendingCount: settlements.Count(x => x.SettlementStatus == (int)SettlementStatus.Pending),
-            InvoicedCount: settlements.Count(x => x.SettlementStatus == (int)SettlementStatus.Invoiced),
             PaidCount: settlements.Count(x => x.SettlementStatus == (int)SettlementStatus.Paid),
-            DisputedCount: settlements.Count(x => x.SettlementStatus == (int)SettlementStatus.Disputed)
+            DisputedCount: settlements.Count(x => x.SettlementStatus == (int)SettlementStatus.Disputed),
+            TotalOutstandingAmount: settlements.Sum(x => x.PartnerCommissionAmount - x.WalletApplied),
+            TotalDisputedAmount: settlements
+                .Where(x => x.SettlementStatus == (int)SettlementStatus.Disputed)
+                .Sum(x => Math.Abs(x.NetBalance))
         );
     }
 }

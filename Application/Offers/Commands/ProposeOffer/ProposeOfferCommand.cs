@@ -15,10 +15,11 @@ public record ProposeOfferCommand(
     string CurrencyCode,
     int? MaxUsesPerUser,
     int? MaxTotalUses,
-    int OfferCodeExpiryMinutes,
+    int OfferCodeExpirySeconds,
     string? ImageUrl,
     DateTime ValidFrom,
-    DateTime? ValidTo
+    DateTime? ValidTo,
+    decimal? PointsPriceValue = null
 ) : IRequest<int>;
 
 public class ProposeOfferCommandHandler(
@@ -42,12 +43,14 @@ public class ProposeOfferCommandHandler(
             ProposedByUserId = userId,
             ApprovalStatus = (int)OfferApprovalStatus.Pending,
             PointsCost = request.PointsCost,
+            PointsPriceValue = await OfferPointsValueResolver.ResolveAsync(
+                applicationDbContext, request.PointsPriceValue, request.PointsCost, request.CurrencyCode, cancellationToken),
             MonetaryValue = request.MonetaryValue,
             CurrencyCode = request.CurrencyCode,
             MaxUsesPerUser = request.MaxUsesPerUser,
             MaxTotalUses = request.MaxTotalUses,
             CurrentTotalUses = 0,
-            OfferCodeExpiryMinutes = request.OfferCodeExpiryMinutes > 0 ? request.OfferCodeExpiryMinutes : 30,
+            OfferCodeExpirySeconds = request.OfferCodeExpirySeconds > 0 ? request.OfferCodeExpirySeconds : 60,
             ImageUrl = request.ImageUrl,
             ValidFrom = request.ValidFrom,
             ValidTo = request.ValidTo,

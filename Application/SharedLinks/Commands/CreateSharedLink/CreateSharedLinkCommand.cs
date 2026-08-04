@@ -1,6 +1,7 @@
 using Cable.Core.Exceptions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace Application.SharedLinks.Commands.CreateSharedLink;
 
@@ -15,7 +16,8 @@ public record CreateSharedLinkCommand(
 public class CreateSharedLinkCommandHandler(
     IApplicationDbContext applicationDbContext,
     ICurrentUserService currentUserService,
-    IHttpContextAccessor httpContextAccessor)
+    IHttpContextAccessor httpContextAccessor,
+    IConfiguration configuration)
     : IRequestHandler<CreateSharedLinkCommand, string>
 {
     public async Task<string> Handle(CreateSharedLinkCommand request, CancellationToken cancellationToken)
@@ -58,8 +60,8 @@ public class CreateSharedLinkCommandHandler(
     {
         var httpContext = httpContextAccessor.HttpContext;
         if (httpContext == null)
-            return "https://localhost:7272"; // Default fallback
-        
+            return configuration["File:ServerUrl"] ?? "https://cable-app.com";
+
         var request = httpContext.Request;
         return $"{request.Scheme}://{request.Host}";
     }

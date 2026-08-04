@@ -1,5 +1,5 @@
 using Application.BannersAttachments.Queries.GetAllBannerAttachmentsById;
-
+using Application.Common.Commands.DeleteAttachment;
 using Application.Common.Interfaces;
 using Cable.Core.Emuns;
 using MediatR;
@@ -76,6 +76,28 @@ public static class FileRoutes
                 op.Parameters[0].Description = "The folder name (e.g., banners, chargingpoints)";
                 op.Parameters[1].Required = true;
                 op.Parameters[1].Description = "The file name";
+                return op;
+            });
+
+        app.MapDelete("/attachment/{folder}/{id:int}",
+                async (IMediator mediator, [FromRoute] UploadFileFolders folder, [FromRoute] int id,
+                        CancellationToken cancellationToken) =>
+                    await mediator.Send(new DeleteAttachmentCommand(folder, id), cancellationToken))
+            .Produces(200)
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Delete Attachment By Id")
+            .WithSummary("Deletes a single attachment by ID from any folder. Removes from database and physical disk.")
+            .WithOpenApi(op =>
+            {
+                op.Parameters[0].Required = true;
+                op.Parameters[0].Description = "Folder enum: CableAttachments, CableBanners, CableEmergencyService, CableServiceProvider, CableOfferAttachments";
+                op.Parameters[1].Required = true;
+                op.Parameters[1].Description = "The attachment ID";
                 return op;
             });
 

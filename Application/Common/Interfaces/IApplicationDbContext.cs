@@ -1,10 +1,12 @@
 ﻿using Domain.Enitites;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace Application.Common.Interfaces;
 
 public interface IApplicationDbContext
 {
+    DatabaseFacade Database { get; }
     DbSet<NotificationToken> NotificationTokens { get; set; }
     DbSet<UserCar> UserCars { get; set; }
     DbSet<CarType> CarTypes { get; set; }
@@ -61,12 +63,21 @@ public interface IApplicationDbContext
     DbSet<ServiceProviderRate> ServiceProviderRates { get; set; }
     DbSet<UserFavoriteServiceProvider> UserFavoriteServiceProviders { get; set; }
 
+    // Social Media DbSets
+    DbSet<SocialMediaPlatform> SocialMediaPlatforms { get; set; }
+    DbSet<SocialLink>          SocialLinks          { get; set; }
+
+    // Provider managers (workers)
+    DbSet<ProviderManager> ProviderManagers { get; set; }
+
     // Offers & Transactions DbSets
     DbSet<PointsConversionRate> PointsConversionRates { get; set; }
     DbSet<ProviderOffer> ProviderOffers { get; set; }
+    DbSet<OfferAttachment> OfferAttachments { get; set; }
     DbSet<OfferTransaction> OfferTransactions { get; set; }
     DbSet<ProviderSettlement> ProviderSettlements { get; set; }
     DbSet<ProviderPayment> ProviderPayments { get; set; }
+    DbSet<ProviderWalletTransaction> ProviderWalletTransactions { get; set; }
 
     // Partner Transactions DbSets
     DbSet<PartnerAgreement> PartnerAgreements { get; set; }
@@ -81,6 +92,27 @@ public interface IApplicationDbContext
     DbSet<LoyaltyPointTransaction> LoyaltyPointTransactions { get; set; }
     DbSet<LoyaltyReward> LoyaltyRewards { get; set; }
     DbSet<UserRewardRedemption> UserRewardRedemptions { get; set; }
+
+    // Analytics engine DbSets
+    DbSet<AnalyticsEvent> AnalyticsEvents { get; set; }
+    DbSet<AnalyticsDailyRollup> AnalyticsDailyRollups { get; set; }
+
+    // Premium station subscriptions
+    DbSet<StationPremiumSubscription> StationPremiumSubscriptions { get; set; }
+
+    // Lookups
+    DbSet<ChargerBrand> ChargerBrands { get; set; }
+    DbSet<ChargingPointChargerBrand> ChargingPointChargerBrands { get; set; }
+    DbSet<TermsVersion> TermsVersions { get; set; }
+    DbSet<UserTermsAcceptance> UserTermsAcceptances { get; set; }
+    DbSet<ProviderFavoriteNotification> ProviderFavoriteNotifications { get; set; }
+    DbSet<NotificationTemplate> NotificationTemplates { get; set; }
+    DbSet<Advertiser> Advertisers { get; set; }
+    DbSet<Campaign> Campaigns { get; set; }
+    DbSet<AppSetting> AppSettings { get; set; }
+    DbSet<Announcement> Announcements { get; set; }
+    DbSet<AnnouncementUserState> AnnouncementUserStates { get; set; }
+    DbSet<CarModelSize> CarModelSizes { get; set; }
 
     Task<int> SaveChanges(CancellationToken cancellationToken = default);
 }

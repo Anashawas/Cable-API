@@ -25,15 +25,26 @@ public record GetChargingPointByIdDto(
     int? VisitorsCount,
     string? Note,
     string? MethodPayment,
-    string? ChargerBrand,
     StatusSummary StatusSummary,
     ChargingPointTypeSummary? ChargingPointType,
     StationTypeSummary? StationType,
     List<string>? Images,
     List<PlugTypeSummary>? PlugTypeSummary,
     bool IsFavorite,
-    bool IsPartner
+    bool IsPartner,
+    DateTime? PremiumPaymentDate = null,
+    DateTime? PremiumExpiresAt = null,
+    int? OwnerId = null,
+    string? OwnerName = null,
+    string? OwnerEmail = null,
+    string? OwnerAccountPhone = null,
+    List<ChargerBrandSummary>? ChargerBrands = null,
+    DateTime? CreatedAt = null,
+    DateTime? ModifiedAt = null
 );
+
+/// <summary>A charger brand at the station and how many chargers of it.</summary>
+public record ChargerBrandSummary(int Id, string Name, int Count);
 
 
 

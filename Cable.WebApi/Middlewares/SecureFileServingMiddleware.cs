@@ -3,6 +3,7 @@ using Cable.Core.Exceptions;
 using System.Security.Claims;
 using Cable.Core;
 using Cable.Core.Emuns;
+using Cable.Core.Enums;
 using Cable.Core.Extenstions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;

@@ -21,6 +21,7 @@ public class PartnerTransaction : BaseAuditableEntity
     public int? ConfirmedByUserId { get; set; }
     public DateTime CodeExpiresAt { get; set; }
     public DateTime? CompletedAt { get; set; }
+    public decimal WalletCoveredAmount { get; set; }
 
     public virtual PartnerAgreement Agreement { get; set; } = null!;
     public virtual UserAccount? User { get; set; }

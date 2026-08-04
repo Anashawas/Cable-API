@@ -17,11 +17,12 @@ public record UpdateOfferCommand(
     string CurrencyCode,
     int? MaxUsesPerUser,
     int? MaxTotalUses,
-    int OfferCodeExpiryMinutes,
+    int OfferCodeExpirySeconds,
     string? ImageUrl,
     DateTime ValidFrom,
     DateTime? ValidTo,
-    bool IsActive
+    bool IsActive,
+    decimal? PointsPriceValue = null
 ) : IRequest;
 
 public class UpdateOfferCommandHandler(
@@ -45,11 +46,13 @@ public class UpdateOfferCommandHandler(
         offer.ProviderType = request.ProviderType;
         offer.ProviderId = request.ProviderId;
         offer.PointsCost = request.PointsCost;
+        offer.PointsPriceValue = await OfferPointsValueResolver.ResolveAsync(
+            applicationDbContext, request.PointsPriceValue, request.PointsCost, request.CurrencyCode, cancellationToken);
         offer.MonetaryValue = request.MonetaryValue;
         offer.CurrencyCode = request.CurrencyCode;
         offer.MaxUsesPerUser = request.MaxUsesPerUser;
         offer.MaxTotalUses = request.MaxTotalUses;
-        offer.OfferCodeExpiryMinutes = request.OfferCodeExpiryMinutes;
+        offer.OfferCodeExpirySeconds = request.OfferCodeExpirySeconds;
         offer.ImageUrl = request.ImageUrl;
         offer.ValidFrom = request.ValidFrom;
         offer.ValidTo = request.ValidTo;

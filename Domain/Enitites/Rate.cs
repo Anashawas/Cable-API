@@ -14,6 +14,9 @@ public partial class Rate:BaseAuditableEntity
     
     public int ChargingPointRate { get; set; }
     public double AVGChargingPointRate { get; set; }
+
+    /// <summary>Optional review text left by the user with the rating.</summary>
+    public string? Comment { get; set; }
     public virtual ChargingPoint ChargingPoint { get; set; } = null!;
     public virtual UserAccount User { get; set; } = null!;
 

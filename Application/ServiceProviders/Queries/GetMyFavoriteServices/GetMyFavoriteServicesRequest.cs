@@ -1,17 +1,20 @@
+using Application.Common.Models;
 using Application.ServiceProviders.Queries.GetAllServiceProviders;
 using Cable.Core;
+using Cable.Core.Emuns;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.ServiceProviders.Queries.GetMyFavoriteServices;
 
-public record GetMyFavoriteServicesRequest() : IRequest<List<ServiceProviderDto>>;
+public record GetMyFavoriteServicesRequest(int? Page = null, int? PageSize = null) : IRequest<PagedResult<ServiceProviderDto>>;
 
 public class GetMyFavoriteServicesRequestHandler(
     IApplicationDbContext applicationDbContext,
-    ICurrentUserService currentUserService)
-    : IRequestHandler<GetMyFavoriteServicesRequest, List<ServiceProviderDto>>
+    ICurrentUserService currentUserService,
+    IUploadFileService uploadFileService)
+    : IRequestHandler<GetMyFavoriteServicesRequest, PagedResult<ServiceProviderDto>>
 {
-    public async Task<List<ServiceProviderDto>> Handle(GetMyFavoriteServicesRequest request,
+    public async Task<PagedResult<ServiceProviderDto>> Handle(GetMyFavoriteServicesRequest request,
         CancellationToken cancellationToken)
     {
         var userId = currentUserService.UserId
@@ -50,12 +53,17 @@ public class GetMyFavoriteServicesRequestHandler(
             x.Address, x.CountryName, x.CityName, x.Latitude, x.Longitude,
             x.Price, x.PriceDescription, x.FromTime, x.ToTime, x.MethodPayment,
             x.VisitorsCount, x.IsVerified, x.HasOffer, x.OfferDescription,
-            x.Service, x.Icon, x.WhatsAppNumber, x.WebsiteUrl,
+            x.Service,
+            !string.IsNullOrEmpty(x.Icon)
+                ? uploadFileService.GetFilePath(UploadFileFolders.CableServiceProvider, x.Icon)
+                : null,
+            x.WhatsAppNumber, x.WebsiteUrl,
             x.ServiceProviderRates.Any() ? x.ServiceProviderRates.Average(r => r.Rating) : 0,
             x.ServiceProviderRates.Count,
-            x.ServiceProviderAttachments.Select(a => a.FileName).ToList(),
+            x.ServiceProviderAttachments.Select(a =>
+                uploadFileService.GetFilePath(UploadFileFolders.CableServiceProvider, a.FileName)).ToList(),
             x.CreatedAt,
             partnerSet.Contains(x.Id)
-        )).ToList();
+        )).ToList().ToOptionallyPaginated(request.Page, request.PageSize);
     }
 }

@@ -1,7 +1,6 @@
 using Application.ChargingPoints.Commands.AddUpdateRequestAttachments;
 using Application.ChargingPoints.Commands.ApproveUpdateRequest;
 using Application.ChargingPoints.Commands.CancelUpdateRequest;
-using Application.ChargingPoints.Commands.ChangeChargingPointOwner;
 using Application.ChargingPoints.Commands.RejectUpdateRequest;
 using Application.ChargingPoints.Commands.SubmitChargingPointUpdateRequest;
 using Application.ChargingPoints.Commands.UploadUpdateRequestIcon;
@@ -12,13 +11,16 @@ using Application.ChargingPoints.Queries.GetPendingUpdateRequests;
 using Application.ChargingPoints.Queries.GetUpdateRequestById;
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Application.Providers.Commands.SendFavoritesNotification;
+using Application.Providers.Commands.SetAutoApproveWorkerNotifications;
+using Application.Providers.Queries.GetFavoritesNotificationHistory;
 using Application.Providers.Queries.GetMyProviderAssets;
+using Application.Providers.Queries.GetProviderFavoritedUsers;
 using Application.ServiceProviders.Commands.AddServiceProviderAttachment;
 using Application.ServiceProviders.Commands.CreateServiceProvider;
 using Application.ServiceProviders.Commands.DeleteServiceProvider;
 using Application.ServiceProviders.Commands.DeleteServiceProviderAttachment;
 using Application.ServiceProviders.Commands.UpdateServiceProvider;
-using Application.ServiceProviders.Commands.ChangeServiceProviderOwner;
 using Application.ServiceProviders.Commands.UploadServiceProviderIcon;
 using Application.ServiceProviders.Queries.GetAllServiceProviders;
 using Application.ServiceProviders.Queries.GetMyServiceProviders;
@@ -157,6 +159,131 @@ public static class ProviderRoutes
             .WithDescription("Returns both charging points and service providers owned by the currently authenticated user.")
             .WithOpenApi();
 
+        app.MapGet("/favorites/{providerType}/{providerId:int}",
+                async (IMediator mediator, [FromRoute] string providerType, [FromRoute] int providerId,
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(
+                        new GetProviderFavoritedUsersRequest(providerType, providerId, page, pageSize),
+                        cancellationToken)))
+            .Produces<PagedResult<FavoritedUserDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Get Provider Favorited Users")
+            .WithSummary("Users who favorited a charging point or service provider (owner, worker, or admin only)")
+            .WithDescription("providerType is 'ChargingPoint' or 'ServiceProvider'. Returns userId, name, city and when they favorited — no contact details. Optional page/pageSize.")
+            .WithOpenApi();
+
+        app.MapPost("/favorites/{providerType}/{providerId:int}/notify",
+                async (IMediator mediator, [FromRoute] string providerType, [FromRoute] int providerId,
+                        SendFavoritesNotificationRequest request, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(
+                        new SendFavoritesNotificationCommand(providerType, providerId, request.Title, request.Body,
+                            request.NotificationTypeId),
+                        cancellationToken)))
+            .Produces<SendFavoritesNotificationResult>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Send Favorites Notification")
+            .WithSummary("Announce to every user who favorited this provider (owner/worker/admin; max 2 actual sends per 24h). Routing (deepLink + FCM type/chargerId) is attached server-side")
+            .WithDescription("providerType is 'ChargingPoint' or 'ServiceProvider'. Body: { notificationTypeId, body } — the title is then built server-side as '{typeName} From {stationName}'; a raw { title, body } still works. A WORKER's send is stored as status 'pending' until the owner/admin approves it, unless autoApproveWorkerNotifications is on for the provider.")
+            .WithOpenApi(op =>
+            {
+                op.RequestBody.Required = true;
+                return op;
+            });
+
+        app.MapGet("/favorites/{providerType}/{providerId:int}/notifications",
+                async (IMediator mediator, [FromRoute] string providerType, [FromRoute] int providerId,
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(
+                        new GetFavoritesNotificationHistoryRequest(providerType, providerId, false, page, pageSize),
+                        cancellationToken)))
+            .Produces<PagedResult<FavoritesNotificationHistoryDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesInternalServerError()
+            .WithName("Get Favorites Notification History")
+            .WithSummary("F1: announcements sent for this asset — 'reached N users, read by M' (owner/worker/admin, newest first, optional paging)")
+            .WithDescription("Each row: title, body, status (pending/sent/rejected), notificationType, sender, submittedAt/sentAt/decidedAt, recipientCount, deliveredCount (FCM-accepted), readCount (from the in-app inbox).")
+            .WithOpenApi();
+
+        app.MapGet("/favorites/{providerType}/{providerId:int}/notifications/pending",
+                async (IMediator mediator, [FromRoute] string providerType, [FromRoute] int providerId,
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(
+                        new GetFavoritesNotificationHistoryRequest(providerType, providerId, true, page, pageSize),
+                        cancellationToken)))
+            .Produces<PagedResult<FavoritesNotificationHistoryDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesInternalServerError()
+            .WithName("Get Pending Favorites Notifications")
+            .WithSummary("F3: worker announcements awaiting owner/admin approval for this asset")
+            .WithOpenApi();
+
+        app.MapPut("/favorites/notifications/{notificationId:int}/approve",
+                async (IMediator mediator, [FromRoute] int notificationId, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new DecideFavoritesNotificationCommand(notificationId, true),
+                        cancellationToken)))
+            .Produces<DecideFavoritesNotificationResult>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Approve Favorites Notification")
+            .WithSummary("F3: owner/admin approves a worker's pending announcement — it is delivered NOW (rate limit checked at this moment)")
+            .WithOpenApi();
+
+        app.MapPut("/favorites/notifications/{notificationId:int}/reject",
+                async (IMediator mediator, [FromRoute] int notificationId, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new DecideFavoritesNotificationCommand(notificationId, false),
+                        cancellationToken)))
+            .Produces<DecideFavoritesNotificationResult>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Reject Favorites Notification")
+            .WithSummary("F3: owner/admin rejects a worker's pending announcement — nothing is delivered")
+            .WithOpenApi();
+
+        app.MapPut("/favorites/{providerType}/{providerId:int}/auto-approve-worker-notifications",
+                async (IMediator mediator, [FromRoute] string providerType, [FromRoute] int providerId,
+                        SetAutoApproveRequest request, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(
+                        new SetAutoApproveWorkerNotificationsCommand(providerType, providerId, request.Enabled),
+                        cancellationToken)))
+            .Produces<bool>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Set Auto Approve Worker Notifications")
+            .WithSummary("F4: owner/admin toggles direct sending for this provider's workers (default off). Body: { enabled }")
+            .WithOpenApi(op =>
+            {
+                op.RequestBody.Required = true;
+                return op;
+            });
+
         return app;
     }
 
@@ -169,10 +296,14 @@ public static class ProviderRoutes
         // Get my charging points
         app.MapGet("/charging-points/my",
                 async (IMediator mediator, [FromQuery] int? chargerPointTypeId, [FromQuery] string? cityName,
-                        CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetMyChargingPointsRequest(chargerPointTypeId, cityName),
-                        cancellationToken)))
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetMyChargingPointsRequest(chargerPointTypeId, cityName, page, pageSize),
+                        cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<GetAllChargingPointsDto>>()
+            .Produces<PagedResult<GetAllChargingPointsDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesInternalServerError()
@@ -201,14 +332,11 @@ public static class ProviderRoutes
                         request.ChargersCount,
                         request.Latitude,
                         request.Longitude,
-                        request.ChargerPointTypeId,
-                        request.StationTypeId,
+                        request.StatusId,
                         request.OwnerPhone,
-                        request.HasOffer,
                         request.Service,
                         request.OfferDescription,
                         request.Address,
-                        request.ChargerBrand,
                         request.PlugTypeIds,
                         request.AttachmentsToDelete
                     ), cancellationToken)))
@@ -279,34 +407,15 @@ public static class ProviderRoutes
             })
             .DisableAntiforgery();
 
-        // Change owner
-        app.MapPatch("/charging-points/change-owner/{chargingPointId:int}",
-                async (IMediator mediator, [FromRoute] int chargingPointId, ChangeChargingPointOwnerRequest request,
-                        CancellationToken cancellationToken) =>
-                    await mediator.Send(new ChangeChargingPointOwnerCommand(chargingPointId, request.NewOwnerId), cancellationToken))
-            .Produces(200)
-            .RequireAuthorization()
-            .ProducesUnAuthorized()
-            .ProducesForbidden()
-            .ProducesNotFound()
-            .ProducesValidationProblem()
-            .ProducesInternalServerError()
-            .WithName("Change Charging Point Owner")
-            .WithSummary("Changes the owner of a charging point")
-            .WithDescription("Transfers ownership of a charging point to a different user. Requires authorization.")
-            .WithOpenApi(op =>
-            {
-                op.Parameters[0].Required = true;
-                op.Parameters[0].Description = "The ID of the charging point";
-                op.RequestBody.Required = true;
-                return op;
-            });
-
         // Get My Update Requests
         app.MapPost("/charging-points/update-requests/my-requests",
                 async (IMediator mediator, GetMyUpdateRequestsRequest request, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(request, cancellationToken)))
+                {
+                    var paged = await mediator.Send(request, cancellationToken);
+                    return Results.Ok(request.Page.HasValue || request.PageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<GetPendingUpdateRequestsDto>>()
+            .Produces<PagedResult<GetPendingUpdateRequestsDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesInternalServerError()
@@ -361,8 +470,12 @@ public static class ProviderRoutes
         // Get Pending Update Requests (Admin)
         app.MapPost("/charging-points/update-requests/pending",
                 async (IMediator mediator, GetPendingUpdateRequestsRequest request, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(request, cancellationToken)))
+                {
+                    var paged = await mediator.Send(request, cancellationToken);
+                    return Results.Ok(request.Page.HasValue || request.PageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<GetPendingUpdateRequestsDto>>()
+            .Produces<PagedResult<GetPendingUpdateRequestsDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesInternalServerError()
@@ -431,9 +544,14 @@ public static class ProviderRoutes
     {
         // Get my service providers
         app.MapGet("/service-providers/my",
-                async (IMediator mediator, [FromQuery] int? categoryId, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetMyServiceProvidersRequest(categoryId), cancellationToken)))
+                async (IMediator mediator, [FromQuery] int? categoryId,
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetMyServiceProvidersRequest(categoryId, page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<ServiceProviderDto>>()
+            .Produces<PagedResult<ServiceProviderDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesInternalServerError()
@@ -627,29 +745,6 @@ public static class ProviderRoutes
             {
                 op.Parameters[0].Required = true;
                 op.Parameters[0].Description = "The ID of the service provider";
-                return op;
-            });
-
-        // Change service provider owner
-        app.MapPatch("/service-providers/change-owner/{serviceProviderId:int}",
-                async (IMediator mediator, [FromRoute] int serviceProviderId, ChangeServiceProviderOwnerRequest request,
-                        CancellationToken cancellationToken) =>
-                    await mediator.Send(new ChangeServiceProviderOwnerCommand(serviceProviderId, request.NewOwnerId), cancellationToken))
-            .Produces(200)
-            .RequireAuthorization()
-            .ProducesUnAuthorized()
-            .ProducesForbidden()
-            .ProducesNotFound()
-            .ProducesValidationProblem()
-            .ProducesInternalServerError()
-            .WithName("Change Service Provider Owner")
-            .WithSummary("Changes the owner of a service provider")
-            .WithDescription("Transfers ownership of a service provider to a different user. Only the current owner can transfer ownership.")
-            .WithOpenApi(op =>
-            {
-                op.Parameters[0].Required = true;
-                op.Parameters[0].Description = "The ID of the service provider";
-                op.RequestBody.Required = true;
                 return op;
             });
 

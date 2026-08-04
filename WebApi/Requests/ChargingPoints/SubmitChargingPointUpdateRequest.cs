@@ -17,14 +17,11 @@ public record SubmitChargingPointUpdateRequest(
     int? ChargersCount,
     double? Latitude,
     double? Longitude,
-    int? ChargerPointTypeId,
-    int? StationTypeId,
+    int? StatusId,
     string? OwnerPhone,
-    bool? HasOffer,
     string? Service,
     string? OfferDescription,
     string? Address,
-    string? ChargerBrand,
     List<int>? PlugTypeIds,
     List<int>? AttachmentsToDelete
 );

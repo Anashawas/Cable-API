@@ -1,3 +1,4 @@
+using Application.Common.Security;
 using Cable.Core;
 using Cable.Core.Exceptions;
 using Microsoft.EntityFrameworkCore;
@@ -28,6 +29,8 @@ public class UpdateRewardCommandHandler(
 {
     public async Task Handle(UpdateRewardCommand request, CancellationToken cancellationToken)
     {
+        await AdminRoleGuard.EnsureAdminAsync(applicationDbContext, currentUserService, cancellationToken);
+
         var userId = currentUserService.UserId
                      ?? throw new NotAuthorizedAccessException("User not authenticated");
 

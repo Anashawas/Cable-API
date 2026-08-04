@@ -9,7 +9,8 @@ public record ProviderPartnerAgreementDto(
     double PointsRewardPercentage,
     string? ConversionRateName,
     double? PointsPerUnit,
-    int CodeExpiryMinutes,
+    int CodeExpirySeconds,
+    decimal? MinimumTransactionAmount,
     bool IsActive,
     string? Note,
     DateTime? CreatedAt
@@ -42,7 +43,8 @@ public class GetProviderPartnerAgreementRequestHandler(
             agreement.PointsRewardPercentage,
             agreement.ConversionRate?.Name,
             agreement.ConversionRate?.PointsPerUnit,
-            agreement.CodeExpiryMinutes,
+            agreement.CodeExpirySeconds,
+            agreement.MinimumTransactionAmount,
             agreement.IsActive,
             agreement.Note,
             agreement.CreatedAt);

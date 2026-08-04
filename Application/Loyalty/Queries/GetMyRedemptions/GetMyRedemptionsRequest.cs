@@ -1,3 +1,4 @@
+using Application.Common.Models;
 using Cable.Core;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,14 +16,14 @@ public record RedemptionDto(
     DateTime? FulfilledAt
 );
 
-public record GetMyRedemptionsRequest : IRequest<List<RedemptionDto>>;
+public record GetMyRedemptionsRequest(int? Page = null, int? PageSize = null) : IRequest<PagedResult<RedemptionDto>>;
 
 public class GetMyRedemptionsRequestHandler(
     IApplicationDbContext applicationDbContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<GetMyRedemptionsRequest, List<RedemptionDto>>
+    : IRequestHandler<GetMyRedemptionsRequest, PagedResult<RedemptionDto>>
 {
-    public async Task<List<RedemptionDto>> Handle(GetMyRedemptionsRequest request, CancellationToken cancellationToken)
+    public async Task<PagedResult<RedemptionDto>> Handle(GetMyRedemptionsRequest request, CancellationToken cancellationToken)
     {
         var userId = currentUserService.UserId
                      ?? throw new NotAuthorizedAccessException("User not authenticated");
@@ -35,6 +36,6 @@ public class GetMyRedemptionsRequestHandler(
                 r.Id, r.Reward.Name, r.PointsSpent, r.Status,
                 r.RedemptionCode, r.ProviderType, r.ProviderId,
                 r.RedeemedAt, r.FulfilledAt))
-            .ToListAsync(cancellationToken);
+            .ToOptionallyPaginatedAsync(request.Page, request.PageSize, cancellationToken: cancellationToken);
     }
 }

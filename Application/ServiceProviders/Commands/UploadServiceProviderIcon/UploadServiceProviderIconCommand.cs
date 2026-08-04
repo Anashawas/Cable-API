@@ -1,4 +1,3 @@
-using Cable.Core;
 using Cable.Core.Emuns;
 using Cable.Core.Exceptions;
 using Microsoft.AspNetCore.Http;
@@ -10,23 +9,14 @@ public record UploadServiceProviderIconCommand(IFormFile File, int Id) : IReques
 
 public class UploadServiceProviderIconCommandHandler(
     IApplicationDbContext applicationDbContext,
-    IUploadFileService uploadFileService,
-    ICurrentUserService currentUserService)
+    IUploadFileService uploadFileService)
     : IRequestHandler<UploadServiceProviderIconCommand>
 {
     public async Task Handle(UploadServiceProviderIconCommand request, CancellationToken cancellationToken)
     {
-        var userId = currentUserService.UserId
-                     ?? throw new NotAuthorizedAccessException("User not authenticated");
-
         var serviceProvider = await applicationDbContext.ServiceProviders
-            .FirstOrDefaultAsync(x => x.Id == request.Id && !x.IsDeleted, cancellationToken);
-
-        if (serviceProvider == null)
-            throw new NotFoundException($"Service provider not found with id : {request.Id}");
-
-        if (serviceProvider.OwnerId != userId)
-            throw new ForbiddenAccessException("You are not the owner of this service provider");
+                                  .FirstOrDefaultAsync(x => x.Id == request.Id && !x.IsDeleted, cancellationToken)
+                              ?? throw new NotFoundException($"Service provider not found with id : {request.Id}");
 
         // Delete old icon if exists
         if (!string.IsNullOrEmpty(serviceProvider.Icon))

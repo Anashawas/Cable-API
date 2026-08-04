@@ -15,7 +15,7 @@ public class GetUserByIdQueryHandler(IApplicationDbContext applicationDbContext)
 {
     public async Task<GetUserByIdDto> Handle(GetUserByIdRequest request, CancellationToken cancellationToken)
     {
-        return await applicationDbContext.UserAccounts
+        var dto = await applicationDbContext.UserAccounts
             .Where(x => x.Id == request.Id && x.IsActive && !x.IsDeleted)
             .Select(x => new GetUserByIdDto(
                 x.Id,
@@ -28,6 +28,7 @@ public class GetUserByIdQueryHandler(IApplicationDbContext applicationDbContext)
                 x.Country,
                 x.City,
                 x.IsPhoneVerified,
+                x.HasReadUpdateNotes,
                 new RoleSummary(x.Role.Id, x.Role.Name),
                 x.UserCars.GroupBy(uc => new { uc.CarModel.CarType.Id, uc.CarModel.CarType.Name })
                     .Select(carTypeGroup => new UserCarTypeDto(
@@ -44,9 +45,21 @@ public class GetUserByIdQueryHandler(IApplicationDbContext applicationDbContext)
                                     carModelGroup.First().PlugType.SerialNumber
                                 )
                             )).ToList()
-                    )).ToList()
+                    )).ToList(),
+                true // HasAcceptedTerms — computed after the query (expression trees reject optional args)
             ))
             .AsNoTracking()
             .FirstOrDefaultAsync(cancellationToken) ?? throw new NotFoundException($"Can not find user {request.Id}");
+
+        // Terms flag: accepted the active version for their role? (No published
+        // terms at all → true, there is nothing to accept.)
+        var acceptance = await applicationDbContext.UserAccounts.AsNoTracking()
+            .Where(x => x.Id == request.Id)
+            .Select(x => new { x.RoleId, x.AcceptedTermsVersionId })
+            .FirstAsync(cancellationToken);
+        var activeTermsId = await Application.Terms.TermsResolver.GetActiveIdForRoleAsync(
+            applicationDbContext, acceptance.RoleId, cancellationToken);
+
+        return dto with { HasAcceptedTerms = activeTermsId == null || acceptance.AcceptedTermsVersionId == activeTermsId };
     }
 }

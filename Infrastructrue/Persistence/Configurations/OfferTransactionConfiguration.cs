@@ -30,7 +30,7 @@ public class OfferTransactionConfiguration : IEntityTypeConfiguration<OfferTrans
         builder.Property(e => e.CurrencyCode)
             .IsRequired()
             .HasMaxLength(10)
-            .HasDefaultValue("KWD");
+            .HasDefaultValue("JOD");
 
         builder.Property(e => e.ProviderType)
             .IsRequired()
@@ -45,6 +45,11 @@ public class OfferTransactionConfiguration : IEntityTypeConfiguration<OfferTrans
 
         builder.Property(e => e.CompletedAt)
             .HasColumnType("datetime");
+
+        builder.Property(e => e.WalletCreditedAmount)
+            .IsRequired()
+            .HasDefaultValue(0m)
+            .HasColumnType("decimal(18,3)");
 
         builder.Property(e => e.IsDeleted)
             .IsRequired()

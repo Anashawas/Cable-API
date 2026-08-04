@@ -341,17 +341,20 @@ public class AuthenticationService : IAuthenticationService
             throw new NotAuthorizedAccessException(Resources.InvalidUserNameOrPassword);
         }
 
-        var providerRole = await _applicationDbContext.Roles
-            .FirstOrDefaultAsync(r => r.Name == "Provider" && !r.IsDeleted, cancellationToken);
+        // Provider-app access is granted to Providers (owners) and Workers (assigned staff).
+        var allowedRoleIds = await _applicationDbContext.Roles
+            .Where(r => (r.Name == "Provider" || r.Name == "Worker") && !r.IsDeleted)
+            .Select(r => r.Id)
+            .ToListAsync(cancellationToken);
 
-        if (providerRole == null)
+        if (allowedRoleIds.Count == 0)
         {
-            throw new CableApplicationException("Provider role not configured in the system");
+            throw new CableApplicationException("Provider/Worker roles not configured in the system");
         }
 
-        if (user.RoleId != providerRole.Id)
+        if (!allowedRoleIds.Contains(user.RoleId))
         {
-            throw new ForbiddenAccessException("Access denied. This endpoint is only for Provider users.");
+            throw new ForbiddenAccessException("Access denied. This endpoint is only for Provider or Worker users.");
         }
 
 

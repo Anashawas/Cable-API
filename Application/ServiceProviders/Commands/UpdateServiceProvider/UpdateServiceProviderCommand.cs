@@ -1,4 +1,3 @@
-using Cable.Core;
 using Cable.Core.Exceptions;
 using Microsoft.EntityFrameworkCore;
 
@@ -32,21 +31,14 @@ public record UpdateServiceProviderCommand(
 ) : IRequest;
 
 public class UpdateServiceProviderCommandHandler(
-    IApplicationDbContext applicationDbContext,
-    ICurrentUserService currentUserService)
+    IApplicationDbContext applicationDbContext)
     : IRequestHandler<UpdateServiceProviderCommand>
 {
     public async Task Handle(UpdateServiceProviderCommand request, CancellationToken cancellationToken)
     {
-        var userId = currentUserService.UserId
-                     ?? throw new NotAuthorizedAccessException("User not authenticated");
-
         var serviceProvider = await applicationDbContext.ServiceProviders
                                   .FirstOrDefaultAsync(x => !x.IsDeleted && x.Id == request.Id, cancellationToken)
                               ?? throw new NotFoundException($"Service provider with id {request.Id} not found");
-
-        if (serviceProvider.OwnerId != userId)
-            throw new ForbiddenAccessException("You are not the owner of this service provider");
 
         serviceProvider.Name = request.Name;
         serviceProvider.ServiceCategoryId = request.ServiceCategoryId;

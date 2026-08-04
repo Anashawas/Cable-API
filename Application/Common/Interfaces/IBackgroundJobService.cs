@@ -9,11 +9,6 @@ public interface IBackgroundJobService
     Task<int> ExpirePartnerTransactionCodesAsync(CancellationToken cancellationToken = default);
 
     // ==========================================
-    // Settlement
-    // ==========================================
-    Task<int> GenerateMonthlySettlementsAsync(int year, int month, CancellationToken cancellationToken = default);
-
-    // ==========================================
     // Security Cleanup (Critical)
     // ==========================================
     Task<int> CleanupExpiredPhoneVerificationsAsync(CancellationToken cancellationToken = default);

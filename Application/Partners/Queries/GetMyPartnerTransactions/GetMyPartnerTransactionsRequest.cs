@@ -1,3 +1,4 @@
+using Application.Common.Models;
 using Cable.Core;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,14 +22,14 @@ public record PartnerTransactionDto(
     DateTime? CreatedAt
 );
 
-public record GetMyPartnerTransactionsRequest(int? Status) : IRequest<List<PartnerTransactionDto>>;
+public record GetMyPartnerTransactionsRequest(int? Status, int? Page = null, int? PageSize = null) : IRequest<PagedResult<PartnerTransactionDto>>;
 
 public class GetMyPartnerTransactionsRequestHandler(
     IApplicationDbContext applicationDbContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<GetMyPartnerTransactionsRequest, List<PartnerTransactionDto>>
+    : IRequestHandler<GetMyPartnerTransactionsRequest, PagedResult<PartnerTransactionDto>>
 {
-    public async Task<List<PartnerTransactionDto>> Handle(GetMyPartnerTransactionsRequest request,
+    public async Task<PagedResult<PartnerTransactionDto>> Handle(GetMyPartnerTransactionsRequest request,
         CancellationToken cancellationToken)
     {
         var userId = currentUserService.UserId
@@ -40,37 +41,28 @@ public class GetMyPartnerTransactionsRequestHandler(
         if (request.Status.HasValue)
             query = query.Where(x => x.Status == request.Status.Value);
 
-        var transactions = await query
+        var paged = await query
             .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync(cancellationToken);
+            .ToOptionallyPaginatedAsync(request.Page, request.PageSize, cancellationToken: cancellationToken);
+        var transactions = paged.Items;
 
-        var result = new List<PartnerTransactionDto>();
-        foreach (var t in transactions)
-        {
-            string? providerName = null;
-            if (t.ProviderType == "ChargingPoint")
-            {
-                providerName = await applicationDbContext.ChargingPoints
-                    .Where(x => x.Id == t.ProviderId)
-                    .Select(x => x.Name)
-                    .FirstOrDefaultAsync(cancellationToken);
-            }
-            else if (t.ProviderType == "ServiceProvider")
-            {
-                providerName = await applicationDbContext.ServiceProviders
-                    .Where(x => x.Id == t.ProviderId)
-                    .Select(x => x.Name)
-                    .FirstOrDefaultAsync(cancellationToken);
-            }
+        // Batch load provider names (avoids N+1 queries)
+        var cpIds = transactions.Where(t => t.ProviderType == "ChargingPoint").Select(t => t.ProviderId).Distinct().ToList();
+        var spIds = transactions.Where(t => t.ProviderType == "ServiceProvider").Select(t => t.ProviderId).Distinct().ToList();
 
-            result.Add(new PartnerTransactionDto(
-                t.Id, t.PartnerAgreementId, providerName, t.TransactionCode,
-                t.Status, t.ProviderType, t.ProviderId,
-                t.TransactionAmount, t.CurrencyCode, t.CommissionPercentage,
-                t.CommissionAmount, t.PointsAwarded,
-                t.CodeExpiresAt, t.CompletedAt, t.CreatedAt));
-        }
+        var cpNames = cpIds.Count > 0
+            ? await applicationDbContext.ChargingPoints.Where(x => cpIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken)
+            : new Dictionary<int, string>();
+        var spNames = spIds.Count > 0
+            ? await applicationDbContext.ServiceProviders.Where(x => spIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken)
+            : new Dictionary<int, string>();
 
-        return result;
+        return paged.As(transactions.Select(t => new PartnerTransactionDto(
+            t.Id, t.PartnerAgreementId,
+            t.ProviderType == "ChargingPoint" ? cpNames.GetValueOrDefault(t.ProviderId) : spNames.GetValueOrDefault(t.ProviderId),
+            t.TransactionCode, t.Status, t.ProviderType, t.ProviderId,
+            t.TransactionAmount, t.CurrencyCode, t.CommissionPercentage,
+            t.CommissionAmount, t.PointsAwarded,
+            t.CodeExpiresAt, t.CompletedAt, t.CreatedAt)).ToList());
     }
 }

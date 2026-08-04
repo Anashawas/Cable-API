@@ -1,4 +1,3 @@
-using Cable.Core;
 using Cable.Core.Emuns;
 using Cable.Core.Exceptions;
 using Microsoft.EntityFrameworkCore;
@@ -9,21 +8,14 @@ public record DeleteServiceProviderAttachmentCommand(int Id) : IRequest;
 
 public class DeleteServiceProviderAttachmentCommandHandler(
     IApplicationDbContext applicationDbContext,
-    IUploadFileService uploadFileService,
-    ICurrentUserService currentUserService)
+    IUploadFileService uploadFileService)
     : IRequestHandler<DeleteServiceProviderAttachmentCommand>
 {
     public async Task Handle(DeleteServiceProviderAttachmentCommand request, CancellationToken cancellationToken)
     {
-        var userId = currentUserService.UserId
-                     ?? throw new NotAuthorizedAccessException("User not authenticated");
-
         var serviceProvider = await applicationDbContext.ServiceProviders
                                   .FirstOrDefaultAsync(x => x.Id == request.Id && !x.IsDeleted, cancellationToken)
                               ?? throw new NotFoundException($"Service provider with id {request.Id} not found");
-
-        if (serviceProvider.OwnerId != userId)
-            throw new ForbiddenAccessException("You are not the owner of this service provider");
 
         var attachments = await applicationDbContext.ServiceProviderAttachments
                               .Where(x => x.ServiceProviderId == request.Id && !x.IsDeleted)

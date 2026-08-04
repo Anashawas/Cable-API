@@ -1,8 +1,11 @@
-using Application.ChargingPoints.Queries.GetChargingPointById;
 using Cable.Core.Enums;
 
 namespace Application.ChargingPoints.Queries.GetUpdateRequestById;
 
+/// <summary>
+/// Single update request with the field-by-field diff. Old values come from the
+/// snapshot taken at submit time, not from the live station.
+/// </summary>
 public record GetUpdateRequestByIdDto(
     int Id,
     int ChargingPointId,
@@ -16,66 +19,10 @@ public record GetUpdateRequestByIdDto(
     int? ReviewedByUserId,
     string? ReviewedByUserName,
     string? RejectionReason,
-    ChargingPointChanges Changes,
-    ChargingPointCurrentValues CurrentValues
-);
-
-public record ChargingPointChanges(
-    string? Name,
-    string? Note,
-    string? CountryName,
-    string? CityName,
-    string? Phone,
-    string? MethodPayment,
-    double? Price,
-    string? FromTime,
-    string? ToTime,
-    int? ChargerSpeed,
-    int? ChargersCount,
-    double? Latitude,
-    double? Longitude,
-    int? ChargerPointTypeId,
-    string? ChargerPointTypeName,
-    int? StationTypeId,
-    string? StationTypeName,
-    string? OwnerPhone,
-    bool? HasOffer,
-    string? Service,
-    string? OfferDescription,
-    string? Address,
-    List<int>? PlugTypeIds,
-    List<PlugTypeSummary>? PlugTypes,
-    string? NewIcon,
-    string? OldIcon,
-    List<AttachmentChangeDto>? AttachmentChanges
-);
-
-public record ChargingPointCurrentValues(
-    string Name,
-    string? Note,
-    string? CountryName,
-    string? CityName,
-    string? Phone,
-    string? MethodPayment,
-    double? Price,
-    string? FromTime,
-    string? ToTime,
-    int? ChargerSpeed,
-    int? ChargersCount,
-    double Latitude,
-    double Longitude,
-    int ChargerPointTypeId,
-    string? ChargerPointTypeName,
-    int StationTypeId,
-    string? StationTypeName,
-    string? OwnerPhone,
-    bool HasOffer,
-    string? Service,
-    string? OfferDescription,
-    string? Address,
-    List<PlugTypeSummary> PlugTypes,
-    string? Icon,
-    List<string> Attachments
+    List<UpdateRequestChangeDto> Changes,
+    List<string> Attachments,
+    List<string> RiskFlags,
+    List<AttachmentChangeDto> AttachmentChanges
 );
 
 public record AttachmentChangeDto(

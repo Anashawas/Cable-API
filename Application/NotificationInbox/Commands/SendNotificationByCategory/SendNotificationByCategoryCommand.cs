@@ -15,7 +15,9 @@ public record SendNotificationByCategoryCommand(
     string Body,
     string? DeepLink = null,
     string? Data = null,
-    FirebaseAppType AppType = FirebaseAppType.UserApp
+    FirebaseAppType AppType = FirebaseAppType.UserApp,
+    string? TargetType = null,   // R4: "charging-point" | "service-provider" | "none"
+    int? TargetId = null
 ) : IRequest<SendNotificationByFilterResult>;
 
 public class SendNotificationByFilterCommandHandler(
@@ -27,6 +29,15 @@ public class SendNotificationByFilterCommandHandler(
         SendNotificationByCategoryCommand request,
         CancellationToken cancellationToken)
     {
+        // One BatchId per send so we can later track per-send statistics.
+        var batchId = Guid.NewGuid();
+
+        // R4: build routing from the structured target (raw DeepLink still honored).
+        var deepLink = NotificationRouting.BuildDeepLink(request.TargetType, request.TargetId) ?? request.DeepLink;
+        var fcmData = NotificationRouting.BuildFcmData(request.TargetType, request.TargetId);
+        if (deepLink is not null && !fcmData.ContainsKey("deepLink"))
+            fcmData["deepLink"] = deepLink;
+
         // 1. Build query to find matching users
         var usersQuery = applicationDbContext.UserAccounts
             .AsNoTracking()
@@ -88,7 +99,8 @@ public class SendNotificationByFilterCommandHandler(
             allTokens,
             request.Title,
             request.Body,
-            request.AppType);
+            request.AppType,
+            fcmData);
         
         var successfulUserIds = userTokens
             .Where(ut => sendResult.SuccessfulTokens.Contains(ut.Token))
@@ -104,9 +116,10 @@ public class SendNotificationByFilterCommandHandler(
                 request.NotificationTypeId,
                 request.Title,
                 request.Body,
-                request.DeepLink,
+                deepLink,
                 request.Data,
-                cancellationToken);
+                cancellationToken,
+                batchId);
         }
 
         return new SendNotificationByFilterResult

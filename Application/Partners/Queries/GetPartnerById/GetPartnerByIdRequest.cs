@@ -15,7 +15,8 @@ public record PartnerDetailDto(
     int? PointsConversionRateId,
     string? ConversionRateName,
     double? PointsPerUnit,
-    int CodeExpiryMinutes,
+    int CodeExpirySeconds,
+    decimal? MinimumTransactionAmount,
     bool IsActive,
     string? Note,
     DateTime? CreatedAt
@@ -58,7 +59,8 @@ public class GetPartnerByIdRequestHandler(
             agreement.PointsConversionRateId,
             agreement.ConversionRate?.Name,
             agreement.ConversionRate?.PointsPerUnit,
-            agreement.CodeExpiryMinutes,
+            agreement.CodeExpirySeconds,
+            agreement.MinimumTransactionAmount,
             agreement.IsActive,
             agreement.Note,
             agreement.CreatedAt);

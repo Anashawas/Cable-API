@@ -36,7 +36,7 @@ public class ValidateSharedLinkCommandHandler(
             return new ValidateSharedLinkResult(false, "Link is inactive", null);
         }
 
-        if (sharedLink.ExpiresAt.HasValue && sharedLink.ExpiresAt.Value <= DateTime.Now)
+        if (sharedLink.ExpiresAt.HasValue && sharedLink.ExpiresAt.Value <= DateTime.UtcNow)
         {
             return new ValidateSharedLinkResult(false, "Link has expired", null);
         }
@@ -60,7 +60,7 @@ public class ValidateSharedLinkCommandHandler(
                 UserId = currentUserService.UserId,
                 DeviceInfo = request.DeviceInfo,
                 IpAddress = request.IpAddress,
-                UsedAt = DateTime.Now,
+                UsedAt = DateTime.UtcNow,
                 IsSuccessful = true
             };
 
@@ -90,7 +90,7 @@ public class ValidateSharedLinkCommandHandler(
                 UserId = currentUserService.UserId,
                 DeviceInfo = request.DeviceInfo,
                 IpAddress = request.IpAddress,
-                UsedAt = DateTime.Now,
+                UsedAt = DateTime.UtcNow,
                 IsSuccessful = false,
                 ErrorMessage = ex.Message
             };

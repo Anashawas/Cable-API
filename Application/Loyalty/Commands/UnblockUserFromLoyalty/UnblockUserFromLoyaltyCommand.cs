@@ -1,3 +1,4 @@
+using Application.Common.Security;
 using Cable.Core;
 using Cable.Core.Exceptions;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,8 @@ public class UnblockUserFromLoyaltyCommandHandler(
 {
     public async Task Handle(UnblockUserFromLoyaltyCommand request, CancellationToken cancellationToken)
     {
+        await AdminRoleGuard.EnsureAdminAsync(applicationDbContext, currentUserService, cancellationToken);
+
         var adminId = currentUserService.UserId
                       ?? throw new NotAuthorizedAccessException("User not authenticated");
 

@@ -31,7 +31,7 @@ public class ProposeOfferCommandValidator : AbstractValidator<ProposeOfferComman
         RuleFor(x => x.ValidFrom)
             .NotEmpty().WithMessage("Valid from date is required");
 
-        RuleFor(x => x.OfferCodeExpiryMinutes)
-            .GreaterThan(0).WithMessage("Offer code expiry must be greater than 0 minutes");
+        RuleFor(x => x.OfferCodeExpirySeconds)
+            .GreaterThan(0).WithMessage("Offer code expiry must be greater than 0 seconds");
     }
 }

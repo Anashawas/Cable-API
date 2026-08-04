@@ -58,9 +58,10 @@ public class LoyaltyPointService(IApplicationDbContext applicationDbContext) : I
                 return 0; // Lifetime limit reached
         }
 
-        // 5. Find or create UserLoyaltyAccount (wallet)
+        // 5. Find or create UserLoyaltyAccount (wallet) with row lock
         var wallet = await applicationDbContext.UserLoyaltyAccounts
-            .FirstOrDefaultAsync(w => w.UserId == userId && !w.IsDeleted, cancellationToken);
+            .FromSqlRaw("SELECT * FROM [UserLoyaltyAccount] WITH (UPDLOCK, ROWLOCK) WHERE UserId = {0} AND IsDeleted = 0", userId)
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (wallet == null)
         {
@@ -165,9 +166,10 @@ public class LoyaltyPointService(IApplicationDbContext applicationDbContext) : I
         var activeSeason = await applicationDbContext.LoyaltySeasons
             .FirstOrDefaultAsync(s => s.IsActive && !s.IsDeleted, cancellationToken);
 
-        // 2. Find or create wallet
+        // 2. Find or create wallet with row lock
         var wallet = await applicationDbContext.UserLoyaltyAccounts
-            .FirstOrDefaultAsync(w => w.UserId == userId && !w.IsDeleted, cancellationToken);
+            .FromSqlRaw("SELECT * FROM [UserLoyaltyAccount] WITH (UPDLOCK, ROWLOCK) WHERE UserId = {0} AND IsDeleted = 0", userId)
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (wallet == null)
         {
@@ -266,9 +268,10 @@ public class LoyaltyPointService(IApplicationDbContext applicationDbContext) : I
         var activeSeason = await applicationDbContext.LoyaltySeasons
             .FirstOrDefaultAsync(s => s.IsActive && !s.IsDeleted, cancellationToken);
 
-        // 2. Get wallet — must exist and have enough balance
+        // 2. Get wallet with row lock — must exist and have enough balance
         var wallet = await applicationDbContext.UserLoyaltyAccounts
-            .FirstOrDefaultAsync(w => w.UserId == userId && !w.IsDeleted, cancellationToken);
+            .FromSqlRaw("SELECT * FROM [UserLoyaltyAccount] WITH (UPDLOCK, ROWLOCK) WHERE UserId = {0} AND IsDeleted = 0", userId)
+            .FirstOrDefaultAsync(cancellationToken);
 
         if (wallet == null || wallet.CurrentBalance < pointsToDeduct)
             throw new Cable.Core.DataValidationException("Points",

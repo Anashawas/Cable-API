@@ -49,6 +49,13 @@ public class GetMyProviderAssetsRequestHandler(
             .ToListAsync(cancellationToken);
         var partnerSet = partnerProviderIds.ToHashSet();
 
+        var spFavCounts = await applicationDbContext.UserFavoriteServiceProviders
+            .AsNoTracking()
+            .Where(f => !f.IsDeleted && spIds.Contains(f.ServiceProviderId))
+            .GroupBy(f => f.ServiceProviderId)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Count, cancellationToken);
+
         var serviceProviderDtos = serviceProviders.Select(x => new ServiceProviderDto(
             x.Id,
             x.Name,
@@ -83,7 +90,8 @@ public class GetMyProviderAssetsRequestHandler(
             x.ServiceProviderRates.Count,
             x.ServiceProviderAttachments.Select(a => a.FileName).ToList(),
             x.CreatedAt,
-            partnerSet.Contains(x.Id)
+            partnerSet.Contains(x.Id),
+            spFavCounts.GetValueOrDefault(x.Id, 0)
         )).ToList();
 
         return new ProviderAssetsDto(chargingPoints, serviceProviderDtos);

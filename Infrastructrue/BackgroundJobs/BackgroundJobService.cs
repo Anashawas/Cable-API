@@ -20,9 +20,22 @@ public class BackgroundJobService(
                          && !x.IsDeleted)
             .ToListAsync(cancellationToken);
 
+        // Group by offer to decrement usage counters
+        var offerGroups = expiredTransactions.GroupBy(x => x.ProviderOfferId).ToList();
+
         foreach (var transaction in expiredTransactions)
         {
             transaction.Status = (int)OfferTransactionStatus.Expired;
+        }
+
+        // Decrement offer usage counters (were incremented at initiation)
+        foreach (var group in offerGroups)
+        {
+            var count = group.Count();
+            await applicationDbContext.ProviderOffers
+                .Where(x => x.Id == group.Key && x.CurrentTotalUses >= count)
+                .ExecuteUpdateAsync(x => x
+                    .SetProperty(o => o.CurrentTotalUses, o => o.CurrentTotalUses - count), cancellationToken);
         }
 
         if (expiredTransactions.Count > 0)
@@ -56,17 +69,47 @@ public class BackgroundJobService(
         foreach (var group in grouped)
         {
             var totalRefund = group.Sum(t => t.CommissionAmount!.Value);
+            var transactionIds = string.Join(", ", group.Select(t => t.Id));
+
             if (group.Key.ProviderType == "ChargingPoint")
             {
                 var cp = await applicationDbContext.ChargingPoints
                     .FirstOrDefaultAsync(x => x.Id == group.Key.ProviderId && !x.IsDeleted, cancellationToken);
-                if (cp != null) cp.LoyaltyCurrentBalance += totalRefund;
+                if (cp != null)
+                {
+                    cp.WalletBalance += totalRefund;
+                    applicationDbContext.ProviderWalletTransactions.Add(new ProviderWalletTransaction
+                    {
+                        ProviderType = group.Key.ProviderType,
+                        ProviderId = group.Key.ProviderId,
+                        TransactionType = (int)WalletTransactionType.CommissionRefund,
+                        Amount = totalRefund,
+                        BalanceAfter = cp.WalletBalance,
+                        ReferenceType = "ExpiredPartnerTransactions",
+                        Note = $"Batch refund for {group.Count()} expired transactions (IDs: {transactionIds})",
+                        RecordedByUserId = cp.OwnerId
+                    });
+                }
             }
             else if (group.Key.ProviderType == "ServiceProvider")
             {
                 var sp = await applicationDbContext.ServiceProviders
                     .FirstOrDefaultAsync(x => x.Id == group.Key.ProviderId && !x.IsDeleted, cancellationToken);
-                if (sp != null) sp.LoyaltyCurrentBalance += totalRefund;
+                if (sp != null)
+                {
+                    sp.WalletBalance += totalRefund;
+                    applicationDbContext.ProviderWalletTransactions.Add(new ProviderWalletTransaction
+                    {
+                        ProviderType = group.Key.ProviderType,
+                        ProviderId = group.Key.ProviderId,
+                        TransactionType = (int)WalletTransactionType.CommissionRefund,
+                        Amount = totalRefund,
+                        BalanceAfter = sp.WalletBalance,
+                        ReferenceType = "ExpiredPartnerTransactions",
+                        Note = $"Batch refund for {group.Count()} expired transactions (IDs: {transactionIds})",
+                        RecordedByUserId = sp.OwnerId
+                    });
+                }
             }
         }
 
@@ -76,154 +119,6 @@ public class BackgroundJobService(
         logger.LogInformation("ExpirePartnerTransactionCodes: Expired {Count} partner transactions", expiredTransactions.Count);
 
         return expiredTransactions.Count;
-    }
-
-    public async Task<int> GenerateMonthlySettlementsAsync(int year, int month,
-        CancellationToken cancellationToken = default)
-    {
-        var startDate = new DateTime(year, month, 1);
-        var endDate = startDate.AddMonths(1);
-        var settlementsCreated = 0;
-
-        // ==========================================
-        // 1. Process Offer Transactions (points deducted, fixed monetary value)
-        // ==========================================
-        var completedOfferTransactions = await applicationDbContext.OfferTransactions
-            .Where(x => x.Status == (int)OfferTransactionStatus.Completed
-                         && !x.IsDeleted
-                         && x.CompletedAt >= startDate
-                         && x.CompletedAt < endDate)
-            .ToListAsync(cancellationToken);
-
-        var offerGroups = completedOfferTransactions
-            .GroupBy(x => new { x.ProviderType, x.ProviderId })
-            .ToList();
-
-        foreach (var group in offerGroups)
-        {
-            var totalMonetaryValue = group.Sum(x => x.MonetaryValue);
-            var totalPointsDeducted = group.Sum(x => x.PointsDeducted);
-
-            var firstTransaction = group.First();
-            var offer = await applicationDbContext.ProviderOffers
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == firstTransaction.ProviderOfferId, cancellationToken);
-
-            var ownerId = offer?.ProposedByUserId ?? 0;
-
-            settlementsCreated += await UpsertSettlement(
-                group.Key.ProviderType, group.Key.ProviderId, ownerId,
-                year, month,
-                partnerTransactionCount: 0,
-                partnerTransactionAmount: 0m,
-                partnerCommissionAmount: 0m,
-                totalPointsAwarded: 0,
-                offerTransactionCount: group.Count(),
-                offerPaymentAmount: totalMonetaryValue,
-                totalPointsDeducted: totalPointsDeducted,
-                cancellationToken);
-        }
-
-        // ==========================================
-        // 2. Process Partner Transactions (points awarded, commission-based)
-        // ==========================================
-        var completedPartnerTransactions = await applicationDbContext.PartnerTransactions
-            .Where(x => x.Status == (int)PartnerTransactionStatus.Completed
-                         && !x.IsDeleted
-                         && x.CompletedAt >= startDate
-                         && x.CompletedAt < endDate)
-            .ToListAsync(cancellationToken);
-
-        var partnerGroups = completedPartnerTransactions
-            .GroupBy(x => new { x.ProviderType, x.ProviderId })
-            .ToList();
-
-        foreach (var group in partnerGroups)
-        {
-            var totalTransactionAmount = group.Sum(x => x.TransactionAmount ?? 0);
-            var totalCommissionAmount = group.Sum(x => x.CommissionAmount ?? 0);
-            var totalPointsAwarded = group.Sum(x => x.PointsAwarded ?? 0);
-
-            var ownerId = await ResolveProviderOwnerId(
-                group.Key.ProviderType, group.Key.ProviderId, cancellationToken);
-
-            settlementsCreated += await UpsertSettlement(
-                group.Key.ProviderType, group.Key.ProviderId, ownerId,
-                year, month,
-                partnerTransactionCount: group.Count(),
-                partnerTransactionAmount: totalTransactionAmount,
-                partnerCommissionAmount: totalCommissionAmount,
-                totalPointsAwarded: totalPointsAwarded,
-                offerTransactionCount: 0,
-                offerPaymentAmount: 0m,
-                totalPointsDeducted: 0,
-                cancellationToken);
-        }
-
-        await applicationDbContext.SaveChanges(cancellationToken);
-
-        logger.LogInformation("GenerateMonthlySettlements: Created {Count} settlements for {Year}-{Month:D2}",
-            settlementsCreated, year, month);
-
-        return settlementsCreated;
-    }
-
-    private async Task<int> UpsertSettlement(
-        string providerType, int providerId, int ownerId,
-        int year, int month,
-        int partnerTransactionCount, decimal partnerTransactionAmount, decimal partnerCommissionAmount,
-        int totalPointsAwarded,
-        int offerTransactionCount, decimal offerPaymentAmount,
-        int totalPointsDeducted,
-        CancellationToken cancellationToken)
-    {
-        var existingSettlement = await applicationDbContext.ProviderSettlements
-            .FirstOrDefaultAsync(x => x.ProviderType == providerType
-                                      && x.ProviderId == providerId
-                                      && x.PeriodYear == year
-                                      && x.PeriodMonth == month
-                                      && !x.IsDeleted, cancellationToken);
-
-        if (existingSettlement != null)
-        {
-            existingSettlement.PartnerTransactionCount += partnerTransactionCount;
-            existingSettlement.PartnerTransactionAmount += partnerTransactionAmount;
-            existingSettlement.PartnerCommissionAmount += partnerCommissionAmount;
-            existingSettlement.TotalPointsAwarded += totalPointsAwarded;
-            existingSettlement.OfferTransactionCount += offerTransactionCount;
-            existingSettlement.OfferPaymentAmount += offerPaymentAmount;
-            existingSettlement.TotalPointsDeducted += totalPointsDeducted;
-
-            // Recalculate net amount
-            existingSettlement.NetAmountDueToProvider =
-                (existingSettlement.PartnerTransactionAmount - existingSettlement.PartnerCommissionAmount)
-                + existingSettlement.OfferPaymentAmount;
-
-            return 0;
-        }
-
-        var netAmount = (partnerTransactionAmount - partnerCommissionAmount) + offerPaymentAmount;
-
-        var settlement = new ProviderSettlement
-        {
-            ProviderType = providerType,
-            ProviderId = providerId,
-            ProviderOwnerId = ownerId,
-            PeriodYear = year,
-            PeriodMonth = month,
-            PartnerTransactionCount = partnerTransactionCount,
-            PartnerTransactionAmount = partnerTransactionAmount,
-            PartnerCommissionAmount = partnerCommissionAmount,
-            TotalPointsAwarded = totalPointsAwarded,
-            OfferTransactionCount = offerTransactionCount,
-            OfferPaymentAmount = offerPaymentAmount,
-            TotalPointsDeducted = totalPointsDeducted,
-            NetAmountDueToProvider = netAmount,
-            SettlementStatus = (int)SettlementStatus.Pending
-        };
-
-        applicationDbContext.ProviderSettlements.Add(settlement);
-        return 1;
     }
 
     // ==========================================
@@ -550,29 +445,4 @@ public class BackgroundJobService(
         return count;
     }
 
-    // ==========================================
-    // Private Helpers
-    // ==========================================
-
-    private async Task<int> ResolveProviderOwnerId(
-        string providerType, int providerId, CancellationToken cancellationToken)
-    {
-        if (providerType == "ChargingPoint")
-        {
-            return await applicationDbContext.ChargingPoints
-                .Where(x => x.Id == providerId)
-                .Select(x => x.OwnerId)
-                .FirstOrDefaultAsync(cancellationToken);
-        }
-
-        if (providerType == "ServiceProvider")
-        {
-            return await applicationDbContext.ServiceProviders
-                .Where(x => x.Id == providerId)
-                .Select(x => x.OwnerId)
-                .FirstOrDefaultAsync(cancellationToken);
-        }
-
-        return 0;
-    }
 }

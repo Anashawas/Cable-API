@@ -1,14 +1,15 @@
+using Application.Common.Models;
 using Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.EmergencyServices.Queries.GetAllEmergencyServices;
 
-public record GetAllEmergencyServicesRequest(bool? IsActive) : IRequest<List<GetAllEmergencyServicesDto>>;
+public record GetAllEmergencyServicesRequest(bool? IsActive, int? Page = null, int? PageSize = null) : IRequest<PagedResult<GetAllEmergencyServicesDto>>;
 
 public class GetAllEmergencyServicesRequestHandler(IApplicationDbContext context)
-    : IRequestHandler<GetAllEmergencyServicesRequest, List<GetAllEmergencyServicesDto>>
+    : IRequestHandler<GetAllEmergencyServicesRequest, PagedResult<GetAllEmergencyServicesDto>>
 {
-    public async Task<List<GetAllEmergencyServicesDto>> Handle(GetAllEmergencyServicesRequest request,
+    public async Task<PagedResult<GetAllEmergencyServicesDto>> Handle(GetAllEmergencyServicesRequest request,
         CancellationToken cancellationToken)
     {
         var query = context.EmergencyServices
@@ -37,7 +38,7 @@ public class GetAllEmergencyServicesRequestHandler(IApplicationDbContext context
                 x.IsActive,
                 x.SortOrder
             ))
-            .ToListAsync(cancellationToken);
+            .ToOptionallyPaginatedAsync(request.Page, request.PageSize, cancellationToken: cancellationToken);
 
         return results;
     }

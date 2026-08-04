@@ -1,16 +1,19 @@
+using Application.Common.Models;
 using Application.ServiceProviders.Queries.GetAllServiceProviders;
+using Cable.Core.Emuns;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.ServiceProviders.Queries.GetNearbyServiceProviders;
 
-public record GetNearbyProvidersRequest(double Latitude, double Longitude, double RadiusKm = 10)
-    : IRequest<List<ServiceProviderDto>>;
+public record GetNearbyProvidersRequest(double Latitude, double Longitude, double RadiusKm = 10, int? Page = null, int? PageSize = null)
+    : IRequest<PagedResult<ServiceProviderDto>>;
 
 public class GetNearbyProvidersRequestHandler(
-    IApplicationDbContext applicationDbContext)
-    : IRequestHandler<GetNearbyProvidersRequest, List<ServiceProviderDto>>
+    IApplicationDbContext applicationDbContext,
+    IUploadFileService uploadFileService)
+    : IRequestHandler<GetNearbyProvidersRequest, PagedResult<ServiceProviderDto>>
 {
-    public async Task<List<ServiceProviderDto>> Handle(GetNearbyProvidersRequest request,
+    public async Task<PagedResult<ServiceProviderDto>> Handle(GetNearbyProvidersRequest request,
         CancellationToken cancellationToken)
     {
         // Approximate bounding box filter (1 degree ≈ 111 km)
@@ -47,12 +50,17 @@ public class GetNearbyProvidersRequestHandler(
             x.Address, x.CountryName, x.CityName, x.Latitude, x.Longitude,
             x.Price, x.PriceDescription, x.FromTime, x.ToTime, x.MethodPayment,
             x.VisitorsCount, x.IsVerified, x.HasOffer, x.OfferDescription,
-            x.Service, x.Icon, x.WhatsAppNumber, x.WebsiteUrl,
+            x.Service,
+            !string.IsNullOrEmpty(x.Icon)
+                ? uploadFileService.GetFilePath(UploadFileFolders.CableServiceProvider, x.Icon)
+                : null,
+            x.WhatsAppNumber, x.WebsiteUrl,
             x.ServiceProviderRates.Any() ? x.ServiceProviderRates.Average(r => r.Rating) : 0,
             x.ServiceProviderRates.Count,
-            x.ServiceProviderAttachments.Select(a => a.FileName).ToList(),
+            x.ServiceProviderAttachments.Select(a =>
+                uploadFileService.GetFilePath(UploadFileFolders.CableServiceProvider, a.FileName)).ToList(),
             x.CreatedAt,
             partnerSet.Contains(x.Id)
-        )).ToList();
+        )).ToList().ToOptionallyPaginated(request.Page, request.PageSize);
     }
 }

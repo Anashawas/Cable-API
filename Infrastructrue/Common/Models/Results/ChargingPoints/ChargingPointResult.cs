@@ -36,9 +36,16 @@ internal class ChargingPointResult
     public string? Icon { get; set; }
     public string? FileName { get; set; }
     public string? MethodPayment { get; set; }
-    public string? ChargerBrand { get; set; }
+    public DateTime? PremiumPaymentDate { get; set; }
+    public DateTime? PremiumExpiresAt { get; set; }
+    public int? OwnerAccountId { get; set; }
+    public string? OwnerName { get; set; }
+    public string? OwnerEmail { get; set; }
+    public string? OwnerAccountPhone { get; set; }
     public bool IsFavorite { get; set; }
     public bool IsPartner { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? ModifiedAt { get; set; }
 }
 internal class
     ChargingPointsResult
@@ -77,9 +84,11 @@ internal class
     public string? Icon { get; set; }
     public string? FileName { get; set; }
     public string? MethodPayment { get; set; }
-    public string? ChargerBrand { get; set; }
+    public bool HasOwner { get; set; }
     public bool IsFavorite { get; set; }
     public bool IsPartner { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? ModifiedAt { get; set; }
 }
 
 internal class UserFavoriteChargingPointResult

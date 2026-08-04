@@ -7,6 +7,7 @@ using Cable.Core.Emuns;
 using Cable.Identity;
 using Cable.Routes;
 using Cable.Middlewares;
+using WebApi.Converters;
 using Cable.WebApi.Middlewares;
 using Cable.WebApi.OpenAPI.Filters;
 using FluentValidation;
@@ -100,6 +101,15 @@ app.UseRequestLocalization(op =>
 
 app.UseCableExceptionHandlerMiddleware();
 
+// Landing page (static export in wwwroot) served at the domain root;
+// API routes always win. See LandingPageMiddleware.
+app.UseLandingPage();
+
+// Explicit routing AFTER the landing static files. Without this, WebApplication
+// auto-inserts routing at the very start of the pipeline, the MapFallback
+// endpoint gets matched before the landing rewrite runs, and StaticFiles steps
+// aside for requests that already have an endpoint (so /ar/ would 404).
+app.UseRouting();
 
 if (app.Environment.IsDevelopment() || app.Environment.IsStaging())
 {
@@ -156,14 +166,6 @@ RecurringJob.AddOrUpdate<IBackgroundJobService>(
     "expire-partner-transaction-codes",
     service => service.ExpirePartnerTransactionCodesAsync(CancellationToken.None),
     "*/5 * * * *");
-
-RecurringJob.AddOrUpdate<IBackgroundJobService>(
-    "generate-monthly-settlements",
-    service => service.GenerateMonthlySettlementsAsync(
-        DateTime.UtcNow.AddMonths(-1).Year,
-        DateTime.UtcNow.AddMonths(-1).Month,
-        CancellationToken.None),
-    "30 0 1 * *");
 
 // Critical: Security Cleanup (daily at 02:00 UTC)
 RecurringJob.AddOrUpdate<IBackgroundJobService>(
@@ -233,18 +235,34 @@ app.MapUserRoutes()
     .MapFileRoutes()
     .MapFavoritesRoutes()
     .MapSharedLinksRoutes()
+    .MapSocialMediaPlatformRoutes()
+    .MapSocialLinkRoutes()
+    .MapWorkerRoutes()
     .MapNotificationInboxRoutes()
     .MapNotificationTypeRoutes()
+    .MapNotificationTemplateRoutes()
     .MapEmergencyServiceRoutes()
     .MapEmergencyServiceAttachmentsRoutes()
     .MapReportRoutes()
     .MapServiceProviderRoutes()
     .MapServiceCategoryRoutes()
     .MapOfferRoutes()
+    .MapOfferAttachmentRoutes()
     .MapConversionRateRoutes()
+    .MapSettingsRoutes()
+    .MapHomeRoutes()
+    .MapAdsRoutes()
+    .MapAdminRoutes()
+    .MapTermsRoutes()
     .MapLoyaltyRoutes()
     .MapPartnerRoutes()
-    .MapProviderRoutes();
+    .MapProviderRoutes()
+    .MapAnalyticsRoutes()
+    .MapChargerBrandRoutes();
+
+// Unknown non-API URLs get the landing 404 page; API-ish paths keep JSON-style 404s.
+app.MapLandingPageFallback();
+
 app.Run();
 
 void ConfigureJsonSerliaizer(JsonSerializerOptions jsonSerializer)
@@ -255,4 +273,9 @@ void ConfigureJsonSerliaizer(JsonSerializerOptions jsonSerializer)
     jsonSerializer.AllowTrailingCommas = true;
     jsonSerializer.Converters.Add(new JsonStringEnumConverter());
     // jsonSerializer.Converters.Add(new JsonTimeOnlyConverter());
+
+    // Temporary: Convert UTC → Jordan time in all responses.
+    // Remove these 2 lines when mobile handles UTC → local conversion.
+    jsonSerializer.Converters.Add(new JordanDateTimeJsonConverter());
+    jsonSerializer.Converters.Add(new JordanNullableDateTimeJsonConverter());
 }

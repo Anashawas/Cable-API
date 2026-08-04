@@ -14,5 +14,8 @@ public record GetPendingUpdateRequestsDto(
     DateTime? ReviewedAt,
     int? ReviewedByUserId,
     string? ReviewedByUserName,
-    string? RejectionReason
+    string? RejectionReason,
+    List<UpdateRequestChangeDto> Changes,
+    List<string> Attachments,
+    List<string> RiskFlags
 );

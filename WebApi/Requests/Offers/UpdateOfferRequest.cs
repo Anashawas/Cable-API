@@ -12,9 +12,10 @@ public record UpdateOfferRequest(
     string CurrencyCode,
     int? MaxUsesPerUser,
     int? MaxTotalUses,
-    int OfferCodeExpiryMinutes,
+    int OfferCodeExpirySeconds,
     string? ImageUrl,
     DateTime ValidFrom,
     DateTime? ValidTo,
-    bool IsActive
+    bool IsActive,
+    decimal? PointsPriceValue = null
 );

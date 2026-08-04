@@ -1,6 +1,8 @@
+using Application.Common.Extensions;
 using Cable.Core;
 using Cable.Core.Emuns;
 using Cable.Core.Exceptions;
+using Domain.Enitites;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Partners.Commands.InitiatePartnerTransaction;
@@ -39,6 +41,11 @@ public class InitiatePartnerTransactionCommandHandler(
                                 cancellationToken)
                         ?? throw new NotFoundException($"Active partner agreement with id {request.PartnerAgreementId} not found");
 
+        // Check minimum transaction amount
+        if (agreement.MinimumTransactionAmount.HasValue && request.TransactionAmount < agreement.MinimumTransactionAmount.Value)
+            throw new DataValidationException("TransactionAmount",
+                $"Transaction amount must be at least {agreement.MinimumTransactionAmount.Value:F3} {request.CurrencyCode}");
+
         // Get conversion rate (agreement-specific or default)
         double conversionRate;
         if (agreement.ConversionRate != null)
@@ -57,77 +64,116 @@ public class InitiatePartnerTransactionCommandHandler(
         var pointsEligibleAmount = request.TransactionAmount * (decimal)(agreement.PointsRewardPercentage / 100.0);
         var pointsToBeAwarded = (int)Math.Floor((double)pointsEligibleAmount * conversionRate);
 
-        // Check if provider is blocked from loyalty + check credit limit + reserve commission
-        if (agreement.ProviderType == "ChargingPoint")
-        {
-            var cp = await applicationDbContext.ChargingPoints
-                .FirstOrDefaultAsync(x => x.Id == agreement.ProviderId && !x.IsDeleted, cancellationToken);
-            if (cp is { IsLoyaltyBlocked: true } &&
-                (!cp.LoyaltyBlockedUntil.HasValue || cp.LoyaltyBlockedUntil.Value >= DateTime.UtcNow))
-                throw new DataValidationException("Loyalty", "This provider is currently blocked from the loyalty system");
-
-            if (cp != null)
-            {
-                if (cp.LoyaltyCreditLimit.HasValue)
-                {
-                    var newBalance = cp.LoyaltyCurrentBalance - commissionAmount;
-                    if (newBalance < -cp.LoyaltyCreditLimit.Value)
-                        throw new DataValidationException("CreditLimit",
-                            $"Provider credit limit reached. Available credit: {(cp.LoyaltyCurrentBalance + cp.LoyaltyCreditLimit.Value):F3} {request.CurrencyCode}");
-                }
-                cp.LoyaltyCurrentBalance -= commissionAmount;
-            }
-        }
-        else if (agreement.ProviderType == "ServiceProvider")
-        {
-            var sp = await applicationDbContext.ServiceProviders
-                .FirstOrDefaultAsync(x => x.Id == agreement.ProviderId && !x.IsDeleted, cancellationToken);
-            if (sp is { IsLoyaltyBlocked: true } &&
-                (!sp.LoyaltyBlockedUntil.HasValue || sp.LoyaltyBlockedUntil.Value >= DateTime.UtcNow))
-                throw new DataValidationException("Loyalty", "This provider is currently blocked from the loyalty system");
-
-            if (sp != null)
-            {
-                if (sp.LoyaltyCreditLimit.HasValue)
-                {
-                    var newBalance = sp.LoyaltyCurrentBalance - commissionAmount;
-                    if (newBalance < -sp.LoyaltyCreditLimit.Value)
-                        throw new DataValidationException("CreditLimit",
-                            $"Provider credit limit reached. Available credit: {(sp.LoyaltyCurrentBalance + sp.LoyaltyCreditLimit.Value):F3} {request.CurrencyCode}");
-                }
-                sp.LoyaltyCurrentBalance -= commissionAmount;
-            }
-        }
-
-        // Generate unique transaction code
+        // Generate unique transaction code before transaction scope
         var transactionCode = await GenerateUniqueCode(cancellationToken);
         var now = DateTime.UtcNow;
-        var expiresAt = now.AddMinutes(agreement.CodeExpiryMinutes);
+        var expiresAt = now.AddSeconds(agreement.CodeExpirySeconds);
 
-        var transaction = new PartnerTransaction
+        // Wrap wallet operations in a transaction with row locking
+        await using var dbTransaction = await applicationDbContext.Database.BeginTransactionAsync(cancellationToken);
+        try
         {
-            PartnerAgreementId = agreement.Id,
-            TransactionCode = transactionCode,
-            Status = (int)PartnerTransactionStatus.Initiated,
-            ProviderType = agreement.ProviderType,
-            ProviderId = agreement.ProviderId,
-            TransactionAmount = request.TransactionAmount,
-            CurrencyCode = request.CurrencyCode,
-            CommissionPercentage = agreement.CommissionPercentage,
-            CommissionAmount = commissionAmount,
-            PointsRewardPercentage = agreement.PointsRewardPercentage,
-            PointsConversionRate = conversionRate,
-            PointsEligibleAmount = pointsEligibleAmount,
-            PointsAwarded = pointsToBeAwarded,
-            ConfirmedByUserId = staffUserId,
-            CodeExpiresAt = expiresAt
-        };
+            decimal walletCoveredAmount = 0;
+            decimal walletBalanceAfter = 0;
 
-        applicationDbContext.PartnerTransactions.Add(transaction);
-        await applicationDbContext.SaveChanges(cancellationToken);
+            if (agreement.ProviderType == "ChargingPoint")
+            {
+                var cp = await applicationDbContext.ChargingPoints
+                    .FindWithLockAsync("ChargingPoint", agreement.ProviderId, cancellationToken);
+                if (cp is { IsLoyaltyBlocked: true } &&
+                    (!cp.LoyaltyBlockedUntil.HasValue || cp.LoyaltyBlockedUntil.Value >= DateTime.UtcNow))
+                    throw new DataValidationException("Loyalty", "This provider is currently blocked from the loyalty system");
 
-        return new InitiatePartnerTransactionResult(
-            transaction.Id, transactionCode, expiresAt, commissionAmount, pointsToBeAwarded, request.TransactionAmount);
+                if (cp != null)
+                {
+                    if (cp.WalletCreditLimit.HasValue)
+                    {
+                        var newBalance = cp.WalletBalance - commissionAmount;
+                        if (newBalance < -cp.WalletCreditLimit.Value)
+                            throw new DataValidationException("CreditLimit",
+                                $"Provider credit limit reached. Available credit: {(cp.WalletBalance + cp.WalletCreditLimit.Value):F3} {request.CurrencyCode}");
+                    }
+
+                    walletCoveredAmount = Math.Min(Math.Max(cp.WalletBalance, 0), commissionAmount);
+                    cp.WalletBalance -= commissionAmount;
+                    walletBalanceAfter = cp.WalletBalance;
+                }
+            }
+            else if (agreement.ProviderType == "ServiceProvider")
+            {
+                var sp = await applicationDbContext.ServiceProviders
+                    .FindWithLockAsync("ServiceProvider", agreement.ProviderId, cancellationToken);
+                if (sp is { IsLoyaltyBlocked: true } &&
+                    (!sp.LoyaltyBlockedUntil.HasValue || sp.LoyaltyBlockedUntil.Value >= DateTime.UtcNow))
+                    throw new DataValidationException("Loyalty", "This provider is currently blocked from the loyalty system");
+
+                if (sp != null)
+                {
+                    if (sp.WalletCreditLimit.HasValue)
+                    {
+                        var newBalance = sp.WalletBalance - commissionAmount;
+                        if (newBalance < -sp.WalletCreditLimit.Value)
+                            throw new DataValidationException("CreditLimit",
+                                $"Provider credit limit reached. Available credit: {(sp.WalletBalance + sp.WalletCreditLimit.Value):F3} {request.CurrencyCode}");
+                    }
+
+                    walletCoveredAmount = Math.Min(Math.Max(sp.WalletBalance, 0), commissionAmount);
+                    sp.WalletBalance -= commissionAmount;
+                    walletBalanceAfter = sp.WalletBalance;
+                }
+            }
+
+            var transaction = new PartnerTransaction
+            {
+                PartnerAgreementId = agreement.Id,
+                TransactionCode = transactionCode,
+                Status = (int)PartnerTransactionStatus.Initiated,
+                ProviderType = agreement.ProviderType,
+                ProviderId = agreement.ProviderId,
+                TransactionAmount = request.TransactionAmount,
+                CurrencyCode = request.CurrencyCode,
+                CommissionPercentage = agreement.CommissionPercentage,
+                CommissionAmount = commissionAmount,
+                PointsRewardPercentage = agreement.PointsRewardPercentage,
+                PointsConversionRate = conversionRate,
+                PointsEligibleAmount = pointsEligibleAmount,
+                PointsAwarded = pointsToBeAwarded,
+                ConfirmedByUserId = staffUserId,
+                CodeExpiresAt = expiresAt,
+                WalletCoveredAmount = walletCoveredAmount
+            };
+
+            applicationDbContext.PartnerTransactions.Add(transaction);
+            await applicationDbContext.SaveChanges(cancellationToken);
+
+            // Create wallet audit record (transaction.Id now available)
+            if (commissionAmount > 0)
+            {
+                applicationDbContext.ProviderWalletTransactions.Add(new ProviderWalletTransaction
+                {
+                    ProviderType = agreement.ProviderType,
+                    ProviderId = agreement.ProviderId,
+                    TransactionType = (int)WalletTransactionType.CommissionDeduction,
+                    Amount = -commissionAmount,
+                    BalanceAfter = walletBalanceAfter,
+                    ReferenceType = "PartnerTransaction",
+                    ReferenceId = transaction.Id,
+                    Note = $"Commission deducted for transaction #{transaction.Id} ({transactionCode})",
+                    RecordedByUserId = staffUserId
+                });
+                await applicationDbContext.SaveChanges(cancellationToken);
+            }
+
+            await dbTransaction.CommitAsync(cancellationToken);
+
+            return new InitiatePartnerTransactionResult(
+                transaction.Id, transactionCode, expiresAt, commissionAmount, pointsToBeAwarded, request.TransactionAmount);
+        }
+        catch
+        {
+            await dbTransaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     private async Task<string> GenerateUniqueCode(CancellationToken cancellationToken)

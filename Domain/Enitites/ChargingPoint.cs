@@ -7,7 +7,9 @@ namespace Domain.Enitites;
 public partial class ChargingPoint : BaseAuditableEntity
 {
     public string Name { get; set; } = null!;
-    public int OwnerId { get; set; }
+
+    /// <summary>Owner user account; null = unassigned station.</summary>
+    public int? OwnerId { get; set; }
     public string? Note { get; set; }
     public string? CountryName { get; set; }
     public string? CityName { get; set; }
@@ -38,7 +40,21 @@ public partial class ChargingPoint : BaseAuditableEntity
     public string? Icon { get; set; }
     public int StationTypeId { get; set; }
 
-    public string? ChargerBrand { get; set; }
+    /// <summary>
+    /// Demo/QA station (e.g. for App Store review). Excluded from public discovery
+    /// lists, but still visible to its owner and when fetched by Id.
+    /// </summary>
+    public bool IsTest { get; set; }
+
+    /// <summary>Paid home-card promo image (one per station, partner-uploaded, admin-reviewed).</summary>
+    public string? ViewImage { get; set; }
+
+    /// <summary>"pending" | "approved" | "rejected"; null when no image. Only approved is served to B2C.</summary>
+    public string? ViewImageStatus { get; set; }
+
+    /// <summary>Charger brands at this station with per-brand charger counts (source of truth).</summary>
+    public virtual ICollection<ChargingPointChargerBrand> ChargerBrands { get; set; } =
+        new List<ChargingPointChargerBrand>();
 
     // Loyalty Blocking
     public bool IsLoyaltyBlocked { get; set; }
@@ -48,9 +64,16 @@ public partial class ChargingPoint : BaseAuditableEntity
     public int? LoyaltyBlockedByUserId { get; set; }
     public virtual UserAccount? LoyaltyBlockedByUser { get; set; }
 
-    // Loyalty Credit Limit
-    public decimal? LoyaltyCreditLimit { get; set; }
-    public decimal LoyaltyCurrentBalance { get; set; }
+    // Wallet system (unified balance + credit limit)
+    public decimal? WalletCreditLimit { get; set; }
+    public decimal WalletBalance { get; set; }
+
+    // Premium subscription (latest values; full history in StationPremiumSubscription)
+    public DateTime? PremiumPaymentDate { get; set; }
+    public DateTime? PremiumExpiresAt { get; set; }
+
+    /// <summary>Part B F4: when on, a worker's fan announcement sends directly (no owner approval).</summary>
+    public bool AutoApproveWorkerNotifications { get; set; }
 
     public virtual ICollection<ChargingPointAttachment> ChargingPointAttachments { get; set; } =
         new List<ChargingPointAttachment>();
@@ -59,7 +82,7 @@ public partial class ChargingPoint : BaseAuditableEntity
 
     public virtual ICollection<ChargingPlug> ChargingPlugs { get; set; } = new List<ChargingPlug>();
 
-    public virtual UserAccount Owner { get; set; } = null!;
+    public virtual UserAccount? Owner { get; set; }
 
     public virtual ICollection<Rate> Rates { get; set; } = new List<Rate>();
 

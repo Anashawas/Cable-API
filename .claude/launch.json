@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "cable-api",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "WebApi", "--launch-profile", "http"],
+      "port": 5202
+    },
+    {
+      "name": "cable-api-staging",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "WebApi", "--launch-profile", "Staging"],
+      "port": 5202
+    },
+    {
+      "name": "cable-admin",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "D:\\NewOpenware-Server\\Cable-Admin"],
+      "port": 3000
+    },
+    {
+      "name": "cable-landing",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--prefix", "D:\\Cable\\cable_landing"],
+      "port": 3005
+    }
+  ]
+}

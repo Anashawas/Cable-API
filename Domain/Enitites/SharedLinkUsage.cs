@@ -7,7 +7,7 @@ public partial class SharedLinkUsage
     public int? UserId { get; set; }
     public string? DeviceInfo { get; set; }
     public string? IpAddress { get; set; }
-    public DateTime UsedAt { get; set; } = DateTime.Now;
+    public DateTime UsedAt { get; set; } = DateTime.UtcNow;
     public bool IsSuccessful { get; set; } = true;
     public string? ErrorMessage { get; set; }
 

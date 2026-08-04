@@ -37,10 +37,10 @@ public class GetUserNotificationsQueryHandler(
         var totalCount = await query.CountAsync(cancellationToken);
         
         var notifications = await query
+            .Include(x => x.NotificationType)
             .OrderByDescending(x => x.CreatedAt)
             .Skip((request.PageNumber - 1) * request.PageSize)
             .Take(request.PageSize)
-            .Include(x => x.NotificationType)
             .Select(x => new NotificationDto(
                 x.Id,
                 x.NotificationTypeId,

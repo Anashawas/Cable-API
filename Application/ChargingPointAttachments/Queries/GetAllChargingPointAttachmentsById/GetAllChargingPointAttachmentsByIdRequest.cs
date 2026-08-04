@@ -15,14 +15,13 @@ public class GetAllChargingPointAttachmentsByIdQueryHandler(
     public async Task<List<UploadFile>> Handle(GetAllChargingPointAttachmentsByIdRequest request,
         CancellationToken cancellationToken)
     {
-        var files = await Task.WhenAll(
-            applicationDbContext.ChargingPointAttachments
-                .Where(x => x.ChargingPointId == request.Id).AsEnumerable()
-                .Select(async item => new UploadFile(item.FileName, item.ContentType,
-                    uploadFileService.GetFilePath(UploadFileFolders.CableAttachments,item.FileName),
-                    item.FileExtension, item.FileSize))
-        );
+        var attachments = await applicationDbContext.ChargingPointAttachments
+            .Where(x => x.ChargingPointId == request.Id && !x.IsDeleted)
+            .Select(x => new { x.FileName, x.ContentType, x.FileExtension, x.FileSize })
+            .ToListAsync(cancellationToken);
 
-        return files.ToList();
+        return attachments.Select(item => new UploadFile(item.FileName, item.ContentType,
+            uploadFileService.GetFilePath(UploadFileFolders.CableAttachments, item.FileName),
+            item.FileExtension, item.FileSize)).ToList();
     }
 }

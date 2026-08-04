@@ -10,12 +10,13 @@ public class OfferTransaction : BaseAuditableEntity
     public int Status { get; set; }
     public int PointsDeducted { get; set; }
     public decimal MonetaryValue { get; set; }
-    public string CurrencyCode { get; set; } = "KWD";
+    public string CurrencyCode { get; set; } = "JOD";
     public string ProviderType { get; set; } = null!;
     public int ProviderId { get; set; }
     public int? ConfirmedByUserId { get; set; }
     public DateTime CodeExpiresAt { get; set; }
     public DateTime? CompletedAt { get; set; }
+    public decimal WalletCreditedAmount { get; set; }
 
     public virtual ProviderOffer Offer { get; set; } = null!;
     public virtual UserAccount? User { get; set; }

@@ -10,6 +10,21 @@ using Application.Loyalty.Commands.RedeemReward;
 using Application.Loyalty.Commands.UnblockProviderFromLoyalty;
 using Application.Loyalty.Commands.UnblockUserFromLoyalty;
 using Application.Loyalty.Commands.UpdateReward;
+using Application.Common.Models;
+using Application.Loyalty;
+using Application.Loyalty.Commands.BulkAwardPoints;
+using Application.Loyalty.Commands.ReverseTransaction;
+using Application.Loyalty.Queries.GetAllPointsTransactions;
+using Application.Loyalty.Queries.GetAllRedemptions;
+using Application.Loyalty.Queries.GetAllSeasons;
+using Application.Loyalty.Queries.GetAllTiers;
+using Application.Loyalty.Queries.GetBlockedProviders;
+using Application.Loyalty.Queries.GetBlockedUsers;
+using Application.Loyalty.Queries.GetFlaggedActivity;
+using Application.Loyalty.Queries.GetLoyaltySummary;
+using Application.Loyalty.Queries.GetProviderActivity;
+using Application.Loyalty.Queries.GetRewardPerformance;
+using Application.Loyalty.Queries.GetUpcomingExpiries;
 using Application.Loyalty.Queries.GetAvailableRewards;
 using Application.Loyalty.Queries.GetCurrentSeason;
 using Application.Loyalty.Queries.GetLeaderboard;
@@ -19,6 +34,8 @@ using Application.Loyalty.Queries.GetMyRedemptions;
 using Application.Loyalty.Queries.GetProviderRedemptions;
 using Application.Loyalty.Queries.GetRewardsForProvider;
 using Application.Loyalty.Queries.GetSeasonHistory;
+using Application.Loyalty.Queries.GetTransactionDetail;
+using Application.Loyalty.Queries.GetUserLoyaltyAccount;
 using Cable.Requests.Loyalty;
 using Cable.WebApi.OpenAPI;
 using MediatR;
@@ -74,10 +91,15 @@ public static class LoyaltyRoutes
         app.MapGet("/GetAvailableRewards",
                 async (IMediator mediator, [FromQuery] string? providerType,
                         [FromQuery] int? providerId, [FromQuery] int? categoryId,
+                        [FromQuery] int? page, [FromQuery] int? pageSize,
                         CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetAvailableRewardsRequest(
-                        providerType, providerId, categoryId), cancellationToken)))
+                {
+                    var paged = await mediator.Send(new GetAvailableRewardsRequest(
+                        providerType, providerId, categoryId, page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<RewardDto>>()
+            .Produces<PagedResult<RewardDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesInternalServerError()
@@ -88,10 +110,15 @@ public static class LoyaltyRoutes
         // Get rewards for a specific provider
         app.MapGet("/GetRewardsForProvider/{providerType}/{providerId:int}",
                 async (IMediator mediator, [FromRoute] string providerType, [FromRoute] int providerId,
+                        [FromQuery] int? page, [FromQuery] int? pageSize,
                         CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetRewardsForProviderRequest(
-                        providerType, providerId), cancellationToken)))
+                {
+                    var paged = await mediator.Send(new GetRewardsForProviderRequest(
+                        providerType, providerId, page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<RewardDto>>()
+            .Produces<PagedResult<RewardDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesInternalServerError()
@@ -120,9 +147,14 @@ public static class LoyaltyRoutes
 
         // Get my redemptions
         app.MapGet("/GetMyRedemptions",
-                async (IMediator mediator, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetMyRedemptionsRequest(), cancellationToken)))
+                async (IMediator mediator, [FromQuery] int? page, [FromQuery] int? pageSize,
+                        CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetMyRedemptionsRequest(page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<RedemptionDto>>()
+            .Produces<PagedResult<RedemptionDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesInternalServerError()
@@ -215,7 +247,8 @@ public static class LoyaltyRoutes
                     await mediator.Send(new AdminAdjustPointsCommand(
                         request.UserId,
                         request.Points,
-                        request.Note
+                        request.Note,
+                        request.ReasonCode
                     ), cancellationToken);
                     return Results.Ok();
                 })
@@ -451,10 +484,15 @@ public static class LoyaltyRoutes
         // Get provider redemptions (admin)
         app.MapGet("/admin/GetProviderRedemptions",
                 async (IMediator mediator, [FromQuery] string? providerType,
-                        [FromQuery] int? providerId, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetProviderRedemptionsRequest(
-                        providerType, providerId), cancellationToken)))
+                        [FromQuery] int? providerId, [FromQuery] int? page, [FromQuery] int? pageSize,
+                        CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetProviderRedemptionsRequest(
+                        providerType, providerId, page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<ProviderRedemptionDto>>()
+            .Produces<PagedResult<ProviderRedemptionDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesForbidden()
@@ -462,6 +500,310 @@ public static class LoyaltyRoutes
             .WithName("Get Provider Redemptions")
             .WithSummary("Admin/Owner views redemptions at a specific provider")
             .WithOpenApi();
+
+        // ==========================================
+        // ADMIN VISIBILITY ENDPOINTS (Cable-Admin portal)
+        // ==========================================
+
+        // A1 — Full loyalty account snapshot for any user
+        app.MapGet("/admin/GetUserLoyaltyAccount/{userId:int}",
+                async (IMediator mediator, [FromRoute] int userId, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new GetUserLoyaltyAccountRequest(userId), cancellationToken)))
+            .Produces<LoyaltyAccountDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesInternalServerError()
+            .WithName("Admin Get User Loyalty Account")
+            .WithSummary("Admin views the full loyalty account of any user")
+            .WithOpenApi(op =>
+            {
+                op.Parameters[0].Required = true;
+                op.Parameters[0].Description = "The id of the user";
+                return op;
+            });
+
+        // A2 — Full points ledger for any user (paged)
+        app.MapGet("/admin/GetUserPointsHistory/{userId:int}",
+                async (IMediator mediator, [FromRoute] int userId,
+                        [FromQuery] int? transactionType, [FromQuery] int? seasonId,
+                        [FromQuery] DateTime? from, [FromQuery] DateTime? to,
+                        [FromQuery] int? page, [FromQuery] int? pageSize,
+                        CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new GetAllPointsTransactionsRequest(
+                        transactionType, userId, seasonId, null, null, from, to,
+                        page ?? 1, pageSize ?? 20), cancellationToken)))
+            .Produces<PagedResult<AdminPointsHistoryDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Admin Get User Points History")
+            .WithSummary("Admin views the full points ledger of any user (paged; filters: transactionType, seasonId, from, to)")
+            .WithOpenApi(op =>
+            {
+                op.Parameters[0].Required = true;
+                op.Parameters[0].Description = "The id of the user";
+                return op;
+            });
+
+        // C1 — Global points feed across all users (paged)
+        app.MapGet("/admin/GetAllPointsTransactions",
+                async (IMediator mediator,
+                        [FromQuery] int? transactionType, [FromQuery] int? userId,
+                        [FromQuery] int? seasonId, [FromQuery] string? providerType,
+                        [FromQuery] int? providerId,
+                        [FromQuery] DateTime? from, [FromQuery] DateTime? to,
+                        [FromQuery] int? page, [FromQuery] int? pageSize,
+                        CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new GetAllPointsTransactionsRequest(
+                        transactionType, userId, seasonId, providerType, providerId, from, to,
+                        page ?? 1, pageSize ?? 20), cancellationToken)))
+            .Produces<PagedResult<AdminPointsHistoryDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Admin Get All Points Transactions")
+            .WithSummary("Admin global loyalty ledger across all users (paged; filters: transactionType, userId, seasonId, providerType, providerId, from, to)")
+            .WithOpenApi();
+
+        // B3 — Full detail of any single transaction (Offer | Partner | Redemption)
+        app.MapGet("/admin/GetTransactionDetail",
+                async (IMediator mediator, [FromQuery] string activityType, [FromQuery] int id,
+                        CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new GetTransactionDetailRequest(activityType, id), cancellationToken)))
+            .Produces<AdminTransactionDetailDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Admin Get Transaction Detail")
+            .WithSummary("Admin opens any single transaction (activityType: Offer | Partner | Redemption) with user, provider and actor details")
+            .WithOpenApi();
+
+        // G — List all seasons (the portal's missing GetAllSeasons)
+        app.MapGet("/admin/GetAllSeasons",
+                async (IMediator mediator, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new GetAllSeasonsRequest(), cancellationToken)))
+            .Produces<List<AdminSeasonDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Admin Get All Seasons")
+            .WithSummary("Admin lists all loyalty seasons")
+            .WithOpenApi();
+
+        // B1 — unified activity feed at one provider (Offer | Partner | Redemption)
+        app.MapGet("/admin/GetProviderActivity",
+                async (IMediator mediator,
+                        [FromQuery] string providerType, [FromQuery] int providerId,
+                        [FromQuery] string? activityType,
+                        [FromQuery] DateTime? from, [FromQuery] DateTime? to,
+                        [FromQuery] int? page, [FromQuery] int? pageSize,
+                        CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new GetProviderActivityRequest(
+                        providerType, providerId, activityType, from, to,
+                        page ?? 1, pageSize ?? 20), cancellationToken)))
+            .Produces<PagedResult<ProviderActivityDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Admin Get Provider Activity")
+            .WithSummary("Admin unified activity feed at one provider — offers, partner transactions and redemptions in one paged list")
+            .WithOpenApi();
+
+        // D1 — all reward redemptions across users/providers
+        app.MapGet("/admin/GetAllRedemptions",
+                async (IMediator mediator,
+                        [FromQuery] int? status, [FromQuery] string? providerType,
+                        [FromQuery] int? providerId, [FromQuery] int? userId,
+                        [FromQuery] DateTime? from, [FromQuery] DateTime? to,
+                        [FromQuery] int? page, [FromQuery] int? pageSize,
+                        CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new GetAllRedemptionsRequest(
+                        status, providerType, providerId, userId, from, to,
+                        page ?? 1, pageSize ?? 20), cancellationToken)))
+            .Produces<PagedResult<AdminRedemptionDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Admin Get All Redemptions")
+            .WithSummary("Admin lists all reward redemptions (paged; filters: status, providerType, providerId, userId, from, to)")
+            .WithOpenApi();
+
+        // I1 — program-health dashboard (outstanding liability + KPIs)
+        app.MapGet("/admin/GetLoyaltySummary",
+                async (IMediator mediator,
+                        [FromQuery] int? seasonId,
+                        [FromQuery] DateTime? from, [FromQuery] DateTime? to,
+                        CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new GetLoyaltySummaryRequest(seasonId, from, to), cancellationToken)))
+            .Produces<LoyaltySummaryDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Admin Get Loyalty Summary")
+            .WithSummary("Admin loyalty program dashboard: outstanding points liability + issued/redeemed/expired KPIs, daily series, top earners")
+            .WithOpenApi();
+
+        // H1 — tier ladder (read-only)
+        app.MapGet("/admin/GetAllTiers",
+                async (IMediator mediator, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new GetAllTiersRequest(), cancellationToken)))
+            .Produces<List<TierDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Admin Get All Tiers")
+            .WithSummary("Admin lists the loyalty tier ladder (thresholds, multipliers, season bonuses)")
+            .WithOpenApi();
+
+        // F1 — blocked users list
+        app.MapGet("/admin/GetBlockedUsers",
+                async (IMediator mediator, [FromQuery] int? page, [FromQuery] int? pageSize,
+                        CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetBlockedUsersRequest(page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
+            .Produces<List<BlockedUserDto>>()
+            .Produces<PagedResult<BlockedUserDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Admin Get Blocked Users")
+            .WithSummary("Admin lists all users currently blocked from loyalty")
+            .WithOpenApi();
+
+        // F2 — blocked providers list
+        app.MapGet("/admin/GetBlockedProviders",
+                async (IMediator mediator, [FromQuery] int? page, [FromQuery] int? pageSize,
+                        CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetBlockedProvidersRequest(page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
+            .Produces<List<BlockedProviderDto>>()
+            .Produces<PagedResult<BlockedProviderDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Admin Get Blocked Providers")
+            .WithSummary("Admin lists all providers currently blocked from loyalty")
+            .WithOpenApi();
+
+        // I2 — per-reward performance
+        app.MapGet("/admin/GetRewardPerformance",
+                async (IMediator mediator, [FromQuery] DateTime? from, [FromQuery] DateTime? to,
+                        [FromQuery] int? page, [FromQuery] int? pageSize,
+                        CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetRewardPerformanceRequest(from, to, page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
+            .Produces<List<RewardPerformanceDto>>()
+            .Produces<PagedResult<RewardPerformanceDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Admin Get Reward Performance")
+            .WithSummary("Admin per-reward performance: redemptions, points spent, remaining stock")
+            .WithOpenApi();
+
+        // H2 — upcoming point expiries
+        app.MapGet("/admin/GetUpcomingExpiries",
+                async (IMediator mediator, [FromQuery] DateTime? from, [FromQuery] DateTime? to,
+                        CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new GetUpcomingExpiriesRequest(from, to), cancellationToken)))
+            .Produces<UpcomingExpiriesDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Admin Get Upcoming Expiries")
+            .WithSummary("Admin views points expiring in the window (default next 90 days), totalled per user")
+            .WithOpenApi();
+
+        // K2 — adjustment reason codes
+        app.MapGet("/admin/GetAdjustmentReasons",
+                (IMediator _) => Results.Ok(AdjustmentReasons.All))
+            .Produces<List<AdjustmentReasonDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesInternalServerError()
+            .WithName("Admin Get Adjustment Reasons")
+            .WithSummary("Reason codes accepted by AdjustPoints (reasonCode field)")
+            .WithOpenApi();
+
+        // L1 — fraud/abuse review queue
+        app.MapGet("/admin/GetFlaggedActivity",
+                async (IMediator mediator, [FromQuery] int? windowHours,
+                        [FromQuery] int? page, [FromQuery] int? pageSize,
+                        CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(
+                        new GetFlaggedActivityRequest(windowHours ?? 24, Page: page, PageSize: pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
+            .Produces<List<FlaggedActivityDto>>()
+            .Produces<PagedResult<FlaggedActivityDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Admin Get Flagged Activity")
+            .WithSummary("Admin review queue of suspicious loyalty activity (velocity heuristics)")
+            .WithOpenApi();
+
+        // J1 — bulk award points to a segment
+        app.MapPost("/admin/BulkAwardPoints",
+                async (IMediator mediator, BulkAwardPointsCommand request, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(request, cancellationToken)))
+            .Produces<BulkAwardPointsResult>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Admin Bulk Award Points")
+            .WithSummary("Admin awards points to a user segment (carTypeId / carModelId / city / tierId); blocked accounts are skipped")
+            .WithOpenApi(op =>
+            {
+                op.RequestBody.Required = true;
+                return op;
+            });
+
+        // K1 — reverse a wrong transaction (points side, audited, idempotent)
+        app.MapPost("/admin/ReverseTransaction",
+                async (IMediator mediator, ReverseTransactionCommand request, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(request, cancellationToken)))
+            .Produces<ReverseTransactionResult>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Admin Reverse Transaction")
+            .WithSummary("Admin reverses a wrong transaction (activityType: Offer | Partner | Redemption | PointsAdjustment) — compensating audited ledger entry; provider wallets/settlements are not modified")
+            .WithOpenApi(op =>
+            {
+                op.RequestBody.Required = true;
+                return op;
+            });
 
         return app;
     }

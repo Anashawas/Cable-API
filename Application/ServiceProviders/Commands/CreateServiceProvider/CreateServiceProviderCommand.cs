@@ -26,7 +26,8 @@ public record CreateServiceProviderCommand(
     string? Service,
     string? Note,
     string? WhatsAppNumber,
-    string? WebsiteUrl
+    string? WebsiteUrl,
+    int? OwnerId = null
 ) : IRequest<int>;
 
 public class CreateServiceProviderCommandHandler(
@@ -45,10 +46,25 @@ public class CreateServiceProviderCommandHandler(
         if (!categoryExists)
             throw new NotFoundException($"Service category with id {request.ServiceCategoryId} not found");
 
+        // Owner defaults to the caller; an explicit OwnerId lets an admin create
+        // the provider on behalf of a provider user.
+        var ownerId = userId;
+        if (request.OwnerId.HasValue)
+        {
+            var owner = await applicationDbContext.UserAccounts.AsNoTracking()
+                            .FirstOrDefaultAsync(x => !x.IsDeleted && x.Id == request.OwnerId.Value, cancellationToken)
+                        ?? throw new NotFoundException($"can not find user with id {request.OwnerId}");
+
+            if (owner.RoleId != 4)
+                throw new DataValidationException("OwnerId", "Owner must have Provider role");
+
+            ownerId = owner.Id;
+        }
+
         var serviceProvider = new ServiceProvider
         {
             Name = request.Name,
-            OwnerId = userId,
+            OwnerId = ownerId,
             ServiceCategoryId = request.ServiceCategoryId,
             StatusId = request.StatusId,
             Description = request.Description,

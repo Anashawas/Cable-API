@@ -25,7 +25,7 @@ public class SendOtpCommandHandler : IRequestHandler<SendOtpCommand, SendOtpResu
 
         if (sent)
         {
-            return new SendOtpResult(true, "OTP sent successfully", DateTime.Now.AddMinutes(5));
+            return new SendOtpResult(true, "OTP sent successfully", DateTime.UtcNow.AddMinutes(5));
         }
 
         return new SendOtpResult(false, "Failed to send OTP", null);

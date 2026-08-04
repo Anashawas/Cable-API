@@ -25,9 +25,12 @@ public class PartnerAgreementConfiguration : IEntityTypeConfiguration<PartnerAgr
         builder.Property(e => e.PointsRewardPercentage)
             .IsRequired();
 
-        builder.Property(e => e.CodeExpiryMinutes)
+        builder.Property(e => e.MinimumTransactionAmount)
+            .HasColumnType("decimal(18,3)");
+
+        builder.Property(e => e.CodeExpirySeconds)
             .IsRequired()
-            .HasDefaultValue(30);
+            .HasDefaultValue(60);
 
         builder.Property(e => e.IsActive)
             .IsRequired()

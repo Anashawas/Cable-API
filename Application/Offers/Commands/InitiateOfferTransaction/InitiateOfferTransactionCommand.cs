@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Application.Offers.Commands.InitiateOfferTransaction;
 
 public record InitiateOfferTransactionResult(
+    int Id,
     string OfferCode,
     DateTime ExpiresAt,
     int PointsCost,
@@ -68,9 +69,19 @@ public class InitiateOfferTransactionCommandHandler(
         if (offer.MaxTotalUses.HasValue && offer.CurrentTotalUses >= offer.MaxTotalUses.Value)
             throw new DataValidationException("Offer", "This offer has reached its maximum usage limit");
 
+        // Atomically increment usage counter (prevents race condition)
+        var updated = await applicationDbContext.ProviderOffers
+            .Where(x => x.Id == offer.Id
+                         && (x.MaxTotalUses == null || x.CurrentTotalUses < x.MaxTotalUses))
+            .ExecuteUpdateAsync(x => x
+                .SetProperty(o => o.CurrentTotalUses, o => o.CurrentTotalUses + 1), cancellationToken);
+
+        if (updated == 0)
+            throw new DataValidationException("Offer", "This offer has reached its maximum usage limit");
+
         // Generate unique offer code
         var offerCode = await GenerateUniqueCode(cancellationToken);
-        var expiresAt = now.AddMinutes(offer.OfferCodeExpiryMinutes);
+        var expiresAt = now.AddSeconds(offer.OfferCodeExpirySeconds);
 
         var transaction = new OfferTransaction
         {
@@ -86,14 +97,11 @@ public class InitiateOfferTransactionCommandHandler(
             CodeExpiresAt = expiresAt
         };
 
-        // Increment offer usage counter at creation time
-        offer.CurrentTotalUses++;
-
         applicationDbContext.OfferTransactions.Add(transaction);
         await applicationDbContext.SaveChanges(cancellationToken);
 
         return new InitiateOfferTransactionResult(
-            offerCode, expiresAt, offer.PointsCost, offer.MonetaryValue, offer.CurrencyCode);
+            transaction.Id, offerCode, expiresAt, offer.PointsCost, offer.MonetaryValue, offer.CurrencyCode);
     }
 
     private async Task<string> GenerateUniqueCode(CancellationToken cancellationToken)

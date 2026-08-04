@@ -1,3 +1,4 @@
+using Application.Common.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Partners.Queries.GetActivePartners;
@@ -9,17 +10,18 @@ public record PartnerDto(
     string? ProviderName,
     double CommissionPercentage,
     double PointsRewardPercentage,
-    int CodeExpiryMinutes,
+    int CodeExpirySeconds,
+    decimal? MinimumTransactionAmount,
     string? Note
 );
 
-public record GetActivePartnersRequest(string? ProviderType) : IRequest<List<PartnerDto>>;
+public record GetActivePartnersRequest(string? ProviderType, int? Page = null, int? PageSize = null) : IRequest<PagedResult<PartnerDto>>;
 
 public class GetActivePartnersRequestHandler(
     IApplicationDbContext applicationDbContext)
-    : IRequestHandler<GetActivePartnersRequest, List<PartnerDto>>
+    : IRequestHandler<GetActivePartnersRequest, PagedResult<PartnerDto>>
 {
-    public async Task<List<PartnerDto>> Handle(GetActivePartnersRequest request, CancellationToken cancellationToken)
+    public async Task<PagedResult<PartnerDto>> Handle(GetActivePartnersRequest request, CancellationToken cancellationToken)
     {
         var query = applicationDbContext.PartnerAgreements
             .Where(x => x.IsActive && !x.IsDeleted);
@@ -27,34 +29,25 @@ public class GetActivePartnersRequestHandler(
         if (!string.IsNullOrEmpty(request.ProviderType))
             query = query.Where(x => x.ProviderType == request.ProviderType);
 
-        var agreements = await query.OrderByDescending(x => x.CreatedAt).ToListAsync(cancellationToken);
+        var paged = await query.OrderByDescending(x => x.CreatedAt)
+            .ToOptionallyPaginatedAsync(request.Page, request.PageSize, cancellationToken: cancellationToken);
+        var agreements = paged.Items;
 
-        var result = new List<PartnerDto>();
-        foreach (var a in agreements)
-        {
-            string? providerName = null;
+        // Batch load provider names (avoids N+1 queries)
+        var cpIds = agreements.Where(a => a.ProviderType == "ChargingPoint").Select(a => a.ProviderId).Distinct().ToList();
+        var spIds = agreements.Where(a => a.ProviderType == "ServiceProvider").Select(a => a.ProviderId).Distinct().ToList();
 
-            if (a.ProviderType == "ChargingPoint")
-            {
-                providerName = await applicationDbContext.ChargingPoints
-                    .Where(x => x.Id == a.ProviderId && !x.IsDeleted)
-                    .Select(x => x.Name)
-                    .FirstOrDefaultAsync(cancellationToken);
-            }
-            else if (a.ProviderType == "ServiceProvider")
-            {
-                providerName = await applicationDbContext.ServiceProviders
-                    .Where(x => x.Id == a.ProviderId && !x.IsDeleted)
-                    .Select(x => x.Name)
-                    .FirstOrDefaultAsync(cancellationToken);
-            }
+        var cpNames = cpIds.Count > 0
+            ? await applicationDbContext.ChargingPoints.Where(x => cpIds.Contains(x.Id) && !x.IsDeleted).ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken)
+            : new Dictionary<int, string>();
+        var spNames = spIds.Count > 0
+            ? await applicationDbContext.ServiceProviders.Where(x => spIds.Contains(x.Id) && !x.IsDeleted).ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken)
+            : new Dictionary<int, string>();
 
-            result.Add(new PartnerDto(
-                a.Id, a.ProviderType, a.ProviderId, providerName,
-                a.CommissionPercentage, a.PointsRewardPercentage,
-                a.CodeExpiryMinutes, a.Note));
-        }
-
-        return result;
+        return paged.As(agreements.Select(a => new PartnerDto(
+            a.Id, a.ProviderType, a.ProviderId,
+            a.ProviderType == "ChargingPoint" ? cpNames.GetValueOrDefault(a.ProviderId) : spNames.GetValueOrDefault(a.ProviderId),
+            a.CommissionPercentage, a.PointsRewardPercentage,
+            a.CodeExpirySeconds, a.MinimumTransactionAmount, a.Note)).ToList());
     }
 }

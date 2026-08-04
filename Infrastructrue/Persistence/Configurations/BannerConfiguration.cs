@@ -13,5 +13,15 @@ public partial class BannerConfiguration : IEntityTypeConfiguration<Banner>
         builder.Property(x => x.Phone).HasMaxLength(50);
         builder.Property(x => x.Email).HasMaxLength(50);
 
+        // Location targeting + ad-serving fields
+        builder.Property(x => x.TargetType).IsRequired().HasMaxLength(20).HasDefaultValue("national");
+        builder.Property(x => x.TargetCity).HasMaxLength(100);
+        builder.Property(x => x.LinkedEntityType).HasMaxLength(20);
+
+        builder.HasOne(x => x.Campaign)
+            .WithMany()
+            .HasForeignKey(x => x.CampaignId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_Banner_Campaign");
     }
 }

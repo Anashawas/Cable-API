@@ -6,6 +6,7 @@ public record CreatePartnerAgreementRequest(
     double CommissionPercentage,
     double PointsRewardPercentage,
     int? PointsConversionRateId,
-    int CodeExpiryMinutes,
+    int CodeExpirySeconds,
+    decimal? MinimumTransactionAmount,
     string? Note
 );

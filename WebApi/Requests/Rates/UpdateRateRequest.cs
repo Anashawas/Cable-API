@@ -1,3 +1,3 @@
-﻿namespace Cable.Requests.Rates;
+namespace Cable.Requests.Rates;
 
-public record UpdateRateRequest(int ChargingPointRate);
+public record UpdateRateRequest(int ChargingPointRate, string? Comment = null);

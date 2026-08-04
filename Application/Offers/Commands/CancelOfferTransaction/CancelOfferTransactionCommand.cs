@@ -27,6 +27,12 @@ public class CancelOfferTransactionCommandHandler(
 
         transaction.Status = (int)OfferTransactionStatus.Cancelled;
 
+        // Decrement offer usage counter (was incremented at initiation)
+        await applicationDbContext.ProviderOffers
+            .Where(x => x.Id == transaction.ProviderOfferId && x.CurrentTotalUses > 0)
+            .ExecuteUpdateAsync(x => x
+                .SetProperty(o => o.CurrentTotalUses, o => o.CurrentTotalUses - 1), cancellationToken);
+
         await applicationDbContext.SaveChanges(cancellationToken);
     }
 }

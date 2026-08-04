@@ -9,6 +9,8 @@ public class ProviderSettlement : BaseAuditableEntity
     public int ProviderOwnerId { get; set; }
     public int PeriodYear { get; set; }
     public int PeriodMonth { get; set; }
+    public int PeriodType { get; set; }  // SettlementPeriodType: 2=Weekly (Sun-Sat)
+    public int PeriodWeek { get; set; }  // Week number (1-53, Sun-Sat)
 
     // Partner Transaction aggregates (user pays provider for EV charging; Cable takes commission)
     public int PartnerTransactionCount { get; set; }
@@ -21,13 +23,15 @@ public class ProviderSettlement : BaseAuditableEntity
     public decimal OfferPaymentAmount { get; set; }
     public int TotalPointsDeducted { get; set; }
 
-    // Net settlement: (PartnerTransactionAmount - PartnerCommissionAmount) + OfferPaymentAmount
-    public decimal NetAmountDueToProvider { get; set; }
+    // Net balance: OfferPaymentAmount - PartnerCommissionAmount
+    // Positive = Cable owes provider, Negative = Provider owes Cable
+    public decimal NetBalance { get; set; }
+
+    // Wallet deduction applied to this settlement
+    public decimal WalletApplied { get; set; }
 
     public int SettlementStatus { get; set; }
-    public DateTime? InvoicedAt { get; set; }
     public DateTime? PaidAt { get; set; }
-    public decimal? PaidAmount { get; set; }
     public string? AdminNote { get; set; }
 
     public virtual UserAccount ProviderOwner { get; set; } = null!;

@@ -82,7 +82,7 @@ public class SharedLinkRepository(ApplicationDbContext applicationDbContext) : I
     public async Task CleanupExpiredLinksAsync(CancellationToken cancellationToken)
     {
         var expiredLinks = await applicationDbContext.SharedLinks
-            .Where(x => x.ExpiresAt.HasValue && x.ExpiresAt.Value <= DateTime.Now && !x.IsDeleted)
+            .Where(x => x.ExpiresAt.HasValue && x.ExpiresAt.Value <= DateTime.UtcNow && !x.IsDeleted)
             .ToListAsync(cancellationToken);
 
         foreach (var link in expiredLinks)

@@ -27,7 +27,7 @@ public static class ReportRoutes
                     request,
                     cancellationToken);
 
-                var fileName = $"UtilityInvoice_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+                var fileName = $"UtilityInvoice_{DateTime.UtcNow:yyyyMMdd_HHmmss}.pdf";
 
                 return Results.File(
                     pdfBytes,

@@ -44,6 +44,9 @@ public class ProviderOfferConfiguration : IEntityTypeConfiguration<ProviderOffer
         builder.Property(e => e.PointsCost)
             .IsRequired();
 
+        builder.Property(e => e.PointsPriceValue)
+            .HasColumnType("decimal(18,3)");
+
         builder.Property(e => e.MonetaryValue)
             .IsRequired()
             .HasColumnType("decimal(18,3)");
@@ -51,15 +54,15 @@ public class ProviderOfferConfiguration : IEntityTypeConfiguration<ProviderOffer
         builder.Property(e => e.CurrencyCode)
             .IsRequired()
             .HasMaxLength(10)
-            .HasDefaultValue("KWD");
+            .HasDefaultValue("JOD");
 
         builder.Property(e => e.CurrentTotalUses)
             .IsRequired()
             .HasDefaultValue(0);
 
-        builder.Property(e => e.OfferCodeExpiryMinutes)
+        builder.Property(e => e.OfferCodeExpirySeconds)
             .IsRequired()
-            .HasDefaultValue(30);
+            .HasDefaultValue(60);
 
         builder.Property(e => e.ImageUrl)
             .HasMaxLength(500);

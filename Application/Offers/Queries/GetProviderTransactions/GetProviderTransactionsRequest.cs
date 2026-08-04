@@ -1,3 +1,4 @@
+using Application.Common.Models;
 using Application.Offers.Queries.GetMyOfferTransactions;
 using Cable.Core;
 using Microsoft.EntityFrameworkCore;
@@ -8,15 +9,17 @@ public record GetProviderTransactionsRequest(
     string ProviderType,
     int ProviderId,
     int? Month = null,
-    int? Year = null
-) : IRequest<List<OfferTransactionDto>>;
+    int? Year = null,
+    int? Page = null,
+    int? PageSize = null
+) : IRequest<PagedResult<OfferTransactionDto>>;
 
 public class GetProviderTransactionsRequestHandler(
     IApplicationDbContext applicationDbContext,
     ICurrentUserService currentUserService)
-    : IRequestHandler<GetProviderTransactionsRequest, List<OfferTransactionDto>>
+    : IRequestHandler<GetProviderTransactionsRequest, PagedResult<OfferTransactionDto>>
 {
-    public async Task<List<OfferTransactionDto>> Handle(GetProviderTransactionsRequest request,
+    public async Task<PagedResult<OfferTransactionDto>> Handle(GetProviderTransactionsRequest request,
         CancellationToken cancellationToken)
     {
         _ = currentUserService.UserId
@@ -37,17 +40,17 @@ public class GetProviderTransactionsRequestHandler(
             query = query.Where(x => x.CreatedAt >= startDate && x.CreatedAt < endDate);
         }
 
-        var transactions = await query
+        var paged = await query
             .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync(cancellationToken);
+            .ToOptionallyPaginatedAsync(request.Page, request.PageSize, cancellationToken: cancellationToken);
 
-        return transactions.Select(x => new OfferTransactionDto(
+        return paged.As(paged.Items.Select(x => new OfferTransactionDto(
             x.Id, x.ProviderOfferId, x.Offer?.Title,
             x.UserId, x.User?.Name, x.OfferCode, x.Status,
             x.PointsDeducted, x.MonetaryValue, x.CurrencyCode,
             x.ProviderType, x.ProviderId,
             x.ConfirmedByUserId, x.CodeExpiresAt, x.CompletedAt,
             x.CreatedAt
-        )).ToList();
+        )).ToList());
     }
 }

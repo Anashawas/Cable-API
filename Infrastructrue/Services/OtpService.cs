@@ -27,11 +27,51 @@ public class OtpService : IOtpService
         _otpOptions = otpOptions.Value;
     }
 
+    /// <summary>
+    /// True when this number should use the fixed OTP and skip the SMS gateway, i.e. either:
+    ///   - dev/QA mode is on (TestModeForAllNumbers — applies to every number), or
+    ///   - the number is an allow-listed demo/review account (e.g. App Store review).
+    /// </summary>
+    private bool IsTestPhoneNumber(string? phoneNumber)
+    {
+        // Development mode: no number ever receives a paid SMS.
+        if (_otpOptions.TestModeForAllNumbers)
+            return true;
+
+        if (string.IsNullOrWhiteSpace(phoneNumber))
+            return false;
+
+        var numbers = _otpOptions.TestPhoneNumbers;
+        if (numbers is null || numbers.Length == 0)
+            return false;
+
+        return numbers.Any(n =>
+            !string.IsNullOrWhiteSpace(n) &&
+            string.Equals(n.Trim(), phoneNumber.Trim(), StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// The request validators enforce ^\d{6}$, so a misconfigured TestOtp would be rejected
+    /// with a 400 before it ever reaches verification. Fall back to a valid 6-digit code
+    /// rather than silently handing out one that can never be submitted.
+    /// </summary>
+    private string GetFixedTestOtp()
+    {
+        var configured = _otpOptions.TestOtp?.Trim();
+
+        return !string.IsNullOrEmpty(configured)
+               && configured.Length == 6
+               && configured.All(char.IsDigit)
+            ? configured
+            : "000000";
+    }
+
     public async Task<string> GenerateOtpAsync(string phoneNumber, CancellationToken cancellationToken)
     {
-        // Generate 6-digit OTP
-        var random = new Random();
-        var otp = random.Next(100000, 999999).ToString();
+        // Demo/review accounts always get the same fixed code.
+        var otp = IsTestPhoneNumber(phoneNumber)
+            ? GetFixedTestOtp()
+            : new Random().Next(100000, 999999).ToString();
 
         // Encrypt OTP before storing
         var encryptedOtp = _dataEncryption.Encrypt(otp);
@@ -57,6 +97,10 @@ public class OtpService : IOtpService
 
     public async Task<bool> SendOtpAsync(string phoneNumber, string otp, CancellationToken cancellationToken)
     {
+        // Never send a real SMS to a demo/review account — the code is already known.
+        if (IsTestPhoneNumber(phoneNumber))
+            return true;
+
         var message = string.Format(Resources.OtpMessage, otp, _otpOptions.ExpiryMinutes);
         return await _smsService.SendSmsAsync(phoneNumber, message, cancellationToken);
     }
@@ -100,6 +144,8 @@ public class OtpService : IOtpService
 
     public async Task<bool> IsRateLimitedAsync(string phoneNumber, CancellationToken cancellationToken)
     =>
+        // Reviewers may retry many times — don't rate-limit demo/review accounts.
+        !IsTestPhoneNumber(phoneNumber) &&
          await _context.PhoneVerifications
             .Where(x => x.PhoneNumber == phoneNumber &&
                         x.CreatedAt >= DateTime.UtcNow.AddMinutes(-_otpOptions.RateLimitMinutes) &&

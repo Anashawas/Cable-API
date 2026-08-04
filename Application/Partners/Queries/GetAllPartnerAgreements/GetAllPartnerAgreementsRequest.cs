@@ -1,3 +1,4 @@
+using Application.Common.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Partners.Queries.GetAllPartnerAgreements;
@@ -11,19 +12,20 @@ public record AdminPartnerAgreementDto(
     double PointsRewardPercentage,
     int? PointsConversionRateId,
     string? ConversionRateName,
-    int CodeExpiryMinutes,
+    int CodeExpirySeconds,
+    decimal? MinimumTransactionAmount,
     bool IsActive,
     string? Note,
     DateTime? CreatedAt
 );
 
-public record GetAllPartnerAgreementsRequest(bool? IsActive) : IRequest<List<AdminPartnerAgreementDto>>;
+public record GetAllPartnerAgreementsRequest(bool? IsActive, int? Page = null, int? PageSize = null) : IRequest<PagedResult<AdminPartnerAgreementDto>>;
 
 public class GetAllPartnerAgreementsRequestHandler(
     IApplicationDbContext applicationDbContext)
-    : IRequestHandler<GetAllPartnerAgreementsRequest, List<AdminPartnerAgreementDto>>
+    : IRequestHandler<GetAllPartnerAgreementsRequest, PagedResult<AdminPartnerAgreementDto>>
 {
-    public async Task<List<AdminPartnerAgreementDto>> Handle(
+    public async Task<PagedResult<AdminPartnerAgreementDto>> Handle(
         GetAllPartnerAgreementsRequest request, CancellationToken cancellationToken)
     {
         var query = applicationDbContext.PartnerAgreements
@@ -33,36 +35,28 @@ public class GetAllPartnerAgreementsRequestHandler(
         if (request.IsActive.HasValue)
             query = query.Where(x => x.IsActive == request.IsActive.Value);
 
-        var agreements = await query
+        var paged = await query
             .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync(cancellationToken);
+            .ToOptionallyPaginatedAsync(request.Page, request.PageSize, cancellationToken: cancellationToken);
+        var agreements = paged.Items;
 
-        var result = new List<AdminPartnerAgreementDto>();
-        foreach (var a in agreements)
-        {
-            string? providerName = null;
-            if (a.ProviderType == "ChargingPoint")
-            {
-                providerName = await applicationDbContext.ChargingPoints
-                    .Where(x => x.Id == a.ProviderId)
-                    .Select(x => x.Name)
-                    .FirstOrDefaultAsync(cancellationToken);
-            }
-            else if (a.ProviderType == "ServiceProvider")
-            {
-                providerName = await applicationDbContext.ServiceProviders
-                    .Where(x => x.Id == a.ProviderId)
-                    .Select(x => x.Name)
-                    .FirstOrDefaultAsync(cancellationToken);
-            }
+        // Batch load provider names (avoids N+1 queries)
+        var cpIds = agreements.Where(a => a.ProviderType == "ChargingPoint").Select(a => a.ProviderId).Distinct().ToList();
+        var spIds = agreements.Where(a => a.ProviderType == "ServiceProvider").Select(a => a.ProviderId).Distinct().ToList();
 
-            result.Add(new AdminPartnerAgreementDto(
-                a.Id, a.ProviderType, a.ProviderId, providerName,
-                a.CommissionPercentage, a.PointsRewardPercentage,
-                a.PointsConversionRateId, a.ConversionRate?.Name,
-                a.CodeExpiryMinutes, a.IsActive, a.Note, a.CreatedAt));
-        }
+        var cpNames = cpIds.Count > 0
+            ? await applicationDbContext.ChargingPoints.Where(x => cpIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken)
+            : new Dictionary<int, string>();
+        var spNames = spIds.Count > 0
+            ? await applicationDbContext.ServiceProviders.Where(x => spIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken)
+            : new Dictionary<int, string>();
 
-        return result;
+        return paged.As(agreements.Select(a => new AdminPartnerAgreementDto(
+            a.Id, a.ProviderType, a.ProviderId,
+            a.ProviderType == "ChargingPoint" ? cpNames.GetValueOrDefault(a.ProviderId) : spNames.GetValueOrDefault(a.ProviderId),
+            a.CommissionPercentage, a.PointsRewardPercentage,
+            a.PointsConversionRateId, a.ConversionRate?.Name,
+            a.CodeExpirySeconds, a.MinimumTransactionAmount,
+            a.IsActive, a.Note, a.CreatedAt)).ToList());
     }
 }

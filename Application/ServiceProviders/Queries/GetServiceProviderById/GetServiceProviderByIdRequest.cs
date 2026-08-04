@@ -1,4 +1,5 @@
 using Application.ServiceProviders.Queries.GetAllServiceProviders;
+using Cable.Core.Emuns;
 using Cable.Core.Exceptions;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,7 +8,8 @@ namespace Application.ServiceProviders.Queries.GetServiceProviderById;
 public record GetServiceProviderByIdRequest(int Id) : IRequest<ServiceProviderDto>;
 
 public class GetServiceProviderByIdRequestHandler(
-    IApplicationDbContext applicationDbContext)
+    IApplicationDbContext applicationDbContext,
+    IUploadFileService uploadFileService)
     : IRequestHandler<GetServiceProviderByIdRequest, ServiceProviderDto>
 {
     public async Task<ServiceProviderDto> Handle(GetServiceProviderByIdRequest request,
@@ -23,12 +25,9 @@ public class GetServiceProviderByIdRequestHandler(
                     .FirstOrDefaultAsync(sp => sp.Id == request.Id && !sp.IsDeleted, cancellationToken)
                 ?? throw new NotFoundException($"Service provider with id {request.Id} not found");
 
-        // Increment visitors count
-        var provider = await applicationDbContext.ServiceProviders
-            .FirstAsync(sp => sp.Id == request.Id, cancellationToken);
-        provider.VisitorsCount++;
-        await applicationDbContext.SaveChanges(cancellationToken);
-
+        // View counting is no longer a side effect of this read — the client
+        // records a FullView via POST /api/analytics/track, which the engine
+        // folds into VisitorsCount + the analytics tables.
         var isPartner = await applicationDbContext.PartnerAgreements
             .AsNoTracking()
             .AnyAsync(pa => pa.ProviderType == "ServiceProvider" && pa.ProviderId == x.Id
@@ -56,17 +55,20 @@ public class GetServiceProviderByIdRequestHandler(
             x.FromTime,
             x.ToTime,
             x.MethodPayment,
-            x.VisitorsCount + 1,
+            x.VisitorsCount,
             x.IsVerified,
             x.HasOffer,
             x.OfferDescription,
             x.Service,
-            x.Icon,
+            !string.IsNullOrEmpty(x.Icon)
+                ? uploadFileService.GetFilePath(UploadFileFolders.CableServiceProvider, x.Icon)
+                : null,
             x.WhatsAppNumber,
             x.WebsiteUrl,
             x.ServiceProviderRates.Any() ? x.ServiceProviderRates.Average(r => r.Rating) : 0,
             x.ServiceProviderRates.Count,
-            x.ServiceProviderAttachments.Select(a => a.FileName).ToList(),
+            x.ServiceProviderAttachments.Select(a =>
+                uploadFileService.GetFilePath(UploadFileFolders.CableServiceProvider, a.FileName)).ToList(),
             x.CreatedAt,
             isPartner
         );

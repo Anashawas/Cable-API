@@ -1,14 +1,17 @@
+using Application.Common.Models;
+using Cable.Core.Emuns;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.ServiceProviders.Queries.GetAllServiceProviders;
 
-public record GetAllServiceProvidersRequest(int? CategoryId = null) : IRequest<List<ServiceProviderDto>>;
+public record GetAllServiceProvidersRequest(int? CategoryId = null, int? Page = null, int? PageSize = null) : IRequest<PagedResult<ServiceProviderDto>>;
 
 public class GetAllServiceProvidersRequestHandler(
-    IApplicationDbContext applicationDbContext)
-    : IRequestHandler<GetAllServiceProvidersRequest, List<ServiceProviderDto>>
+    IApplicationDbContext applicationDbContext,
+    IUploadFileService uploadFileService)
+    : IRequestHandler<GetAllServiceProvidersRequest, PagedResult<ServiceProviderDto>>
 {
-    public async Task<List<ServiceProviderDto>> Handle(GetAllServiceProvidersRequest request,
+    public async Task<PagedResult<ServiceProviderDto>> Handle(GetAllServiceProvidersRequest request,
         CancellationToken cancellationToken)
     {
         var query = applicationDbContext.ServiceProviders
@@ -63,14 +66,17 @@ public class GetAllServiceProvidersRequestHandler(
             x.HasOffer,
             x.OfferDescription,
             x.Service,
-            x.Icon,
+            !string.IsNullOrEmpty(x.Icon)
+                ? uploadFileService.GetFilePath(UploadFileFolders.CableServiceProvider, x.Icon)
+                : null,
             x.WhatsAppNumber,
             x.WebsiteUrl,
             x.ServiceProviderRates.Any() ? x.ServiceProviderRates.Average(r => r.Rating) : 0,
             x.ServiceProviderRates.Count,
-            x.ServiceProviderAttachments.Select(a => a.FileName).ToList(),
+            x.ServiceProviderAttachments.Select(a =>
+                uploadFileService.GetFilePath(UploadFileFolders.CableServiceProvider, a.FileName)).ToList(),
             x.CreatedAt,
             partnerSet.Contains(x.Id)
-        )).ToList();
+        )).ToList().ToOptionallyPaginated(request.Page, request.PageSize);
     }
 }

@@ -1,16 +1,17 @@
-﻿
+
+using Application.Common.Models;
 using Cable.Core.Emuns;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Banners.Queries.GetAllBanners;
 
-public record GetAllBannersRequest() : IRequest<List<GetAllBannersDto>>;
+public record GetAllBannersRequest(int? Page = null, int? PageSize = null) : IRequest<PagedResult<GetAllBannersDto>>;
 
 public class GetAllBannersQueryHandler(IApplicationDbContext applicationDbContext, IUploadFileService uploadFileService)
-    : IRequestHandler<GetAllBannersRequest, List<GetAllBannersDto>>
+    : IRequestHandler<GetAllBannersRequest, PagedResult<GetAllBannersDto>>
 {
-    public async Task<List<GetAllBannersDto>> Handle(GetAllBannersRequest request, CancellationToken cancellationToken)
+    public async Task<PagedResult<GetAllBannersDto>> Handle(GetAllBannersRequest request, CancellationToken cancellationToken)
     {
         var result = await applicationDbContext.Banners.AsNoTracking()
             .Where(x => !x.IsDeleted)
@@ -22,6 +23,6 @@ public class GetAllBannersQueryHandler(IApplicationDbContext applicationDbContex
                 a.Id, a.ContentType, a.FileName, a.FileSize, a.FileExtension,
                 uploadFileService.GetFilePath(folder: UploadFileFolders.CableBanners, fileName: a.FileName))).ToList()
         )).ToList();
-        return banners;
+        return banners.ToOptionallyPaginated(request.Page, request.PageSize);
     }
 }

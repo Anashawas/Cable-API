@@ -69,10 +69,16 @@ public class UploadFileService(ICurrentUserService currentUserService, IHttpCont
 
     public string GetFilePath(UploadFileFolders folder, string fileName)
     {
+        // Config first, request host only as fallback: URLs built (and sometimes
+        // STORED, e.g. announcement imageUrl) must never capture whatever host the
+        // API happened to be reached on — a local upload once persisted a
+        // "localhost:5202" URL that phones couldn't load.
         var request = httpContextAccessor.HttpContext?.Request;
-        var baseUrl = request != null
-            ? $"{request.Scheme}://{request.Host}"
-            : _uploadFileOption.ServerUrl;
+        var baseUrl = !string.IsNullOrWhiteSpace(_uploadFileOption.ServerUrl)
+            ? _uploadFileOption.ServerUrl.TrimEnd('/')
+            : request != null
+                ? $"{request.Scheme}://{request.Host}"
+                : string.Empty;
         return UploadFilePathHelper.GetFilePath(baseUrl, folder, fileName);
     }
 

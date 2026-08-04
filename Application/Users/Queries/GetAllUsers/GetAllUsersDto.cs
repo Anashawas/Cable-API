@@ -6,7 +6,10 @@ public record GetAllUsersDto(
     string? Phone,
     string? UserName,
     string? Email,
+    string? City,
     bool IsPhoneVerified,
+    bool HasReadUpdateNotes,
+    bool IsDeleted,
     DateTime CreatedAt,
     RoleSummary Role,
     List<UserCarSummaryDto> UserCars);

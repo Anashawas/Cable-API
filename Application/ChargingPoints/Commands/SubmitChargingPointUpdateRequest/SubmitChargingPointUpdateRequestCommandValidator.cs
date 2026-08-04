@@ -37,17 +37,11 @@ public class SubmitChargingPointUpdateRequestCommandValidator
             .When(x => x.PlugTypeIds != null)
             .WithMessage("One or more plug type IDs are invalid");
 
-        // Charger point type validation
-        RuleFor(x => x.ChargerPointTypeId)
-            .MustAsync(async (id, ct) => await ChargerPointTypeExists(id, ct))
-            .When(x => x.ChargerPointTypeId.HasValue)
-            .WithMessage("Charger point type does not exist");
-
-        // Station type validation
-        RuleFor(x => x.StationTypeId)
-            .MustAsync(async (id, ct) => await StationTypeExists(id, ct))
-            .When(x => x.StationTypeId.HasValue)
-            .WithMessage("Station type does not exist");
+        // Status (open/closed) validation
+        RuleFor(x => x.StatusId)
+            .MustAsync(async (id, ct) => await StatusExists(id, ct))
+            .When(x => x.StatusId.HasValue)
+            .WithMessage("Status does not exist");
     }
 
     private async Task<bool> ChargingPointExists(int id, CancellationToken ct)
@@ -65,15 +59,9 @@ public class SubmitChargingPointUpdateRequestCommandValidator
         return validIds.Count == ids.Count;
     }
 
-    private async Task<bool> ChargerPointTypeExists(int? id, CancellationToken ct)
+    private async Task<bool> StatusExists(int? id, CancellationToken ct)
     {
         if (!id.HasValue) return true;
-        return await _context.ChargingPointTypes.AnyAsync(x => x.Id == id.Value, ct);
-    }
-
-    private async Task<bool> StationTypeExists(int? id, CancellationToken ct)
-    {
-        if (!id.HasValue) return true;
-        return await _context.StationTypes.AnyAsync(x => x.Id == id.Value, ct);
+        return await _context.Statuses.AnyAsync(x => x.Id == id.Value, ct);
     }
 }

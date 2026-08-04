@@ -1,3 +1,4 @@
+using Application.Common.Security;
 using Cable.Core;
 using FluentValidation;
 
@@ -41,6 +42,8 @@ public class CreateRewardCommandHandler(
 {
     public async Task<int> Handle(CreateRewardCommand request, CancellationToken cancellationToken)
     {
+        await AdminRoleGuard.EnsureAdminAsync(applicationDbContext, currentUserService, cancellationToken);
+
         var userId = currentUserService.UserId
                      ?? throw new NotAuthorizedAccessException("User not authenticated");
 

@@ -27,12 +27,17 @@ public record GetAllChargingPointsDto(
     int? VisitorsCount,
     string? Note,
     string? MethodPayment,
-    string? ChargerBrand,
     StatusSummary StatusSummary,
     ChargingPointTypeSummary? ChargingPointType,
     StationTypeSummary? StationType,
     List<string>? Images,
     List<PlugTypeSummary> PlugTypeSummary,
     bool IsFavorite,
-    bool IsPartner
+    bool IsPartner,
+    bool HasOwner = false,
+    DateTime? CreatedAt = null,
+    DateTime? ModifiedAt = null,
+    int? FavoritesCount = null,
+    string? ViewImage = null,
+    string? ViewImageStatus = null
 );

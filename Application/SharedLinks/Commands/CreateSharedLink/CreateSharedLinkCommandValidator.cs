@@ -25,6 +25,6 @@ public class CreateSharedLinkCommandValidator : AbstractValidator<CreateSharedLi
 
     private static bool BeValidExpiryDate(DateTime? expiresAt)
     {
-        return !expiresAt.HasValue || expiresAt.Value > DateTime.Now;
+        return !expiresAt.HasValue || expiresAt.Value > DateTime.UtcNow;
     }
 }

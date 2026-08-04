@@ -13,7 +13,8 @@ public static class NotificationInboxHelper
         string body,
         string? deepLink,
         string? data,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Guid? batchId = null)
     {
         var userIdsList = userIds.ToList();
 
@@ -21,6 +22,9 @@ public static class NotificationInboxHelper
         {
             return 0;
         }
+
+        // If no batchId provided, generate one so every send is still trackable as a group.
+        var effectiveBatchId = batchId ?? Guid.NewGuid();
 
         var notifications = new List<Domain.Enitites.NotificationInbox>();
 
@@ -34,7 +38,8 @@ public static class NotificationInboxHelper
                 Body = body,
                 IsRead = false,
                 DeepLink = deepLink,
-                Data = data
+                Data = data,
+                BatchId = effectiveBatchId
             });
         }
 

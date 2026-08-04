@@ -18,6 +18,7 @@ public partial class RateConfiguration : IEntityTypeConfiguration<Rate>
         
         entity.Property(e => e.CreatedAt).HasColumnType("datetime");
         entity.Property(e => e.ModifiedAt).HasColumnType("datetime");
+        entity.Property(e => e.Comment).HasMaxLength(1000);
 
         entity.HasOne(d => d.ChargingPoint).WithMany(p => p.Rates)
             .HasForeignKey(d => d.ChargingPointId)

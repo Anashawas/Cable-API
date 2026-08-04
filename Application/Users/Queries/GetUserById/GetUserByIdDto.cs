@@ -13,8 +13,10 @@ public record GetUserByIdDto(
     string? Country,
     string? City,
     bool IsPhoneVerified,
+    bool HasReadUpdateNotes,
     RoleSummary Role,
-    List<UserCarTypeDto> UserCars
+    List<UserCarTypeDto> UserCars,
+    bool HasAcceptedTerms = true
 );
 
 public record UserCarTypeDto(int CarTypeId, string CarTypeName, List<UserCarModelDto> CarModels);

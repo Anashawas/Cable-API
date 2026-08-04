@@ -1,6 +1,7 @@
 using Application.Common.Models;
 using Application.ServiceProviders.Commands.AddServiceProviderAttachment;
 using Application.ServiceProviders.Commands.AddToFavoriteService;
+using Application.ServiceProviders.Commands.ChangeServiceProviderOwner;
 using Application.ServiceProviders.Commands.CreateServiceProvider;
 using Application.ServiceProviders.Commands.DeleteServiceProvider;
 using Application.ServiceProviders.Commands.DeleteServiceProviderAttachment;
@@ -38,9 +39,14 @@ public static class ServiceProviderRoutes
     {
         // Get all service providers
         app.MapGet("/GetAllServiceProviders",
-                async (IMediator mediator, [FromQuery] int? categoryId, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetAllServiceProvidersRequest(categoryId), cancellationToken)))
+                async (IMediator mediator, [FromQuery] int? categoryId,
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetAllServiceProvidersRequest(categoryId, page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<ServiceProviderDto>>()
+            .Produces<PagedResult<ServiceProviderDto>>()
             .ProducesInternalServerError()
             .WithName("Get All Service Providers")
             .WithSummary("Get all service providers")
@@ -66,9 +72,14 @@ public static class ServiceProviderRoutes
 
         // Get by category
         app.MapGet("/GetByCategory/{categoryId:int}",
-                async (IMediator mediator, [FromRoute] int categoryId, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetProvidersByCategoryRequest(categoryId), cancellationToken)))
+                async (IMediator mediator, [FromRoute] int categoryId,
+                        [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetProvidersByCategoryRequest(categoryId, page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<ServiceProviderDto>>()
+            .Produces<PagedResult<ServiceProviderDto>>()
             .ProducesInternalServerError()
             .WithName("Get Service Providers By Category")
             .WithSummary("Get service providers by category")
@@ -83,10 +94,15 @@ public static class ServiceProviderRoutes
         // Get nearby
         app.MapGet("/GetNearby",
                 async (IMediator mediator, [FromQuery] double latitude, [FromQuery] double longitude,
-                        [FromQuery] double? radiusKm, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetNearbyProvidersRequest(latitude, longitude, radiusKm ?? 10),
-                        cancellationToken)))
+                        [FromQuery] double? radiusKm, [FromQuery] int? page, [FromQuery] int? pageSize,
+                        CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetNearbyProvidersRequest(latitude, longitude, radiusKm ?? 10, page, pageSize),
+                        cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<ServiceProviderDto>>()
+            .Produces<PagedResult<ServiceProviderDto>>()
             .ProducesInternalServerError()
             .WithName("Get Nearby Service Providers")
             .WithSummary("Get nearby service providers")
@@ -95,9 +111,14 @@ public static class ServiceProviderRoutes
 
         // Get my favorites
         app.MapGet("/GetMyFavorites",
-                async (IMediator mediator, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetMyFavoriteServicesRequest(), cancellationToken)))
+                async (IMediator mediator, [FromQuery] int? page, [FromQuery] int? pageSize,
+                        CancellationToken cancellationToken) =>
+                {
+                    var paged = await mediator.Send(new GetMyFavoriteServicesRequest(page, pageSize), cancellationToken);
+                    return Results.Ok(page.HasValue || pageSize.HasValue ? (object)paged : paged.Items);
+                })
             .Produces<List<ServiceProviderDto>>()
+            .Produces<PagedResult<ServiceProviderDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
             .ProducesInternalServerError()
@@ -403,6 +424,29 @@ public static class ServiceProviderRoutes
             {
                 op.Parameters[0].Required = true;
                 op.Parameters[0].Description = "The ID of the service provider";
+                return op;
+            });
+
+        // Change service provider owner (admin)
+        app.MapPatch("/ChangeOwner/{serviceProviderId:int}",
+                async (IMediator mediator, [FromRoute] int serviceProviderId, ChangeServiceProviderOwnerRequest request,
+                        CancellationToken cancellationToken) =>
+                    await mediator.Send(new ChangeServiceProviderOwnerCommand(serviceProviderId, request.NewOwnerId), cancellationToken))
+            .Produces(200)
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Change Service Provider Owner")
+            .WithSummary("Changes the owner of a service provider (admin)")
+            .WithDescription("Transfers ownership of a service provider to a different user. New owner must have Provider role.")
+            .WithOpenApi(op =>
+            {
+                op.Parameters[0].Required = true;
+                op.Parameters[0].Description = "The ID of the service provider";
+                op.RequestBody.Required = true;
                 return op;
             });
 

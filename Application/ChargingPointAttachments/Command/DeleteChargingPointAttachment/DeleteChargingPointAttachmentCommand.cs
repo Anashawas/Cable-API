@@ -20,7 +20,7 @@ public class DeleteChargingPointAttachmentCommandHandler(
                                       ?? throw new NotFoundException(
                                           $"Can not find charging point attachment with id {request.Id}");
         
-        uploadFileService.DeleteFiles(UploadFileFolders.CableBanners,
+        uploadFileService.DeleteFiles(UploadFileFolders.CableAttachments,
             chargingPointAttachment.Select(x => x.FileName).ToArray(), cancellationToken);
 
         applicationDbContext.ChargingPointAttachments.RemoveRange(chargingPointAttachment);

@@ -5,7 +5,9 @@ namespace Domain.Enitites;
 public class ServiceProvider : BaseAuditableEntity
 {
     public string Name { get; set; } = null!;
-    public int OwnerId { get; set; }
+
+    /// <summary>Owner user account; null = unassigned provider.</summary>
+    public int? OwnerId { get; set; }
     public int ServiceCategoryId { get; set; }
     public int StatusId { get; set; }
     public string? Description { get; set; }
@@ -33,17 +35,20 @@ public class ServiceProvider : BaseAuditableEntity
 
     // Loyalty Blocking
     public bool IsLoyaltyBlocked { get; set; }
+
+    /// <summary>Part B F4: when on, a worker's fan announcement sends directly (no owner approval).</summary>
+    public bool AutoApproveWorkerNotifications { get; set; }
     public DateTime? LoyaltyBlockedAt { get; set; }
     public DateTime? LoyaltyBlockedUntil { get; set; }
     public string? LoyaltyBlockReason { get; set; }
     public int? LoyaltyBlockedByUserId { get; set; }
     public virtual UserAccount? LoyaltyBlockedByUser { get; set; }
 
-    // Loyalty Credit Limit
-    public decimal? LoyaltyCreditLimit { get; set; }
-    public decimal LoyaltyCurrentBalance { get; set; }
+    // Wallet system (unified balance + credit limit)
+    public decimal? WalletCreditLimit { get; set; }
+    public decimal WalletBalance { get; set; }
 
-    public virtual UserAccount Owner { get; set; } = null!;
+    public virtual UserAccount? Owner { get; set; }
     public virtual ServiceCategory ServiceCategory { get; set; } = null!;
     public virtual Status Status { get; set; } = null!;
     public virtual ICollection<ServiceProviderAttachment> ServiceProviderAttachments { get; set; } = new List<ServiceProviderAttachment>();

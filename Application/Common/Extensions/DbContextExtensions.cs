@@ -4,6 +4,18 @@ namespace Application.Common.Extensions;
 
 public static class DbContextExtensions
 {
+    /// <summary>
+    /// Reads an entity with UPDLOCK + ROWLOCK to prevent concurrent modifications.
+    /// Must be used inside a BeginTransactionAsync scope.
+    /// </summary>
+    public static async Task<T?> FindWithLockAsync<T>(
+        this DbSet<T> dbSet, string tableName, int id, CancellationToken ct = default) where T : class
+    {
+        return await dbSet
+            .FromSqlRaw($"SELECT * FROM [{tableName}] WITH (UPDLOCK, ROWLOCK) WHERE Id = {{0}} AND IsDeleted = 0", id)
+            .FirstOrDefaultAsync(ct);
+    }
+
     public static async Task<List<T>> SqlQueryAsync<T>(this DbContext db, string sql, object[] parameters = null, CancellationToken cancellationToken = default)
         where T : class
     {

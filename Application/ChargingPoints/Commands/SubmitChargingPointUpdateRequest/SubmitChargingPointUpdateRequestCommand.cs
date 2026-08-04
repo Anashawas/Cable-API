@@ -13,6 +13,9 @@ using Cable.Core;
 
 namespace Application.ChargingPoints.Commands.SubmitChargingPointUpdateRequest;
 
+// Owner-editable whitelist ONLY (operational data). Identity/trust fields —
+// owner, isVerified, stationType, chargingPointType, hasOffer, premium — are
+// deliberately NOT accepted here; those are admin-only via other endpoints.
 public record SubmitChargingPointUpdateRequestCommand(
     int ChargingPointId,
     string? Name,
@@ -28,14 +31,11 @@ public record SubmitChargingPointUpdateRequestCommand(
     int? ChargersCount,
     double? Latitude,
     double? Longitude,
-    int? ChargerPointTypeId,
-    int? StationTypeId,
+    int? StatusId,
     string? OwnerPhone,
-    bool? HasOffer,
     string? Service,
     string? OfferDescription,
     string? Address,
-    string? ChargerBrand,
     List<int>? PlugTypeIds,
     List<int>? AttachmentsToDelete
 ) : IRequest<int>;
@@ -43,7 +43,9 @@ public record SubmitChargingPointUpdateRequestCommand(
 public class SubmitChargingPointUpdateRequestCommandHandler(
     IApplicationDbContext context,
     ICurrentUserService currentUserService,
-    IUploadFileService uploadFileService)
+    IUploadFileService uploadFileService,
+    INotificationService notificationService,
+    Microsoft.Extensions.Logging.ILogger<SubmitChargingPointUpdateRequestCommandHandler> logger)
     : IRequestHandler<SubmitChargingPointUpdateRequestCommand, int>
 {
     public async Task<int> Handle(SubmitChargingPointUpdateRequestCommand request, CancellationToken ct)
@@ -68,6 +70,13 @@ public class SubmitChargingPointUpdateRequestCommandHandler(
                 "There is already a pending update request for this charging point");
 
         // 3. Create update request entity
+        var normalizedPhone = request.Phone != null
+            ? PhoneNumberUtility.NormalizePhoneNumber(request.Phone) ?? request.Phone
+            : null;
+        var normalizedOwnerPhone = request.OwnerPhone != null
+            ? PhoneNumberUtility.NormalizePhoneNumber(request.OwnerPhone) ?? request.OwnerPhone
+            : null;
+
         var updateRequest = new ChargingPointUpdateRequest
         {
             ChargingPointId = request.ChargingPointId,
@@ -79,7 +88,7 @@ public class SubmitChargingPointUpdateRequestCommandHandler(
             Note = request.Note != chargingPoint.Note ? request.Note : null,
             CountryName = request.CountryName != chargingPoint.CountryName ? request.CountryName : null,
             CityName = request.CityName != chargingPoint.CityName ? request.CityName : null,
-            Phone = request.Phone != null ? PhoneNumberUtility.NormalizePhoneNumber(request.Phone) : null,
+            Phone = normalizedPhone != null && normalizedPhone != chargingPoint.Phone ? normalizedPhone : null,
             MethodPayment = request.MethodPayment != chargingPoint.MethodPayment ? request.MethodPayment : null,
             Price = request.Price != chargingPoint.Price ? request.Price : null,
             FromTime = request.FromTime != chargingPoint.FromTime ? request.FromTime : null,
@@ -88,15 +97,16 @@ public class SubmitChargingPointUpdateRequestCommandHandler(
             ChargersCount = request.ChargersCount != chargingPoint.ChargersCount ? request.ChargersCount : null,
             Latitude = request.Latitude != chargingPoint.Latitude ? request.Latitude : null,
             Longitude = request.Longitude != chargingPoint.Longitude ? request.Longitude : null,
-            ChargerPointTypeId = request.ChargerPointTypeId != chargingPoint.ChargerPointTypeId ? request.ChargerPointTypeId : null,
-            StationTypeId = request.StationTypeId != chargingPoint.StationTypeId ? request.StationTypeId : null,
-            OwnerPhone = request.OwnerPhone != null ? PhoneNumberUtility.NormalizePhoneNumber(request.OwnerPhone) : null,
-            HasOffer = request.HasOffer != chargingPoint.HasOffer ? request.HasOffer : null,
+            StatusId = request.StatusId != chargingPoint.StatusId ? request.StatusId : null,
+            OwnerPhone = normalizedOwnerPhone != null && normalizedOwnerPhone != chargingPoint.OwnerPhone ? normalizedOwnerPhone : null,
             Service = request.Service != chargingPoint.Service ? request.Service : null,
             OfferDescription = request.OfferDescription != chargingPoint.OfferDescription ? request.OfferDescription : null,
             Address = request.Address != chargingPoint.Address ? request.Address : null,
-            ChargerBrand = request.ChargerBrand != chargingPoint.ChargerBrand ? request.ChargerBrand : null,
         };
+
+        // Snapshot the station's current values for the changed fields — the
+        // diff shown at review time uses this baseline, not the live station.
+        updateRequest.OldValuesJson = UpdateRequestDiffHelper.BuildOldValuesSnapshot(updateRequest, chargingPoint);
 
         // 4. Handle plug type changes
         if (request.PlugTypeIds != null)
@@ -135,7 +145,10 @@ public class SubmitChargingPointUpdateRequestCommandHandler(
             await context.SaveChanges(ct);
         }
 
-       
+        // Best-effort: tell the admins there is a new request to review.
+        await UpdateRequestNotifier.NotifyAdminsNewRequestAsync(
+            context, notificationService, logger,
+            updateRequest.Id, updateRequest.ChargingPointId, updateRequest.RequestedByUserId, ct);
 
         return updateRequest.Id;
     }

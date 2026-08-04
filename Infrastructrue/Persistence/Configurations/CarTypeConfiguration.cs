@@ -10,5 +10,6 @@ public class CarTypeConfiguration :  IEntityTypeConfiguration<CarType>
     {
         builder.ToTable("CarType");
         builder.Property(x=>x.Name).HasMaxLength(50);
+        builder.Property(x=>x.Icon).HasMaxLength(500);
     }
 }

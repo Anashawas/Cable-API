@@ -3,7 +3,7 @@ namespace Application.ServiceProviders.Queries.GetAllServiceProviders;
 public record ServiceProviderDto(
     int Id,
     string Name,
-    int OwnerId,
+    int? OwnerId,
     string? OwnerName,
     int ServiceCategoryId,
     string? ServiceCategoryName,
@@ -34,5 +34,6 @@ public record ServiceProviderDto(
     int RateCount,
     List<string> Images,
     DateTime CreatedAt,
-    bool IsPartner
+    bool IsPartner,
+    int? FavoritesCount = null
 );

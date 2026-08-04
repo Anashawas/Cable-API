@@ -10,7 +10,8 @@ public class NotificationService(IFirebaseService firebaseService) : INotificati
         string token,
         string title,
         string body,
-        FirebaseAppType appType = FirebaseAppType.UserApp)
+        FirebaseAppType appType = FirebaseAppType.UserApp,
+        IReadOnlyDictionary<string, string>? data = null)
     {
         var message = new Message()
         {
@@ -19,7 +20,8 @@ public class NotificationService(IFirebaseService firebaseService) : INotificati
             {
                 Title = title,
                 Body = body
-            }
+            },
+            Data = data
         };
 
         var messaging = firebaseService.GetFirebaseMessaging(appType);
@@ -27,50 +29,61 @@ public class NotificationService(IFirebaseService firebaseService) : INotificati
         return response;
     }
 
+    // FirebaseAdmin SDK enforces a hard cap of 500 messages per SendEachAsync call.
+    // We chunk larger token lists into ≤500-message batches and aggregate the results.
+    private const int FcmMaxBatchSize = 500;
+
     public async Task<NotificationSendResult> SendMessagesAsync(
         IEnumerable<string> tokens,
         string title,
         string body,
-        FirebaseAppType appType = FirebaseAppType.UserApp)
+        FirebaseAppType appType = FirebaseAppType.UserApp,
+        IReadOnlyDictionary<string, string>? data = null)
     {
-        var tokenList = tokens.ToList();
-        var messages = new List<Message>();
+        var tokenList = tokens?.Where(t => !string.IsNullOrWhiteSpace(t)).ToList()
+                        ?? new List<string>();
 
-        foreach (var token in tokenList)
+        var result = new NotificationSendResult { TotalCount = tokenList.Count };
+
+        if (tokenList.Count == 0)
         {
-            messages.Add(new Message()
-            {
-                Token = token,
-                Notification = new Notification()
-                {
-                    Title = title,
-                    Body = body
-                }
-            });
+            return result;
         }
 
         var messaging = firebaseService.GetFirebaseMessaging(appType);
-        var batchResponse = await messaging.SendEachAsync(messages);
 
-        var result = new NotificationSendResult
+        for (var offset = 0; offset < tokenList.Count; offset += FcmMaxBatchSize)
         {
-            TotalCount = tokenList.Count,
-            SuccessCount = batchResponse.SuccessCount,
-            FailureCount = batchResponse.FailureCount
-        };
+            var chunk = tokenList
+                .Skip(offset)
+                .Take(FcmMaxBatchSize)
+                .ToList();
 
-        for (int i = 0; i < batchResponse.Responses.Count; i++)
-        {
-            var response = batchResponse.Responses[i];
-            var token = tokenList[i];
+            var messages = chunk
+                .Select(token => new Message
+                {
+                    Token = token,
+                    Notification = new Notification
+                    {
+                        Title = title,
+                        Body  = body
+                    },
+                    Data = data
+                })
+                .ToList();
 
-            if (response.IsSuccess)
+            var batchResponse = await messaging.SendEachAsync(messages);
+
+            result.SuccessCount += batchResponse.SuccessCount;
+            result.FailureCount += batchResponse.FailureCount;
+
+            for (var i = 0; i < batchResponse.Responses.Count; i++)
             {
-                result.SuccessfulTokens.Add(token);
-            }
-            else
-            {
-                result.FailedTokens.Add(token);
+                var token = chunk[i];
+                if (batchResponse.Responses[i].IsSuccess)
+                    result.SuccessfulTokens.Add(token);
+                else
+                    result.FailedTokens.Add(token);
             }
         }
 

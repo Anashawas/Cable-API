@@ -29,7 +29,7 @@ public class SetProviderCreditLimitCommandHandler(
                          .FirstOrDefaultAsync(x => x.Id == request.ProviderId && !x.IsDeleted, cancellationToken)
                      ?? throw new NotFoundException($"ChargingPoint with Id '{request.ProviderId}' not found");
 
-            cp.LoyaltyCreditLimit = request.CreditLimit;
+            cp.WalletCreditLimit = request.CreditLimit;
         }
         else if (request.ProviderType == "ServiceProvider")
         {
@@ -37,7 +37,7 @@ public class SetProviderCreditLimitCommandHandler(
                          .FirstOrDefaultAsync(x => x.Id == request.ProviderId && !x.IsDeleted, cancellationToken)
                      ?? throw new NotFoundException($"ServiceProvider with Id '{request.ProviderId}' not found");
 
-            sp.LoyaltyCreditLimit = request.CreditLimit;
+            sp.WalletCreditLimit = request.CreditLimit;
         }
         else
         {

@@ -19,7 +19,10 @@ public class GetAllNotificationTypesQueryHandler(IApplicationDbContext applicati
             .Select(x => new NotificationTypeDto(
                 x.Id,
                 x.Name,
-                x.Description
+                x.Description,
+                x.DeepLinksTo,
+                x.NameEn,
+                x.NameAr
             ))
             .ToListAsync(cancellationToken);
 
@@ -27,8 +30,17 @@ public class GetAllNotificationTypesQueryHandler(IApplicationDbContext applicati
     }
 }
 
+/// <summary>
+/// DeepLinksTo (Part B R5) states where this type routes on tap:
+/// "none" | "charging-point" | "service-provider" | "complaint" | "loyalty" |
+/// "provider" (per-send: the attached deepLink decides charging-point vs
+/// service-provider). The actual link always comes from the stored deepLink.
+/// </summary>
 public record NotificationTypeDto(
     int Id,
     string Name,
-    string? Description
+    string? Description,
+    string? DeepLinksTo,
+    string? NameEn,
+    string? NameAr
 );

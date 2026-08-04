@@ -13,7 +13,9 @@ public record RejectUpdateRequestCommand(int UpdateRequestId, string RejectionRe
 public class RejectUpdateRequestCommandHandler(
     IApplicationDbContext context,
     ICurrentUserService currentUserService,
-    IUploadFileService uploadFileService)
+    IUploadFileService uploadFileService,
+    INotificationService notificationService,
+    Microsoft.Extensions.Logging.ILogger<RejectUpdateRequestCommandHandler> logger)
     : IRequestHandler<RejectUpdateRequestCommand>
 {
     public async Task Handle(RejectUpdateRequestCommand request, CancellationToken cancellationToken)
@@ -53,5 +55,11 @@ public class RejectUpdateRequestCommandHandler(
         updateRequest.RejectionReason = request.RejectionReason;
 
         await context.SaveChanges(cancellationToken);
+
+        // Best-effort: tell the owner why their request was rejected.
+        await UpdateRequestNotifier.NotifyOwnerDecisionAsync(
+            context, notificationService, logger,
+            updateRequest.Id, updateRequest.ChargingPointId, updateRequest.RequestedByUserId,
+            approved: false, request.RejectionReason, cancellationToken);
     }
 }

@@ -23,14 +23,18 @@ public class ChargingPointUpdateRequest : BaseAuditableEntity
     public int? ChargersCount { get; set; }
     public double? Latitude { get; set; }
     public double? Longitude { get; set; }
-    public int? ChargerPointTypeId { get; set; }
-    public int? StationTypeId { get; set; }
+    public int? StatusId { get; set; }
     public string? OwnerPhone { get; set; }
-    public bool? HasOffer { get; set; }
     public string? Service { get; set; }
     public string? OfferDescription { get; set; }
     public string? Address { get; set; }
-    public string? ChargerBrand { get; set; }
+
+    /// <summary>
+    /// JSON snapshot of the station's values for the changed fields, taken at
+    /// submit time. The diff shown to the admin/owner uses this baseline, NOT
+    /// the live station (which may have changed between submit and review).
+    /// </summary>
+    public string? OldValuesJson { get; set; }
 
     // Icon change tracking
     public string? NewIcon { get; set; }

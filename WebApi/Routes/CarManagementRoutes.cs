@@ -1,10 +1,12 @@
-﻿using Application.CarsManagement.CarsModels.Commands.AddCarModal;
+﻿using Application.CarsManagement.CarModelSizes.Queries.GetAllCarModelSizes;
+using Application.CarsManagement.CarsModels.Commands.AddCarModal;
 using Application.CarsManagement.CarsModels.Commands.DeleteCarModel;
 using Application.CarsManagement.CarsModels.Commands.UpdateCarModel;
 using Application.CarsManagement.CarsModels.Queries.GetAllCarsModels;
 using Application.CarsManagement.CarsTypes.Commands.AddCarTypeCommand;
 using Application.CarsManagement.CarsTypes.Commands.DeleteCarType;
 using Application.CarsManagement.CarsTypes.Commands.UpdateCarType;
+using Application.CarsManagement.CarsTypes.Commands.UploadCarTypeIcon;
 using Application.CarsManagement.CarsTypes.Queries.GetAllCarsTypes;
 using Application.CarsManagement.UserCars.Commands.AddUserCar;
 using Application.CarsManagement.UserCars.Commands.DeleteUserCar;
@@ -96,6 +98,15 @@ public static class CarManagementRoutes
 
     private static RouteGroupBuilder MapCarModelsRoutes(this RouteGroupBuilder app)
     {
+        app.MapGet("/GetAllCarModelSizes",
+                async (IMediator mediator, CancellationToken cancellation) =>
+                    Results.Ok(await mediator.Send(new GetAllCarModelSizesRequest(), cancellation)))
+            .Produces<List<GetAllCarModelSizesDto>>()
+            .ProducesInternalServerError()
+            .WithName("Get all car model sizes")
+            .WithSummary("Get all car model sizes (SUV, Hatchback, Sedan, ...)")
+            .WithOpenApi();
+
         app.MapGet("/GetAllCarModels",
                 async (IMediator mediator, CancellationToken cancellation) =>
                     Results.Ok(await mediator.Send(new GetAllCarsModelsRequest(), cancellation)))
@@ -138,7 +149,7 @@ public static class CarManagementRoutes
                 async ([FromRoute] int id, IMediator mediator, UpdateCarModelRequest request,
                         CancellationToken cancellationToken) =>
                     await mediator.Send(
-                        new UpdateCarModelCommand(id, request.Name, request.CarTypeId), cancellationToken))
+                        new UpdateCarModelCommand(id, request.Name, request.CarTypeId, request.SizeId), cancellationToken))
             .Produces(200)
             .RequireAuthorization()
             .ProducesUnAuthorized()
@@ -186,6 +197,21 @@ public static class CarManagementRoutes
                 op.Responses["200"].Description = "The id of the car type";
                 return op;
             });
+
+        app.MapPost("/UploadCarTypeIcon/{id:int}",
+                async (IMediator mediator, [FromForm] IFormFile file, [FromRoute] int id,
+                        CancellationToken cancellationToken) =>
+                    await mediator.Send(new UploadCarTypeIconCommand(file, id), cancellationToken))
+            .Produces(200)
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesInternalServerError()
+            .WithName("Upload car type icon")
+            .WithSummary("Upload car type logo icon")
+            .WithOpenApi()
+            .DisableAntiforgery();
 
         app.MapDelete("/DeleteCarType/{id}",
                 async (IMediator mediator, [FromRoute] int id, CancellationToken cancellationToken) =>

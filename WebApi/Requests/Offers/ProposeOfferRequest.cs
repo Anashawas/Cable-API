@@ -12,8 +12,9 @@ public record ProposeOfferRequest(
     string CurrencyCode,
     int? MaxUsesPerUser,
     int? MaxTotalUses,
-    int OfferCodeExpiryMinutes,
+    int OfferCodeExpirySeconds,
     string? ImageUrl,
     DateTime ValidFrom,
-    DateTime? ValidTo
+    DateTime? ValidTo,
+    decimal? PointsPriceValue = null
 );

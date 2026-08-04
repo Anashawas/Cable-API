@@ -24,6 +24,15 @@ public partial class NotificationTypeConfiguration : IEntityTypeConfiguration<No
 
         entity.Property(e => e.Description)
             .HasMaxLength(500);
+
+        entity.Property(e => e.DeepLinksTo)
+            .HasMaxLength(30);
+
+        entity.Property(e => e.NameEn)
+            .HasMaxLength(100);
+
+        entity.Property(e => e.NameAr)
+            .HasMaxLength(100);
         OnConfigurePartial(entity);
     }
 

@@ -9,7 +9,8 @@ public class PartnerAgreement : BaseAuditableEntity
     public double CommissionPercentage { get; set; }
     public double PointsRewardPercentage { get; set; }
     public int? PointsConversionRateId { get; set; }
-    public int CodeExpiryMinutes { get; set; } = 30;
+    public decimal? MinimumTransactionAmount { get; set; }
+    public int CodeExpirySeconds { get; set; } = 60;
     public bool IsActive { get; set; }
     public string? Note { get; set; }
 

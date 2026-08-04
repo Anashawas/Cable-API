@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Application.Rates.Commands.AddRateCommand;
 
-public record AddRateCommand(int ChargingPointId, int ChargingPointRate) : IRequest<int>;
+public record AddRateCommand(int ChargingPointId, int ChargingPointRate, string? Comment = null) : IRequest<int>;
 
 public class AddRateCommandHandler(
     IApplicationDbContext applicationDbContext,
@@ -23,6 +23,7 @@ public class AddRateCommandHandler(
             UserId = user.Id,
             ChargingPointId = request.ChargingPointId,
             ChargingPointRate = request.ChargingPointRate,
+            Comment = request.Comment,
             AVGChargingPointRate =
                 await rateRepository.CalculateChargePointAverageRate(request.ChargingPointId, request.ChargingPointRate, cancellationToken)
         };

@@ -1,3 +1,4 @@
+using Application.Common.Security;
 using Cable.Core;
 using Cable.Core.Emuns;
 using Cable.Core.Exceptions;
@@ -14,6 +15,8 @@ public class FulfillRedemptionCommandHandler(
 {
     public async Task Handle(FulfillRedemptionCommand request, CancellationToken cancellationToken)
     {
+        await AdminRoleGuard.EnsureAdminAsync(applicationDbContext, currentUserService, cancellationToken);
+
         var userId = currentUserService.UserId
                      ?? throw new NotAuthorizedAccessException("User not authenticated");
 

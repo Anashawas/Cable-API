@@ -31,8 +31,8 @@ public record UpdateChargingPointCommand(
     string? Service,
     string? OfferDescription,
     string? Address,
-    string? ChargerBrand,
-    List<int>? PlugTypeIds
+    List<int>? PlugTypeIds,
+    List<ChargerBrandCountInput>? ChargerBrands = null
 ) : IRequest;
 
 public class UpdateChargingPointCommandHandler(
@@ -54,11 +54,19 @@ public class UpdateChargingPointCommandHandler(
             ? PhoneNumberUtility.NormalizePhoneNumber(request.Phone) ?? request.Phone 
             : request.Phone;
             
-        var normalizedOwnerPhone = !string.IsNullOrEmpty(request.OwnerPhone) 
-            ? PhoneNumberUtility.NormalizePhoneNumber(request.OwnerPhone) ?? request.OwnerPhone 
+        var normalizedOwnerPhone = !string.IsNullOrEmpty(request.OwnerPhone)
+            ? PhoneNumberUtility.NormalizePhoneNumber(request.OwnerPhone) ?? request.OwnerPhone
             : request.OwnerPhone;
-        
-        chargingPoint.OwnerId = user.Id;
+
+        // Brands (many-to-many with counts). When provided, the set is REPLACED
+        // (same semantics as PlugTypeIds); when omitted, the junction is untouched.
+        ChargingPointBrandHelper.ResolvedBrands? brands = null;
+        if (request.ChargerBrands is { Count: > 0 })
+            brands = await ChargingPointBrandHelper.ResolveAsync(applicationDbContext, request.ChargerBrands, cancellationToken);
+
+        // NOTE: ownership is intentionally NOT touched here — it previously
+        // reassigned the station to whoever edited it (ownership hijack).
+        // Ownership changes go through ChangeOwner only.
         chargingPoint.Name = request.Name;
         chargingPoint.Note = request.Note;
         chargingPoint.CountryName = request.CountryName;
@@ -69,7 +77,7 @@ public class UpdateChargingPointCommandHandler(
         chargingPoint.FromTime = request.FromTime;
         chargingPoint.ToTime = request.ToTime;
         chargingPoint.ChargerSpeed = request.ChargerSpeed;
-        chargingPoint.ChargersCount = request.ChargersCount;
+        chargingPoint.ChargersCount = brands?.TotalChargers ?? request.ChargersCount;  // auto-sum when brands given
         chargingPoint.Latitude = request.Latitude;
         chargingPoint.Longitude = request.Longitude;
         chargingPoint.ChargerPointTypeId = request.ChargerPointTypeId;
@@ -81,8 +89,21 @@ public class UpdateChargingPointCommandHandler(
         chargingPoint.Service = request.Service;
         chargingPoint.OfferDescription = request.OfferDescription;
         chargingPoint.Address = request.Address;
-        chargingPoint.ChargerBrand = request.ChargerBrand;
 
+        // Replace the brand set when one was provided
+        if (brands != null)
+        {
+            var existingBrands = await applicationDbContext.ChargingPointChargerBrands
+                .Where(x => x.ChargingPointId == chargingPoint.Id)
+                .ToListAsync(cancellationToken);
+            applicationDbContext.ChargingPointChargerBrands.RemoveRange(existingBrands);
+
+            foreach (var row in brands.Rows)
+            {
+                row.ChargingPointId = chargingPoint.Id;
+                applicationDbContext.ChargingPointChargerBrands.Add(row);
+            }
+        }
 
         var existingChargingPlugs = await applicationDbContext.ChargingPlugs
             .Where(x => x.ChargingPointId == chargingPoint.Id && !x.IsDeleted)

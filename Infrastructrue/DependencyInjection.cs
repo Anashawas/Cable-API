@@ -158,6 +158,8 @@ public static class DependencyInjection
     private static IServiceCollection RegisterBackgroundJobServices(this IServiceCollection services)
     {
         services.AddScoped<IBackgroundJobService, BackgroundJobService>();
+        services.AddScoped<ISettlementService, Services.SettlementService>();
+        services.AddScoped<IAnalyticsService, Services.AnalyticsService>();
         return services;
     }
 
