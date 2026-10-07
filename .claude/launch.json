@@ -4,26 +4,71 @@
     {
       "name": "cable-api",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "WebApi", "--launch-profile", "http"],
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "WebApi",
+        "--launch-profile",
+        "http"
+      ],
       "port": 5202
     },
     {
       "name": "cable-api-staging",
       "runtimeExecutable": "dotnet",
-      "runtimeArgs": ["run", "--project", "WebApi", "--launch-profile", "Staging"],
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "WebApi",
+        "--launch-profile",
+        "Staging"
+      ],
       "port": 5202
     },
     {
       "name": "cable-admin",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "D:\\NewOpenware-Server\\Cable-Admin"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "D:\\NewOpenware-Server\\Cable-Admin"
+      ],
       "port": 3000
+    },
+    {
+      "name": "cable-partner",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "D:\\Cable\\cable-partner"
+      ],
+      "port": 3100
     },
     {
       "name": "cable-landing",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--prefix", "D:\\Cable\\cable_landing"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--prefix",
+        "D:\\Cable\\cable_landing"
+      ],
       "port": 3005
+    },
+    {
+      "name": "cable-ocpp",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": [
+        "run",
+        "--project",
+        "Cable.Ocpp",
+        "--launch-profile",
+        "http"
+      ],
+      "port": 5300
     }
   ]
 }

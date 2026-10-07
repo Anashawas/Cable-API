@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <RootNamespace>Cable.Ocpp</RootNamespace>
+        <UserSecretsId>cable-ocpp</UserSecretsId>
+        <!-- Same convention as WebApi: the dev site (ocpp-dev.cable-app.com) runs as
+             Staging and reads appsettings.Staging.json; production flips this to
+             Production. Both files are git-ignored (connection strings). -->
+        <EnvironmentName>Staging</EnvironmentName>
+    </PropertyGroup>
+
+    <!-- Shares Domain + the EF DbContext with the API, but registers only
+         AddCableDatabase / AddCableHangfireClient — never AddInfrastructure, which
+         would start a Hangfire server and Firebase inside this process. -->
+    <ItemGroup>
+        <ProjectReference Include="..\Application\Application.csproj" />
+        <ProjectReference Include="..\Infrastructrue\Infrastructrue.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Local-only settings never ship. -->
+        <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Raw-frame logging stays on plain SqlClient: batched, off the socket thread. -->
+        <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
+    </ItemGroup>
+
+</Project>

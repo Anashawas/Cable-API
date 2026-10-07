@@ -30,6 +30,9 @@ public interface IApplicationDbContext
 
     DbSet<Rate> Rates { get; set; }
 
+    /// <summary>Provider ratings OF drivers, anchored to completed partner transactions.</summary>
+    DbSet<UserRate> UserRates { get; set; }
+
     DbSet<Role> Roles { get; set; }
 
     DbSet<RolePrivlage> RolePrivlages { get; set; }
@@ -87,6 +90,8 @@ public interface IApplicationDbContext
     DbSet<LoyaltyPointAction> LoyaltyPointActions { get; set; }
     DbSet<LoyaltyTier> LoyaltyTiers { get; set; }
     DbSet<LoyaltySeason> LoyaltySeasons { get; set; }
+    DbSet<LoyaltyBoost> LoyaltyBoosts { get; set; }
+    DbSet<LoyaltyBoostProvider> LoyaltyBoostProviders { get; set; }
     DbSet<UserSeasonProgress> UserSeasonProgresses { get; set; }
     DbSet<UserLoyaltyAccount> UserLoyaltyAccounts { get; set; }
     DbSet<LoyaltyPointTransaction> LoyaltyPointTransactions { get; set; }
@@ -98,7 +103,9 @@ public interface IApplicationDbContext
     DbSet<AnalyticsDailyRollup> AnalyticsDailyRollups { get; set; }
 
     // Premium station subscriptions
-    DbSet<StationPremiumSubscription> StationPremiumSubscriptions { get; set; }
+    DbSet<Subscription> Subscriptions { get; set; }
+    DbSet<Payer> Payers { get; set; }
+    DbSet<Payment> Payments { get; set; }
 
     // Lookups
     DbSet<ChargerBrand> ChargerBrands { get; set; }
@@ -113,6 +120,16 @@ public interface IApplicationDbContext
     DbSet<Announcement> Announcements { get; set; }
     DbSet<AnnouncementUserState> AnnouncementUserStates { get; set; }
     DbSet<CarModelSize> CarModelSizes { get; set; }
+
+    // Cable Connect (OCPP 1.6J)
+    DbSet<OcppChargePoint> OcppChargePoints { get; set; }
+    DbSet<OcppConnector> OcppConnectors { get; set; }
+    DbSet<OcppTransaction> OcppTransactions { get; set; }
+    DbSet<OcppMeterValue> OcppMeterValues { get; set; }
+    DbSet<OcppAuthorizedTag> OcppAuthorizedTags { get; set; }
+    DbSet<OcppRawMessage> OcppRawMessages { get; set; }
+    DbSet<OcppCommand> OcppCommands { get; set; }
+    DbSet<OcppAlert> OcppAlerts { get; set; }
 
     Task<int> SaveChanges(CancellationToken cancellationToken = default);
 }

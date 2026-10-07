@@ -40,6 +40,12 @@ public static class DependencyInjection
         services.AddHttpClient();
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
 
+        // Backs the LastSeenAt write throttle in UserActivityTrackingMiddleware.
+        // Deliberately in-memory and per-instance: the throttle only needs to
+        // stop a burst from one app session, and a few extra writes after a
+        // restart or across instances cost nothing.
+        services.AddMemoryCache();
+
         // Register HybridCache (.NET 9 feature)
         services.AddHybridCache(options =>
         {
@@ -52,7 +58,7 @@ public static class DependencyInjection
             };
         });
 
-        services.RegisterDbContext(configurations)
+        services.AddCableDatabase(configurations)
             .RegisterIdentity(configurations)
             .RegisterUploadFiles(configurations)
             .RegisterGoogleService(configurations)
@@ -63,6 +69,7 @@ public static class DependencyInjection
             .RegisterEmailServices(configurations)
             .RegisterReportsProvider(configurations)
             .RegisterBackgroundJobServices()
+            .RegisterOcppServer(configurations)
             .RegisterRepositories();
 
         return services;
@@ -112,10 +119,23 @@ public static class DependencyInjection
         var uploadFileOptionsSection = configurations.GetSection(UploadFileOptions.ConfigName);
         services.Configure<UploadFileOptions>(uploadFileOptionsSection);
         services.AddScoped<IUploadFileService, UploadFileService>();
+        services.AddScoped<IReceiptPdfService, Services.ReceiptPdfService>();
         return services;
     }
 
     private static IServiceCollection RegisterHangFire(this IServiceCollection services, IConfiguration configurations)
+    {
+        services.AddCableHangfireClient(configurations);
+        services.AddHangfireServer();
+        return services;
+    }
+
+    /// <summary>
+    /// Hangfire storage + IBackgroundJobClient without a server. Cable.Ocpp enqueues
+    /// jobs (fault notifications) that the API's Hangfire server executes with the
+    /// full infrastructure (Firebase, inbox) behind it.
+    /// </summary>
+    public static IServiceCollection AddCableHangfireClient(this IServiceCollection services, IConfiguration configurations)
     {
         services.AddHangfire(opt =>
             {
@@ -125,7 +145,6 @@ public static class DependencyInjection
                 opt.UseRecommendedSerializerSettings();
             }
         );
-        services.AddHangfireServer();
         return services;
     }
 
@@ -163,6 +182,15 @@ public static class DependencyInjection
         return services;
     }
 
+    /// <summary>Cable.Ocpp host for server-initiated commands (Reset, UnlockConnector, …).</summary>
+    private static IServiceCollection RegisterOcppServer(this IServiceCollection services, IConfiguration configurations)
+    {
+        services.Configure<Ocpp.OcppServerOptions>(configurations.GetSection(Ocpp.OcppServerOptions.ConfigName));
+        services.AddHttpClient(Ocpp.OcppCommandClient.HttpClientName);
+        services.AddScoped<IOcppCommandClient, Ocpp.OcppCommandClient>();
+        return services;
+    }
+
     private static IServiceCollection RegisterRepositories(this IServiceCollection services)
     {
         services.AddScoped<IRateRepository, RateRepository>();
@@ -170,6 +198,7 @@ public static class DependencyInjection
         services.AddScoped<IChargingPointRepository, ChargingPointRepository>();
         services.AddScoped<ISharedLinkRepository, SharedLinkRepository>();
         services.AddScoped<ILoyaltyPointService, LoyaltyPointService>();
+        services.AddScoped<ILoyaltyBoostService, LoyaltyBoostService>();
         return services;
     }
 
@@ -216,7 +245,12 @@ public static class DependencyInjection
         return services;
     }
 
-    private static IServiceCollection RegisterDbContext(this IServiceCollection services, IConfiguration configurations)
+    /// <summary>
+    /// DbContext + audit interceptor only. Public so Cable.Ocpp (a separate process)
+    /// can share the database without AddInfrastructure, which would also start a
+    /// Hangfire server and Firebase inside it.
+    /// </summary>
+    public static IServiceCollection AddCableDatabase(this IServiceCollection services, IConfiguration configurations)
     {
         var databaseSettingsSection = configurations.GetSection(DatabaseOptions.ConfigName);
         services.Configure<DatabaseOptions>(databaseSettingsSection);

@@ -42,6 +42,7 @@ public partial class ApplicationDbContext(
     public DbSet<PlugType> PlugTypes { get; set; }
     public DbSet<Privilege> Privilages { get; set; }
     public DbSet<Rate> Rates { get; set; }
+    public DbSet<UserRate> UserRates { get; set; }
     public DbSet<Role> Roles { get; set; }
     public DbSet<RolePrivlage> RolePrivlages { get; set; }
     public DbSet<Status> Statuses { get; set; }
@@ -94,6 +95,8 @@ public partial class ApplicationDbContext(
     public DbSet<LoyaltyPointAction> LoyaltyPointActions { get; set; }
     public DbSet<LoyaltyTier> LoyaltyTiers { get; set; }
     public DbSet<LoyaltySeason> LoyaltySeasons { get; set; }
+    public DbSet<LoyaltyBoost> LoyaltyBoosts { get; set; }
+    public DbSet<LoyaltyBoostProvider> LoyaltyBoostProviders { get; set; }
     public DbSet<UserSeasonProgress> UserSeasonProgresses { get; set; }
     public DbSet<UserLoyaltyAccount> UserLoyaltyAccounts { get; set; }
     public DbSet<LoyaltyPointTransaction> LoyaltyPointTransactions { get; set; }
@@ -105,7 +108,9 @@ public partial class ApplicationDbContext(
     public DbSet<AnalyticsDailyRollup> AnalyticsDailyRollups { get; set; }
 
     // Premium station subscriptions
-    public DbSet<StationPremiumSubscription> StationPremiumSubscriptions { get; set; }
+    public DbSet<Subscription> Subscriptions { get; set; }
+    public DbSet<Payer> Payers { get; set; }
+    public DbSet<Payment> Payments { get; set; }
 
     // Lookups
     public DbSet<ChargerBrand> ChargerBrands { get; set; }
@@ -128,6 +133,16 @@ public partial class ApplicationDbContext(
     public DbSet<AppSetting> AppSettings { get; set; }
     public DbSet<Announcement> Announcements { get; set; }
     public DbSet<AnnouncementUserState> AnnouncementUserStates { get; set; }
+
+    // Cable Connect (OCPP 1.6J) — written by Cable.Ocpp, read by the API
+    public DbSet<OcppChargePoint> OcppChargePoints { get; set; }
+    public DbSet<OcppConnector> OcppConnectors { get; set; }
+    public DbSet<OcppTransaction> OcppTransactions { get; set; }
+    public DbSet<OcppMeterValue> OcppMeterValues { get; set; }
+    public DbSet<OcppAuthorizedTag> OcppAuthorizedTags { get; set; }
+    public DbSet<OcppRawMessage> OcppRawMessages { get; set; }
+    public DbSet<OcppCommand> OcppCommands { get; set; }
+    public DbSet<OcppAlert> OcppAlerts { get; set; }
 
     #endregion
 

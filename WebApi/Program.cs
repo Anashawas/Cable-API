@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Application;
@@ -105,6 +105,14 @@ app.UseCableExceptionHandlerMiddleware();
 // API routes always win. See LandingPageMiddleware.
 app.UseLandingPage();
 
+// Cable Admin SPA served at /admin from its own wwwroot-admin folder —
+// physically separate from the landing site. See AdminSpaMiddleware.
+app.UseAdminSpa();
+
+// Cable Partner SPA served at /partner from its own wwwroot-partner folder.
+// See PartnerSpaMiddleware.
+app.UsePartnerSpa();
+
 // Explicit routing AFTER the landing static files. Without this, WebApplication
 // auto-inserts routing at the very start of the pipeline, the MapFallback
 // endpoint gets matched before the landing rewrite runs, and StaticFiles steps
@@ -149,14 +157,21 @@ app.UseCors();
 
 app.UseCustomAuthenticationResponse();
 app.UseAuthentication();
-app.UseSecurityStampValidation();
+app.UseAccountSessionValidation();
 app.UseAuthorization();
+app.UseUserActivityTracking();
 app.UseSecureFileServing();
 app.MapHangfireDashboard("/Cable-Jobs-Dashboard");
 
 // ==========================================
 // Register Hangfire Recurring Jobs
 // ==========================================
+// Cable Connect alerts: charger offline / plug Faulted / session open too long → push + inbox.
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "check-ocpp-alerts",
+    service => service.CheckOcppAlertsAsync(CancellationToken.None),
+    "*/5 * * * *");
+
 RecurringJob.AddOrUpdate<IBackgroundJobService>(
     "expire-offer-transaction-codes",
     service => service.ExpireOfferTransactionCodesAsync(CancellationToken.None),
@@ -219,6 +234,25 @@ RecurringJob.AddOrUpdate<IBackgroundJobService>(
     service => service.UnblockExpiredProviderLoyaltyBlocksAsync(CancellationToken.None),
     "0 */4 * * *"); // Every 4 hours
 
+// Subscriptions: switch off AfterDays-grace subscriptions whose window has
+// passed. Manual-grace ones (the default) are never touched by this job.
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "apply-subscription-grace",
+    service => service.ApplySubscriptionGraceAsync(CancellationToken.None),
+    "30 0 * * *"); // Daily at 00:30 UTC (03:30 Amman)
+
+// Cable Connect (OCPP): session hygiene + raw-log retention. Fault notifications are
+// enqueued by Cable.Ocpp and executed here (NotifyOcppFaultAsync).
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "mark-stale-ocpp-transactions",
+    service => service.MarkStaleOcppTransactionsAsync(CancellationToken.None),
+    "15 * * * *"); // Hourly
+
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "purge-ocpp-raw-messages",
+    service => service.PurgeOcppRawMessagesAsync(CancellationToken.None),
+    "30 2 * * *"); // Daily at 02:30 UTC
+
 app.MapUserRoutes()
     .MapChargingPointsRoutes()
     .MapChargingPointTypesRoutes()
@@ -258,7 +292,9 @@ app.MapUserRoutes()
     .MapPartnerRoutes()
     .MapProviderRoutes()
     .MapAnalyticsRoutes()
-    .MapChargerBrandRoutes();
+    .MapChargerBrandRoutes()
+    .MapSubscriptionRoutes()
+    .MapOcppRoutes();
 
 // Unknown non-API URLs get the landing 404 page; API-ish paths keep JSON-style 404s.
 app.MapLandingPageFallback();

@@ -1,13 +1,21 @@
-using Application.Common.Interfaces;
+﻿using Application.Common.Interfaces;
 using Cable.Core.Emuns;
 using Domain.Enitites;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Application.Settings;
+using Application.Subscriptions;
+using Cable.Core.Enums;
+using System.Text.Json;
+using Application.NotificationInbox.Helpers;
+using Cable.Core.Constants;
 
 namespace Infrastructrue.BackgroundJobs;
 
 public class BackgroundJobService(
     IApplicationDbContext applicationDbContext,
+    INotificationService notificationService,
+    IOcppCommandClient ocppCommands,
     ILogger<BackgroundJobService> logger) : IBackgroundJobService
 {
     public async Task<int> ExpireOfferTransactionCodesAsync(CancellationToken cancellationToken = default)
@@ -445,4 +453,451 @@ public class BackgroundJobService(
         return count;
     }
 
+
+    public async Task<int> ApplySubscriptionGraceAsync(CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var global = await AppSettingsProvider.GetSubscriptionGraceAsync(applicationDbContext, cancellationToken);
+
+        var lapsed = await applicationDbContext.Subscriptions
+            .Where(s => !s.IsDeleted && !s.IsSwitchedOff && s.ExpiresAt < now)
+            .ToListAsync(cancellationToken);
+
+        var switchedOff = 0;
+        foreach (var s in lapsed)
+        {
+            var grace = SubscriptionPeriodCalculator.EffectiveGrace(s, global);
+            var autoOff = SubscriptionPeriodCalculator.AutoOffAt(s, grace);
+            if (autoOff is null || now <= autoOff.Value) continue;   // manual, or still inside the window
+
+            s.IsSwitchedOff = true;
+            s.SwitchedOffAt = now;
+            s.SwitchedOffByUserId = null;                            // the job, not a person
+            await SubscriptionEntitySync.ApplyAsync(applicationDbContext, s, on: false, now, cancellationToken);
+            switchedOff++;
+        }
+
+        if (switchedOff > 0)
+            await applicationDbContext.SaveChanges(cancellationToken);
+
+        logger.LogInformation("ApplySubscriptionGrace: switched off {Count} lapsed subscription(s)", switchedOff);
+        return switchedOff;
+    }
+
+    // ==========================================
+    // Cable Connect (OCPP)
+    // ==========================================
+
+    public async Task<int> MarkStaleOcppTransactionsAsync(CancellationToken cancellationToken = default)
+    {
+        var cutoff = DateTime.UtcNow - OcppLimits.StaleTransactionAfter;
+
+        // R6: never close them — a late StopTransaction may still arrive. Just flag for the admin.
+        var marked = await applicationDbContext.OcppTransactions
+            .Where(t => t.IsOpen && !t.IsStale && t.StartedAt < cutoff)
+            .ExecuteUpdateAsync(set => set.SetProperty(t => t.IsStale, true), cancellationToken);
+
+        if (marked > 0)
+            logger.LogInformation("MarkStaleOcppTransactions: flagged {Count} session(s) open for more than 24 h", marked);
+        return marked;
+    }
+
+    public async Task<int> PurgeOcppRawMessagesAsync(CancellationToken cancellationToken = default)
+    {
+        var cutoff = DateTime.UtcNow.AddDays(-OcppLimits.RawMessageRetentionDays);
+        var total = 0;
+
+        // Batched so a month of 15-second meter samples never becomes one giant delete.
+        while (true)
+        {
+            var batchIds = await applicationDbContext.OcppRawMessages
+                .Where(m => m.CreatedAt < cutoff)
+                .OrderBy(m => m.Id)
+                .Select(m => m.Id)
+                .Take(5000)
+                .ToListAsync(cancellationToken);
+            if (batchIds.Count == 0) break;
+
+            total += await applicationDbContext.OcppRawMessages
+                .Where(m => batchIds.Contains(m.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+        }
+
+        if (total > 0)
+            logger.LogInformation("PurgeOcppRawMessages: deleted {Count} frame(s) older than {Days} days", total, OcppLimits.RawMessageRetentionDays);
+        return total;
+    }
+
+    public async Task NotifyOcppFaultAsync(int ocppConnectorId, string errorCode, string? info, CancellationToken cancellationToken = default)
+    {
+        var connector = await applicationDbContext.OcppConnectors.AsNoTracking()
+            .Where(c => c.Id == ocppConnectorId)
+            .Select(c => new
+            {
+                c.ConnectorId,
+                c.ChargePoint.ChargePointId,
+                c.ChargePoint.DisplayName,
+                c.ChargePoint.ChargingPointId,
+                StationName = c.ChargePoint.ChargingPoint.Name,
+                c.ChargePoint.ChargingPoint.OwnerId,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (connector is null)
+        {
+            logger.LogWarning("NotifyOcppFault: connector {ConnectorId} no longer exists", ocppConnectorId);
+            return;
+        }
+
+        var recipients = await applicationDbContext.ProviderManagers.AsNoTracking()
+            .Where(m => m.ProviderType == "ChargingPoint" && m.ProviderId == connector.ChargingPointId
+                        && m.IsActive && !m.IsDeleted)
+            .Select(m => m.UserId)
+            .ToListAsync(cancellationToken);
+        if (connector.OwnerId is int ownerId) recipients.Add(ownerId);
+        recipients = recipients.Distinct().ToList();
+        if (recipients.Count == 0) return;
+
+        var chargerName = connector.DisplayName ?? connector.ChargePointId;
+        var where = connector.ConnectorId == 0 ? "" : $" – المقبس {connector.ConnectorId}";
+        // Station names often already start with "محطة"; don't produce "محطة محطة الخليفة".
+        var stationName = (connector.StationName ?? "").Trim();
+        var stationLabel = stationName.StartsWith("محطة", StringComparison.Ordinal) ? stationName : $"محطة {stationName}";
+        var title = $"عطل في الشاحن {chargerName}";
+        var body = $"{stationLabel}: الشاحن {chargerName}{where} أبلغ عن عطل ({errorCode})"
+                   + (string.IsNullOrWhiteSpace(info) ? "" : $" — {info}");
+        var data = JsonSerializer.Serialize(new
+        {
+            type = "ocpp_fault",
+            chargingPointId = connector.ChargingPointId,
+            chargePointId = connector.ChargePointId,
+            connectorId = connector.ConnectorId,
+            errorCode,
+        });
+
+        var tokens = await applicationDbContext.NotificationTokens.AsNoTracking()
+            .Where(t => recipients.Contains(t.UserId))
+            .Select(t => new { t.AppType, t.Token })
+            .ToListAsync(cancellationToken);
+
+        foreach (var group in tokens.GroupBy(t => t.AppType))
+        {
+            try
+            {
+                await notificationService.SendMessagesAsync(group.Select(x => x.Token).ToList(), title, body, group.Key);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "NotifyOcppFault: FCM send failed for app type {AppType}", group.Key);
+            }
+        }
+
+        var typeId = await applicationDbContext.NotificationTypes.AsNoTracking()
+            .Where(t => t.Name == "charging_point_status_changed")
+            .Select(t => (int?)t.Id)
+            .FirstOrDefaultAsync(cancellationToken) ?? 1;
+
+        await NotificationInboxHelper.CreateNotificationInboxRecordsAsync(
+            applicationDbContext, recipients, typeId, title, body, null, data, cancellationToken);
+
+        logger.LogInformation("NotifyOcppFault: {Charger} connector {Connector} {ErrorCode} → {Count} recipient(s)",
+            connector.ChargePointId, connector.ConnectorId, errorCode, recipients.Count);
+    }
+
+    public async Task<int> SyncOcppLocalListAsync(int chargingPointId, int? ocppChargePointId = null, CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+
+        // The station's current allow-list, as the unit should hold it: enabled, not expired.
+        // Expiry goes along so the unit refuses the card after that date even while offline.
+        var cards = await applicationDbContext.OcppAuthorizedTags.AsNoTracking()
+            .Where(t => t.ChargingPointId == chargingPointId && t.IsEnabled && !t.IsDeleted
+                        && (t.ExpiresAt == null || t.ExpiresAt > now))
+            .OrderBy(t => t.IdTag)
+            .Select(t => new { t.IdTag, t.ExpiresAt })
+            .ToListAsync(cancellationToken);
+
+        if (cards.Count > OcppLimits.LocalListMaxEntries)
+        {
+            logger.LogWarning("SyncOcppLocalList: station {StationId} has {Count} cards, above the {Max} the units accept — sending the first {Max}",
+                chargingPointId, cards.Count, OcppLimits.LocalListMaxEntries, OcppLimits.LocalListMaxEntries);
+            cards = cards.Take(OcppLimits.LocalListMaxEntries).ToList();
+        }
+
+        var chargers = await applicationDbContext.OcppChargePoints
+            .Where(c => c.ChargingPointId == chargingPointId && !c.IsDeleted && c.IsEnabled
+                        && (ocppChargePointId == null || c.Id == ocppChargePointId)
+                        && (ocppChargePointId != null || c.LocalListStatus != OcppLocalListStatus.NotSupported))
+            .ToListAsync(cancellationToken);
+        if (chargers.Count == 0) return 0;
+
+        // Version = Unix seconds of this push: always increasing, no bookkeeping, and a Full
+        // update every time so a missed push can never leave the unit with a stale diff.
+        var version = (int)Math.Min(new DateTimeOffset(now).ToUnixTimeSeconds(), int.MaxValue);
+        var list = cards.Select(c => new Dictionary<string, object>
+        {
+            ["idTag"] = c.IdTag,
+            ["idTagInfo"] = c.ExpiresAt is DateTime exp
+                ? new Dictionary<string, object> { ["status"] = "Accepted", ["expiryDate"] = exp }
+                : new Dictionary<string, object> { ["status"] = "Accepted" },
+        }).ToList();
+        var payload = new Dictionary<string, object>
+        {
+            ["listVersion"] = version,
+            ["localAuthorizationList"] = list,
+            ["updateType"] = "Full",
+        };
+
+        var confirmed = 0;
+        foreach (var cp in chargers)
+        {
+            var outcome = await ocppCommands.SendAsync(cp.ChargePointId, "SendLocalList", payload, cancellationToken);
+            var verdict = outcome.Answered ? ReadStatus(outcome.Payload) : null;
+            Audit(cp.Id, "SendLocalList", $"{{\"listVersion\":{version},\"updateType\":\"Full\",\"cards\":{cards.Count}}}", outcome, verdict);
+
+            if (outcome.Answered && verdict == "Accepted")
+            {
+                // The unit may still answer Authorize from cached decisions; drop them so the new list rules.
+                var clear = await ocppCommands.SendAsync(cp.ChargePointId, "ClearCache", new Dictionary<string, object>(), cancellationToken);
+                Audit(cp.Id, "ClearCache", "{}", clear, clear.Answered ? ReadStatus(clear.Payload) : null);
+
+                cp.LocalListVersion = version;
+                cp.LocalListSyncedAt = now;
+                cp.LocalListStatus = OcppLocalListStatus.Synced;
+                confirmed++;
+            }
+            else if (verdict == "NotSupported" || outcome.Status == "CallError" && outcome.ErrorCode is "NotImplemented" or "NotSupported")
+            {
+                cp.LocalListStatus = OcppLocalListStatus.NotSupported;
+                logger.LogInformation("SyncOcppLocalList: {ChargePointId} has no local list support — not retrying", cp.ChargePointId);
+            }
+            else if (outcome.Status == "NotConnected")
+            {
+                // Pushed again when it boots (Cable.Ocpp enqueues on BootNotification for Pending units).
+                cp.LocalListStatus = OcppLocalListStatus.Pending;
+            }
+            else
+            {
+                cp.LocalListStatus = OcppLocalListStatus.Failed;
+                logger.LogWarning("SyncOcppLocalList: {ChargePointId} answered {Status} / {Verdict} {Error}",
+                    cp.ChargePointId, outcome.Status, verdict, outcome.ErrorDescription);
+            }
+        }
+
+        await applicationDbContext.SaveChanges(cancellationToken);
+        logger.LogInformation("SyncOcppLocalList: station {StationId}, {Cards} card(s) v{Version} → {Confirmed}/{Total} charger(s) confirmed",
+            chargingPointId, cards.Count, version, confirmed, chargers.Count);
+        return confirmed;
+
+        void Audit(int cpId, string action, string request, OcppCommandOutcome o, string? resultStatus) =>
+            applicationDbContext.OcppCommands.Add(new OcppCommand
+            {
+                OcppChargePointId = cpId,
+                Action = action,
+                RequestPayload = request,
+                Status = o.Status,
+                ResultStatus = resultStatus,
+                ResponsePayload = o.Payload,
+                ErrorCode = o.ErrorCode,
+                ErrorDescription = o.ErrorDescription is { Length: > 500 } d ? d[..500] : o.ErrorDescription,
+                DurationMs = (int)Math.Min(o.ElapsedMs, int.MaxValue),
+            });
+
+        static string? ReadStatus(string? json)
+        {
+            if (string.IsNullOrWhiteSpace(json)) return null;
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                return doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("status", out var st) && st.ValueKind == JsonValueKind.String
+                    ? st.GetString() : null;
+            }
+            catch (JsonException) { return null; }
+        }
+    }
+
+    public async Task<int> CheckOcppAlertsAsync(CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var opened = 0;
+
+        var open = await applicationDbContext.OcppAlerts
+            .Where(a => a.ResolvedAt == null && !a.IsDeleted)
+            .ToListAsync(cancellationToken);
+
+        // ---- 1. Charger offline too long: socket gone, or open but silent (no message) for the threshold.
+        var offlineCutoff = now - OcppLimits.OfflineAlertAfter;
+        var offline = await applicationDbContext.OcppChargePoints.AsNoTracking()
+            .Where(c => !c.IsDeleted && c.IsEnabled && c.LastBootAt != null
+                        && ((!c.IsConnected && c.DisconnectedAt != null && c.DisconnectedAt < offlineCutoff)
+                            || (c.IsConnected && c.LastMessageAt != null && c.LastMessageAt < offlineCutoff)))
+            .Select(c => new AlertTarget(c.Id, c.ChargePointId, c.DisplayName, c.ChargingPointId, c.ChargingPoint.Name, c.ChargingPoint.OwnerId,
+                null, null, (c.IsConnected ? c.LastMessageAt : c.DisconnectedAt)!.Value, null))
+            .ToListAsync(cancellationToken);
+
+        foreach (var t in offline)
+        {
+            if (open.Any(a => a.Type == OcppAlertType.ChargerOffline && a.OcppChargePointId == t.ChargePointRowId)) continue;
+            var minutes = (int)(now - t.Since).TotalMinutes;
+            var recipients = await NotifyOcppAlertAsync(t, OcppAlertType.ChargerOffline,
+                $"الشاحن {t.Name} غير متصل",
+                $"{t.StationLabel}: الشاحن {t.Name} منقطع عن كيبل منذ {minutes} دقيقة", cancellationToken);
+            open.Add(AddAlert(t, OcppAlertType.ChargerOffline, $"offline {minutes} min", recipients, now));
+            opened++;
+        }
+
+        // Back online → close + tell them.
+        var offlineIds = offline.Select(t => t.ChargePointRowId).ToHashSet();
+        foreach (var a in open.Where(a => a.Type == OcppAlertType.ChargerOffline && !offlineIds.Contains(a.OcppChargePointId)).ToList())
+        {
+            var t = await LoadTargetAsync(a.OcppChargePointId, cancellationToken);
+            if (t is not null)
+                await NotifyOcppAlertAsync(t, OcppAlertType.ChargerOffline, $"عاد الشاحن {t.Name} للاتصال",
+                    $"{t.StationLabel}: الشاحن {t.Name} متصل بكيبل من جديد", cancellationToken, resolved: true);
+            a.ResolvedAt = now;
+        }
+
+        // ---- 2. Plug Faulted too long (the immediate fault push already went out; this is the escalation).
+        var faultCutoff = now - OcppLimits.FaultedAlertAfter;
+        var faulted = await applicationDbContext.OcppConnectors.AsNoTracking()
+            .Where(k => k.Status == OcppConnectorStatus.Faulted && !k.ChargePoint.IsDeleted && k.ChargePoint.IsEnabled
+                        && (k.StatusUpdatedAt ?? k.StatusReceivedAt) < faultCutoff)
+            .Select(k => new AlertTarget(k.ChargePoint.Id, k.ChargePoint.ChargePointId, k.ChargePoint.DisplayName, k.ChargePoint.ChargingPointId,
+                k.ChargePoint.ChargingPoint.Name, k.ChargePoint.ChargingPoint.OwnerId,
+                k.ConnectorId, null, k.StatusUpdatedAt ?? k.StatusReceivedAt, k.ErrorCode))
+            .ToListAsync(cancellationToken);
+
+        foreach (var t in faulted)
+        {
+            if (open.Any(a => a.Type == OcppAlertType.ConnectorFaulted && a.OcppChargePointId == t.ChargePointRowId && a.ConnectorId == t.ConnectorId)) continue;
+            var minutes = (int)(now - t.Since).TotalMinutes;
+            var recipients = await NotifyOcppAlertAsync(t, OcppAlertType.ConnectorFaulted,
+                $"عطل مستمر في الشاحن {t.Name}",
+                $"{t.StationLabel}: الشاحن {t.Name}{t.Where} في حالة عطل ({t.Detail}) منذ {minutes} دقيقة", cancellationToken);
+            open.Add(AddAlert(t, OcppAlertType.ConnectorFaulted, t.Detail, recipients, now));
+            opened++;
+        }
+
+        var faultedKeys = faulted.Select(t => (t.ChargePointRowId, t.ConnectorId)).ToHashSet();
+        foreach (var a in open.Where(a => a.Type == OcppAlertType.ConnectorFaulted && !faultedKeys.Contains((a.OcppChargePointId, a.ConnectorId))).ToList())
+        {
+            var t = await LoadTargetAsync(a.OcppChargePointId, cancellationToken, a.ConnectorId);
+            if (t is not null)
+                await NotifyOcppAlertAsync(t, OcppAlertType.ConnectorFaulted, $"انتهى العطل في الشاحن {t.Name}",
+                    $"{t.StationLabel}: الشاحن {t.Name}{t.Where} عاد للعمل", cancellationToken, resolved: true);
+            a.ResolvedAt = now;
+        }
+
+        // ---- 3. Session open too long (a car forgotten on the plug, or a charger that never sent Stop).
+        var sessionCutoff = now - OcppLimits.LongSessionAlertAfter;
+        var longSessions = await applicationDbContext.OcppTransactions.AsNoTracking()
+            .Where(x => x.IsOpen && !x.IsStale && !x.WasRejected && x.StartedAt < sessionCutoff && !x.ChargePoint.IsDeleted)
+            .Select(x => new AlertTarget(x.ChargePoint.Id, x.ChargePoint.ChargePointId, x.ChargePoint.DisplayName, x.ChargePoint.ChargingPointId,
+                x.ChargePoint.ChargingPoint.Name, x.ChargePoint.ChargingPoint.OwnerId,
+                x.ConnectorId, x.Id, x.StartedAt, x.IdTag))
+            .ToListAsync(cancellationToken);
+
+        foreach (var t in longSessions)
+        {
+            if (open.Any(a => a.Type == OcppAlertType.SessionTooLong && a.OcppTransactionId == t.TransactionId)) continue;
+            var hours = (int)(now - t.Since).TotalHours;
+            var recipients = await NotifyOcppAlertAsync(t, OcppAlertType.SessionTooLong,
+                $"جلسة شحن طويلة على الشاحن {t.Name}",
+                $"{t.StationLabel}: الشاحن {t.Name}{t.Where} يشحن منذ {hours} ساعة (البطاقة {t.Detail})", cancellationToken);
+            open.Add(AddAlert(t, OcppAlertType.SessionTooLong, $"idTag {t.Detail}, {hours} h", recipients, now));
+            opened++;
+        }
+
+        var longIds = longSessions.Select(t => t.TransactionId).ToHashSet();
+        foreach (var a in open.Where(a => a.Type == OcppAlertType.SessionTooLong && !longIds.Contains(a.OcppTransactionId)).ToList())
+            a.ResolvedAt = now;   // the session ended (or went stale) — no push for that
+
+        await applicationDbContext.SaveChanges(cancellationToken);
+        if (opened > 0)
+            logger.LogInformation("CheckOcppAlerts: opened {Opened} alert(s); {Open} open in total", opened, open.Count(a => a.ResolvedAt == null));
+        return opened;
+
+        OcppAlert AddAlert(AlertTarget t, string type, string? details, int recipients, DateTime at)
+        {
+            var row = new OcppAlert
+            {
+                OcppChargePointId = t.ChargePointRowId,
+                Type = type,
+                ConnectorId = t.ConnectorId,
+                OcppTransactionId = t.TransactionId,
+                ConditionSince = t.Since,
+                NotifiedAt = at,
+                Details = details is { Length: > 300 } d ? d[..300] : details,
+                Recipients = recipients,
+            };
+            applicationDbContext.OcppAlerts.Add(row);
+            return row;
+        }
+    }
+
+    /// <summary>Who, what, since when — one shape for all three alert rules.</summary>
+    private sealed record AlertTarget(int ChargePointRowId, string ChargePointId, string? DisplayName, int ChargingPointId, string? StationName, int? OwnerId,
+        int? ConnectorId, int? TransactionId, DateTime Since, string? Detail)
+    {
+        public string Name => DisplayName ?? ChargePointId;
+        public string Where => ConnectorId is int c and > 0 ? $" – المقبس {c}" : "";
+        public string StationLabel
+        {
+            get
+            {
+                var n = (StationName ?? "").Trim();
+                return n.StartsWith("محطة", StringComparison.Ordinal) ? n : $"محطة {n}";
+            }
+        }
+    }
+
+    private async Task<AlertTarget?> LoadTargetAsync(int ocppChargePointId, CancellationToken ct, int? connectorId = null) =>
+        await applicationDbContext.OcppChargePoints.AsNoTracking()
+            .Where(c => c.Id == ocppChargePointId)
+            .Select(c => new AlertTarget(c.Id, c.ChargePointId, c.DisplayName, c.ChargingPointId, c.ChargingPoint.Name, c.ChargingPoint.OwnerId,
+                connectorId, null, DateTime.UtcNow, null))
+            .FirstOrDefaultAsync(ct);
+
+    /// <summary>Push + inbox to the station owner, its active managers and every active admin. Returns how many people.</summary>
+    private async Task<int> NotifyOcppAlertAsync(AlertTarget t, string alertType, string title, string body, CancellationToken ct, bool resolved = false)
+    {
+        var recipients = await applicationDbContext.ProviderManagers.AsNoTracking()
+            .Where(m => m.ProviderType == "ChargingPoint" && m.ProviderId == t.ChargingPointId && m.IsActive && !m.IsDeleted)
+            .Select(m => m.UserId)
+            .ToListAsync(ct);
+        recipients.AddRange(await applicationDbContext.UserAccounts.AsNoTracking()
+            .Where(u => u.RoleId == 2 && u.IsActive && !u.IsDeleted)
+            .Select(u => u.Id)
+            .ToListAsync(ct));
+        if (t.OwnerId is int ownerId) recipients.Add(ownerId);
+        recipients = recipients.Distinct().ToList();
+        if (recipients.Count == 0) return 0;
+
+        var data = JsonSerializer.Serialize(new
+        {
+            type = "ocpp_alert",
+            alertType,
+            resolved,
+            chargingPointId = t.ChargingPointId,
+            chargePointId = t.ChargePointId,
+            connectorId = t.ConnectorId,
+        });
+
+        var tokens = await applicationDbContext.NotificationTokens.AsNoTracking()
+            .Where(x => recipients.Contains(x.UserId))
+            .Select(x => new { x.AppType, x.Token })
+            .ToListAsync(ct);
+        foreach (var group in tokens.GroupBy(x => x.AppType))
+        {
+            try { await notificationService.SendMessagesAsync(group.Select(x => x.Token).ToList(), title, body, group.Key); }
+            catch (Exception ex) { logger.LogWarning(ex, "OcppAlert: FCM send failed for app type {AppType}", group.Key); }
+        }
+
+        var typeId = await applicationDbContext.NotificationTypes.AsNoTracking()
+            .Where(x => x.Name == "charging_point_status_changed")
+            .Select(x => (int?)x.Id)
+            .FirstOrDefaultAsync(ct) ?? 1;
+        await NotificationInboxHelper.CreateNotificationInboxRecordsAsync(applicationDbContext, recipients, typeId, title, body, null, data, ct);
+        return recipients.Count;
+    }
 }
