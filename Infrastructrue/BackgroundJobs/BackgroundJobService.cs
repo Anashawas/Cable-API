@@ -812,6 +812,78 @@ public class BackgroundJobService(
         foreach (var a in open.Where(a => a.Type == OcppAlertType.SessionTooLong && !longIds.Contains(a.OcppTransactionId)).ToList())
             a.ResolvedAt = now;   // the session ended (or went stale) — no push for that
 
+        // ---- 4. Charging finished but the car is still plugged in (Finishing / SuspendedEV): the plug is
+        //         blocked for the next driver. Stage 1 → the driver, if the card is linked to a user;
+        //         stage 2 (or stage 1 when no driver is known) → the station owner / managers.
+        var parkedCutoff = now - OcppLimits.ParkedAlertAfter;
+        var parked = await applicationDbContext.OcppConnectors.AsNoTracking()
+            .Where(k => k.ConnectorId > 0 && !k.ChargePoint.IsDeleted && k.ChargePoint.IsEnabled
+                        && (k.Status == OcppConnectorStatus.Finishing || k.Status == OcppConnectorStatus.SuspendedEV)
+                        && (k.StatusUpdatedAt ?? k.StatusReceivedAt) < parkedCutoff)
+            .Select(k => new AlertTarget(k.ChargePoint.Id, k.ChargePoint.ChargePointId, k.ChargePoint.DisplayName, k.ChargePoint.ChargingPointId,
+                k.ChargePoint.ChargingPoint.Name, k.ChargePoint.ChargingPoint.OwnerId,
+                k.ConnectorId, null, k.StatusUpdatedAt ?? k.StatusReceivedAt, k.Status))
+            .ToListAsync(cancellationToken);
+
+        foreach (var t in parked)
+        {
+            if (open.Any(a => a.Type == OcppAlertType.ParkedAfterCharging && a.OcppChargePointId == t.ChargePointRowId && a.ConnectorId == t.ConnectorId)) continue;
+
+            // Whose car? The latest session on that plug → its idTag → OcppUserIdTag.
+            var lastTag = await applicationDbContext.OcppTransactions.AsNoTracking()
+                .Where(x => x.OcppChargePointId == t.ChargePointRowId && x.ConnectorId == t.ConnectorId && !x.WasRejected)
+                .OrderByDescending(x => x.StartedAt)
+                .Select(x => x.IdTag)
+                .FirstOrDefaultAsync(cancellationToken);
+            var driverId = lastTag is null ? null : await applicationDbContext.OcppUserIdTags.AsNoTracking()
+                .Where(u => u.IdTag == lastTag && u.IsEnabled && !u.IsDeleted)
+                .Select(u => (int?)u.UserId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var minutes = (int)(now - t.Since).TotalMinutes;
+            int recipients;
+            DateTime? escalatedAt = null;
+            if (driverId is int driver)
+            {
+                recipients = await NotifyOcppAlertAsync(t, OcppAlertType.ParkedAfterCharging,
+                    "سيارتك خلصت شحن",
+                    $"{t.StationLabel}: انتهى شحن سيارتك على {t.Name}{t.Where} منذ {minutes} دقيقة — ممكن تفصلها لتفسح المقبس للسواق التالي؟",
+                    cancellationToken, onlyUsers: [driver], appType: FirebaseAppType.UserApp);
+            }
+            else
+            {
+                recipients = await NotifyOcppAlertAsync(t, OcppAlertType.ParkedAfterCharging,
+                    $"مقبس محجوز بدون شحن على {t.Name}",
+                    $"{t.StationLabel}: {t.Name}{t.Where} خلص الشحن والسيارة ما زالت موصولة منذ {minutes} دقيقة",
+                    cancellationToken, includeAdmins: false);
+                escalatedAt = now;
+            }
+            var row = AddAlert(t, OcppAlertType.ParkedAfterCharging, $"{t.Detail} {minutes} min, tag {lastTag ?? "?"}", recipients, now);
+            row.DriverUserId = driverId;
+            row.EscalatedAt = escalatedAt;
+            open.Add(row);
+            opened++;
+        }
+
+        // Stage 2: the driver was told, the car is still there → the station.
+        var parkedKeys = parked.Select(t => (t.ChargePointRowId, t.ConnectorId)).ToHashSet();
+        foreach (var a in open.Where(a => a.Type == OcppAlertType.ParkedAfterCharging && a.EscalatedAt == null
+                                          && a.NotifiedAt <= now - OcppLimits.ParkedEscalateAfter
+                                          && parkedKeys.Contains((a.OcppChargePointId, a.ConnectorId))).ToList())
+        {
+            var t = parked.First(x => x.ChargePointRowId == a.OcppChargePointId && x.ConnectorId == a.ConnectorId);
+            var minutes = (int)(now - t.Since).TotalMinutes;
+            a.Recipients += await NotifyOcppAlertAsync(t, OcppAlertType.ParkedAfterCharging,
+                $"مقبس محجوز بدون شحن على {t.Name}",
+                $"{t.StationLabel}: {t.Name}{t.Where} خلص الشحن والسيارة ما زالت موصولة منذ {minutes} دقيقة (تم تنبيه السواق قبل {(int)OcppLimits.ParkedEscalateAfter.TotalMinutes} دقيقة)",
+                cancellationToken, includeAdmins: false);
+            a.EscalatedAt = now;
+        }
+
+        // Cable removed (or a new session started): close silently.
+        foreach (var a in open.Where(a => a.Type == OcppAlertType.ParkedAfterCharging && !parkedKeys.Contains((a.OcppChargePointId, a.ConnectorId))).ToList())
+            a.ResolvedAt = now;
+
         await applicationDbContext.SaveChanges(cancellationToken);
         if (opened > 0)
             logger.LogInformation("CheckOcppAlerts: opened {Opened} alert(s); {Open} open in total", opened, open.Count(a => a.ResolvedAt == null));
@@ -859,18 +931,34 @@ public class BackgroundJobService(
             .FirstOrDefaultAsync(ct);
 
     /// <summary>Push + inbox to the station owner, its active managers and every active admin. Returns how many people.</summary>
-    private async Task<int> NotifyOcppAlertAsync(AlertTarget t, string alertType, string title, string body, CancellationToken ct, bool resolved = false)
+    /// <summary>
+    /// Push + inbox. Default audience: the station owner, its active managers and every active
+    /// admin (station app). <paramref name="onlyUsers"/> replaces that audience (e.g. the driver,
+    /// through the user app); <paramref name="includeAdmins"/> = false keeps operational
+    /// nudges off the admins' phones.
+    /// </summary>
+    private async Task<int> NotifyOcppAlertAsync(AlertTarget t, string alertType, string title, string body, CancellationToken ct,
+        bool resolved = false, bool includeAdmins = true, IReadOnlyCollection<int>? onlyUsers = null, FirebaseAppType? appType = null)
     {
-        var recipients = await applicationDbContext.ProviderManagers.AsNoTracking()
-            .Where(m => m.ProviderType == "ChargingPoint" && m.ProviderId == t.ChargingPointId && m.IsActive && !m.IsDeleted)
-            .Select(m => m.UserId)
-            .ToListAsync(ct);
-        recipients.AddRange(await applicationDbContext.UserAccounts.AsNoTracking()
-            .Where(u => u.RoleId == 2 && u.IsActive && !u.IsDeleted)
-            .Select(u => u.Id)
-            .ToListAsync(ct));
-        if (t.OwnerId is int ownerId) recipients.Add(ownerId);
-        recipients = recipients.Distinct().ToList();
+        List<int> recipients;
+        if (onlyUsers is not null)
+        {
+            recipients = onlyUsers.Distinct().ToList();
+        }
+        else
+        {
+            recipients = await applicationDbContext.ProviderManagers.AsNoTracking()
+                .Where(m => m.ProviderType == "ChargingPoint" && m.ProviderId == t.ChargingPointId && m.IsActive && !m.IsDeleted)
+                .Select(m => m.UserId)
+                .ToListAsync(ct);
+            if (includeAdmins)
+                recipients.AddRange(await applicationDbContext.UserAccounts.AsNoTracking()
+                    .Where(u => u.RoleId == 2 && u.IsActive && !u.IsDeleted)
+                    .Select(u => u.Id)
+                    .ToListAsync(ct));
+            if (t.OwnerId is int ownerId) recipients.Add(ownerId);
+            recipients = recipients.Distinct().ToList();
+        }
         if (recipients.Count == 0) return 0;
 
         var data = JsonSerializer.Serialize(new
@@ -884,7 +972,7 @@ public class BackgroundJobService(
         });
 
         var tokens = await applicationDbContext.NotificationTokens.AsNoTracking()
-            .Where(x => recipients.Contains(x.UserId))
+            .Where(x => recipients.Contains(x.UserId) && (appType == null || x.AppType == appType))
             .Select(x => new { x.AppType, x.Token })
             .ToListAsync(ct);
         foreach (var group in tokens.GroupBy(x => x.AppType))

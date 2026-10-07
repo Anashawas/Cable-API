@@ -73,3 +73,38 @@ BEGIN
 END
 ELSE PRINT 'SKIP dbo.OcppAlert exists';
 GO
+
+-- idTag → Cable user (driver pushes, automatic loyalty points, later remote start/stop from the app).
+IF OBJECT_ID('dbo.OcppUserIdTag', 'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.OcppUserIdTag
+    (
+        Id         INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_OcppUserIdTag PRIMARY KEY,
+        UserId     INT            NOT NULL,
+        IdTag      NVARCHAR(50)   NOT NULL,   -- normalised: trimmed, upper-case
+        Label      NVARCHAR(100)  NULL,
+        IsEnabled  BIT            NOT NULL CONSTRAINT DF_OcppUserIdTag_IsEnabled DEFAULT 1,
+        CreatedBy  INT            NULL,
+        CreatedAt  DATETIME       NOT NULL,
+        ModifiedBy INT            NULL,
+        ModifiedAt DATETIME       NULL,
+        IsDeleted  BIT            NOT NULL CONSTRAINT DF_OcppUserIdTag_IsDeleted DEFAULT 0,
+        CONSTRAINT FK_OcppUserIdTag_UserAccount FOREIGN KEY (UserId) REFERENCES dbo.UserAccount (Id)
+    );
+    CREATE UNIQUE INDEX UX_OcppUserIdTag_IdTag ON dbo.OcppUserIdTag (IdTag) WHERE [IsDeleted] = 0;
+    CREATE INDEX IX_OcppUserIdTag_User ON dbo.OcppUserIdTag (UserId);
+    PRINT 'Created dbo.OcppUserIdTag';
+END
+ELSE PRINT 'SKIP dbo.OcppUserIdTag exists';
+GO
+
+-- Parked-after-charging alert: two stages (driver, then station).
+IF COL_LENGTH('dbo.OcppAlert', 'EscalatedAt') IS NULL
+BEGIN
+    ALTER TABLE dbo.OcppAlert ADD
+        EscalatedAt  DATETIME2(3) NULL,   -- when the station owner / managers were told
+        DriverUserId INT          NULL;   -- the driver told first (OcppUserIdTag), when known
+    PRINT 'Added OcppAlert.EscalatedAt / DriverUserId';
+END
+ELSE PRINT 'SKIP OcppAlert.EscalatedAt exists';
+GO

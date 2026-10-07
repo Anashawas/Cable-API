@@ -66,6 +66,9 @@ public static class OcppAlertType
     public const string ChargerOffline = "ChargerOffline";
     public const string ConnectorFaulted = "ConnectorFaulted";
     public const string SessionTooLong = "SessionTooLong";
+
+    /// <summary>Charging finished (Finishing / SuspendedEV) but the cable is still in: the plug is blocked for the next driver.</summary>
+    public const string ParkedAfterCharging = "ParkedAfterCharging";
 }
 
 /// <summary>
@@ -108,6 +111,12 @@ public static class OcppLimits
     public static readonly TimeSpan OfflineAlertAfter = TimeSpan.FromMinutes(15);
     public static readonly TimeSpan FaultedAlertAfter = TimeSpan.FromMinutes(15);
     public static readonly TimeSpan LongSessionAlertAfter = TimeSpan.FromHours(6);
+
+    /// <summary>Plug in Finishing / SuspendedEV this long → tell the driver (if the card is linked to a user), else the station.</summary>
+    public static readonly TimeSpan ParkedAlertAfter = TimeSpan.FromMinutes(20);
+
+    /// <summary>Still parked this long after the driver was told → tell the station owner / managers.</summary>
+    public static readonly TimeSpan ParkedEscalateAfter = TimeSpan.FromMinutes(20);
 
     /// <summary>Same connector + same error code within this window = one notification.</summary>
     public static readonly TimeSpan FaultNotificationDedupe = TimeSpan.FromMinutes(30);

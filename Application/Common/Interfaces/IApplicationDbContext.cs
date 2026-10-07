@@ -130,6 +130,7 @@ public interface IApplicationDbContext
     DbSet<OcppRawMessage> OcppRawMessages { get; set; }
     DbSet<OcppCommand> OcppCommands { get; set; }
     DbSet<OcppAlert> OcppAlerts { get; set; }
+    DbSet<OcppUserIdTag> OcppUserIdTags { get; set; }
 
     Task<int> SaveChanges(CancellationToken cancellationToken = default);
 }

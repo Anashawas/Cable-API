@@ -87,7 +87,7 @@ network; and anything while the unit still points at another server (one charger
 | 4.10 | "Cards on the unit" chip per charger (Synced vN · when · count / Pending / Failed / Not supported) + "Sync cards now" | ✅ Oct 7 | — |
 | 4.11 | Reports: energy & sessions per station per day, plug utilization %, faults per month, Excel export | 💡 | data already stored |
 | 4.12 | Tariffs per station: per kWh, per minute, idle fee, free list (owner's cards) | 💡 Phase 3 | commercial agreement |
-| 4.13 | Alert rules: charger offline > 15 min, plug Faulted > 15 min, session open > 6 h → push + inbox to admins, the station owner and managers; "back online / fault cleared" push when it resolves; Alerts panel + KPI tile on the Cable Connect screen | ✅ Oct 7 | job `check-ocpp-alerts` every 5 min |
+| 4.13 | Alert rules: charger offline > 15 min, plug Faulted > 15 min, session open > 6 h → push + inbox to admins, the station owner and managers; "back online / fault cleared" push when it resolves; **parked after charging** (Finishing / SuspendedEV > 20 min → the driver via `OcppUserIdTag`, then the station 20 min later; station directly when the card is not linked); Alerts panel + KPI tile on the Cable Connect screen | ✅ Oct 7 | job `check-ocpp-alerts` every 5 min |
 | 4.14 | Remote start / stop from admin (support use) | 💡 Phase 3 | 3.9 |
 | 4.15 | Firmware & diagnostics page | 💡 | 3.12 |
 
@@ -117,7 +117,7 @@ Nothing is built yet. Everything here is gated by the station's OcppConnect subs
 | 6.1 | **"N of M plugs free"** live badge on the station card and page, with plug type & max power | ⏳ Phase E | B2C API endpoint |
 | 6.2 | "Notify me when a plug is free" | 💡 | 6.1 + small job |
 | 6.3 | Charger-level detail on the station page: each plug's live state | 💡 | 6.1 |
-| 6.4 | **Start charging from the app** on a chosen plug (a virtual card id per app user, no physical card), stop from the app | 💡 Phase 3 | 3.9 + user ↔ idTag mapping |
+| 6.4 | **Start charging from the app** on a chosen plug (a virtual card id per app user, no physical card), stop from the app | 💡 Phase 3 | 3.9 + `OcppUserIdTag` (table exists since Oct 7; admin screen to link a card to a user still ⏳) |
 | 6.5 | Live session screen: kWh so far, charging power, battery % if the car reports it, elapsed time, cost so far | 💡 Phase 3 | 6.4 + tariffs |
 | 6.6 | Pushes: charging started, car stopped drawing, charging complete, cable still plugged | 💡 Phase 3 | 6.4 |
 | 6.7 | Unlock my cable | 💡 Phase 3 | 3.5, own session only |

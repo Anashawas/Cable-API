@@ -25,7 +25,7 @@ public class GetOcppAlertsRequestHandler(IApplicationDbContext db, ICurrentUserS
             .Select(a => new OcppAlertDto(
                 a.Id, a.Type, a.OcppChargePointId, a.ChargePoint.ChargePointId, a.ChargePoint.DisplayName,
                 a.ChargePoint.ChargingPointId, a.ChargePoint.ChargingPoint.Name,
-                a.ConnectorId, a.OcppTransactionId, a.ConditionSince, a.NotifiedAt, a.ResolvedAt, a.Details, a.Recipients))
+                a.ConnectorId, a.OcppTransactionId, a.ConditionSince, a.NotifiedAt, a.ResolvedAt, a.Details, a.Recipients, a.DriverUserId, a.EscalatedAt))
             .ToListAsync(cancellationToken);
     }
 }

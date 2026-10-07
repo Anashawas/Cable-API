@@ -17,6 +17,7 @@ public class OcppAlertConfiguration : IEntityTypeConfiguration<OcppAlert>
         builder.Property(e => e.ConditionSince).HasColumnType("datetime2(3)").IsRequired();
         builder.Property(e => e.NotifiedAt).HasColumnType("datetime2(3)").IsRequired();
         builder.Property(e => e.ResolvedAt).HasColumnType("datetime2(3)");
+        builder.Property(e => e.EscalatedAt).HasColumnType("datetime2(3)");
         builder.Property(e => e.Recipients).IsRequired().HasDefaultValue(0);
         builder.Property(e => e.IsDeleted).IsRequired().HasDefaultValue(false);
         builder.Property(e => e.CreatedAt).HasColumnType("datetime");

@@ -143,6 +143,7 @@ public partial class ApplicationDbContext(
     public DbSet<OcppRawMessage> OcppRawMessages { get; set; }
     public DbSet<OcppCommand> OcppCommands { get; set; }
     public DbSet<OcppAlert> OcppAlerts { get; set; }
+    public DbSet<OcppUserIdTag> OcppUserIdTags { get; set; }
 
     #endregion
 

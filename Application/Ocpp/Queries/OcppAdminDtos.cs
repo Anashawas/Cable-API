@@ -220,4 +220,8 @@ public record OcppAlertDto(
     DateTime NotifiedAt,
     DateTime? ResolvedAt,
     string? Details,
-    int Recipients);
+    int Recipients,
+    /// <summary>ParkedAfterCharging: the driver told first (null = card not linked to a user).</summary>
+    int? DriverUserId = null,
+    /// <summary>ParkedAfterCharging: when the station was told.</summary>
+    DateTime? EscalatedAt = null);

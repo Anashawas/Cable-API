@@ -33,5 +33,11 @@ public class OcppAlert : BaseAuditableEntity
     /// <summary>How many people got the push + inbox entry.</summary>
     public int Recipients { get; set; }
 
+    /// <summary>ParkedAfterCharging: the driver (via OcppUserIdTag) who was told first; null when the card is not linked to a user.</summary>
+    public int? DriverUserId { get; set; }
+
+    /// <summary>ParkedAfterCharging: when the station owner / managers were told (the second stage, or the first when no driver is known).</summary>
+    public DateTime? EscalatedAt { get; set; }
+
     public virtual OcppChargePoint ChargePoint { get; set; } = null!;
 }

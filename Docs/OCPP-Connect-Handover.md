@@ -336,11 +336,33 @@ condition clears the row gets `ResolvedAt` and offline / fault alerts send a "ba
 Alerts panel on the Cable Connect screen (open by default, "show resolved" toggle, click → charger)
 and an "Open alerts" tile. API: `GET /api/admin/ocpp/alerts?openOnly=&chargePointId=&take=`.
 Table in `OcppConnect_Phase2.sql`.
+Fourth rule (N-5): a plug in Finishing / SuspendedEV for 20 min = a car parked after charging.
+If the last session's idTag is linked to a user in `OcppUserIdTag`, the driver gets the push
+(user app) first and the station owner / managers 20 min later (`EscalatedAt`); if the card is
+not linked, the station is told at once. Closes silently when the cable comes out. Admins are
+not included in this one.
 
 Simulator: answers all the commands while it runs (`--run N` keeps it alive): Reset really
 drops the socket and reboots 4 s later; ChangeAvailability flips the plug to Unavailable and
 keeps that across the reboot; GetConfiguration returns an RH4-like key set; SendLocalList /
 GetLocalListVersion / ClearCache keep an in-memory card list and print it.
+
+## 9d. Shared Hangfire storage — publish the API before relying on a new job
+
+The dev database is also the Hangfire storage of **every** API instance pointed at it: the
+deployed `dev.cable-app.com`, a developer's local run, a second local run that was not stopped.
+All of them pull from the same queues and all run the recurring-job scheduler. Consequences:
+
+- A job method that exists only in a newer build (e.g. a new `IBackgroundJobService` method)
+  can be picked up by an older instance → `JobLoadException: … does not contain a method with
+  signature …`, the recurring job gets an `Error` and its next run is pushed back; an enqueued
+  job fails and retries. It works again once an instance with the new build takes it, but
+  the timing becomes random.
+- So: **publish the API to dev before counting on a new job there**, and when testing a new job
+  locally expect the deployed instance to steal (and fail) some runs. `HangFire.Server` shows
+  who is alive (`win6061…` = SmarterASP, your machine name = local).
+- Production has only the production API, so this does not apply there — as long as nobody
+  points a local run at the production database.
 
 ## 10. What is NOT built yet
 
