@@ -42,6 +42,7 @@ public class GetOcppChargePointByIdRequestHandler(IApplicationDbContext db, ICur
         var subscription = await OcppSubscriptionGate.GetStateAsync(db, cp.ChargingPointId, cancellationToken);
         var cardsAtStation = await db.OcppAuthorizedTags.AsNoTracking()
             .CountAsync(t => t.ChargingPointId == cp.ChargingPointId && t.IsEnabled && !t.IsDeleted, cancellationToken);
+        var onboarding = await OcppOnboarding.ComputeAsync(db, cp.ChargePointId, cp.LastBootAt, cp.CreatedAt, cancellationToken);
 
         return new OcppChargePointDetailDto(
             cp.Id, cp.ChargePointId, cp.DisplayName, cp.ChargingPointId, cp.ChargingPoint.Name,
@@ -60,6 +61,7 @@ public class GetOcppChargePointByIdRequestHandler(IApplicationDbContext db, ICur
                 sessionsToday.Sum(t => t.EnergyKwh ?? 0m),
                 faultsToday),
             new OcppLocalListStateDto(cp.LocalListStatus, cp.LocalListVersion, cp.LocalListSyncedAt, cardsAtStation, cp.LocalListStatus == Cable.Core.Constants.OcppLocalListStatus.Synced),
+            onboarding,
             cp.CreatedAt, cp.ModifiedAt);
     }
 }

@@ -314,6 +314,19 @@ identity, authorization key, security profile, APN…) and `UnlockConnector` ref
 Charging — both in the API command and again inside Cable.Ocpp, so nothing holding the internal
 key can bypass them.
 
+**Commissioning state (Oct 7).** Until a charger's first BootNotification the API derives
+`onboarding` from the raw log's system rows: Waiting (nothing reached us), Connected (socket
+accepted, no boot yet), Refused (handshake rejected, with the HTTP status and reason: unknown
+id, bad password, disabled, locked), Booted. The charger page shows it as a card polled every
+4 s, the table as a chip instead of "Offline", and the register flow opens the new charger right
+after the credentials sheet — so at the station you watch it connect instead of reading JSON.
+
+**Command confirmation (Oct 7).** A CALLRESULT means "received". Cable.Ocpp stamps
+`OcppCommand.CompletedAt` when the charger's own follow-up proves the effect: BootNotification
+after Reset, StatusNotification with the requested state after ChangeAvailability /
+UnlockConnector, the requested message after TriggerMessage (30-minute window, newest open
+command of that action). The history shows "confirmed after N s" or "not confirmed yet".
+
 **Alert rules.** Hangfire job `check-ocpp-alerts` every 5 min (`CheckOcppAlertsAsync`):
 charger offline (socket gone, or open but silent) > 15 min, plug Faulted > 15 min, session open
 > 6 h (thresholds in `OcppLimits`). First time a condition crosses the line it writes one open

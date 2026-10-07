@@ -20,7 +20,7 @@ public class GetOcppCommandsRequestHandler(IApplicationDbContext db, ICurrentUse
         if (!exists)
             throw new NotFoundException($"cannot find OCPP charge point with id: {request.OcppChargePointId}");
 
-        return await db.OcppCommands.AsNoTracking()
+        var rows = await db.OcppCommands.AsNoTracking()
             .Where(c => c.OcppChargePointId == request.OcppChargePointId && !c.IsDeleted)
             .OrderByDescending(c => c.Id)
             .Take(Math.Clamp(request.Take ?? 30, 1, 500))
@@ -28,7 +28,11 @@ public class GetOcppCommandsRequestHandler(IApplicationDbContext db, ICurrentUse
                 c.Id, c.Action, c.RequestPayload, c.Status, c.ResultStatus, c.ResponsePayload,
                 c.ErrorCode, c.ErrorDescription, c.DurationMs, c.CreatedBy,
                 db.UserAccounts.Where(u => u.Id == c.CreatedBy).Select(u => u.Name).FirstOrDefault(),
-                c.CreatedAt))
+                c.CreatedAt,
+                c.CompletedAt,
+                null))
             .ToListAsync(cancellationToken);
+
+        return rows.Select(d => d with { ConfirmedAfterSec = d.CompletedAt is DateTime done ? (int)Math.Max(0, (done - d.CreatedAt).TotalSeconds) : null }).ToList();
     }
 }

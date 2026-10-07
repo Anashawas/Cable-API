@@ -71,9 +71,20 @@ public record OcppChargePointListItemDto(
     int FaultedConnectors,
     int OpenSessions,
     OcppSubscriptionStateDto Subscription,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    /// <summary>Only until the first BootNotification: Waiting | Connected | Refused. Null once the unit has booted.</summary>
+    string? OnboardingState = null,
+    string? OnboardingReason = null);
 
 public record OcppChargePointTodayDto(int Sessions, decimal EnergyKwh, int Faults);
+
+/// <summary>
+/// What happened since the charger was registered, for the admin standing at the station:
+/// Waiting (nothing reached us yet) · Connected (socket accepted, no BootNotification yet) ·
+/// Refused (handshake rejected — Reason says why: unknown id, bad password, disabled, locked) ·
+/// Booted (vendor / model / firmware are in). At = when that last happened.
+/// </summary>
+public record OcppOnboardingDto(string State, string? Reason, int? HttpStatus, DateTime? At, DateTime RegisteredAt);
 
 public record OcppChargePointDetailDto(
     int Id,
@@ -109,6 +120,7 @@ public record OcppChargePointDetailDto(
     List<OcppTransactionDto> RecentTransactions,
     OcppChargePointTodayDto Today,
     OcppLocalListStateDto LocalList,
+    OcppOnboardingDto Onboarding,
     DateTime CreatedAt,
     DateTime? ModifiedAt);
 
@@ -188,7 +200,10 @@ public record OcppCommandDto(
     int? DurationMs,
     int? RequestedById,
     string? RequestedByName,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    /// <summary>When the charger's follow-up message proved the command took effect (Reset → BootNotification, ChangeAvailability → StatusNotification…). Null = accepted but not yet confirmed.</summary>
+    DateTime? CompletedAt = null,
+    int? ConfirmedAfterSec = null);
 
 /// <summary>An alert-job finding. Type: ChargerOffline | ConnectorFaulted | SessionTooLong; ResolvedAt null = still open.</summary>
 public record OcppAlertDto(

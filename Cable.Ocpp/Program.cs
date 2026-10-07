@@ -42,6 +42,7 @@ builder.Services.AddSingleton<CommandSender>();
 builder.Services.AddHttpClient(nameof(KeepAliveSelfPing));
 builder.Services.AddHostedService<KeepAliveSelfPing>();
 builder.Services.AddScoped<TagAuthorizer>();
+builder.Services.AddScoped<CommandConfirmer>();
 
 // Charger-initiated actions, keyed by OCPP action name. Anything else → NotImplemented.
 builder.Services.AddKeyedScoped<IOcppHandler, BootNotificationHandler>("BootNotification");

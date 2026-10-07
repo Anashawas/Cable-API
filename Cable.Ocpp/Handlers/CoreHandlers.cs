@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Cable.Ocpp.Handlers;
 
 /// <summary>Updates the charger row with what the unit says about itself; never touches sessions (R2).</summary>
-public sealed class BootNotificationHandler(IApplicationDbContext db, Hangfire.IBackgroundJobClient jobs, ILogger<BootNotificationHandler> log) : IOcppHandler
+public sealed class BootNotificationHandler(IApplicationDbContext db, Hangfire.IBackgroundJobClient jobs, CommandConfirmer confirmer, ILogger<BootNotificationHandler> log) : IOcppHandler
 {
     public async Task<object> HandleAsync(OcppSession session, JsonElement payload, CancellationToken cancellationToken)
     {
@@ -54,19 +54,26 @@ public sealed class BootNotificationHandler(IApplicationDbContext db, Hangfire.I
             }
         }
 
+        // A boot is the proof a Reset (or a TriggerMessage BootNotification) took effect.
+        await confirmer.ConfirmAsync(cp.Id, "Reset", _ => true, cancellationToken);
+        await confirmer.ConfirmAsync(cp.Id, "TriggerMessage", r => CommandConfirmer.Str(r, "requestedMessage") == "BootNotification", cancellationToken);
+
         // currentTime sets the charger's clock — real UTC, no local conversion (R7).
         return new { status = "Accepted", currentTime = now, interval = cp.HeartbeatInterval };
     }
 }
 
-public sealed class HeartbeatHandler : IOcppHandler
+public sealed class HeartbeatHandler(CommandConfirmer confirmer) : IOcppHandler
 {
-    public Task<object> HandleAsync(OcppSession session, JsonElement payload, CancellationToken cancellationToken) =>
-        Task.FromResult<object>(new { currentTime = DateTime.UtcNow });
+    public async Task<object> HandleAsync(OcppSession session, JsonElement payload, CancellationToken cancellationToken)
+    {
+        await confirmer.ConfirmAsync(session.OcppChargePointId, "TriggerMessage", r => CommandConfirmer.Str(r, "requestedMessage") == "Heartbeat", cancellationToken);
+        return new { currentTime = DateTime.UtcNow };
+    }
 }
 
 /// <summary>Upserts the connector row; unknown connector ids are created, never refused. Faulted → owner notification.</summary>
-public sealed class StatusNotificationHandler(IApplicationDbContext db, FaultNotifier faults) : IOcppHandler
+public sealed class StatusNotificationHandler(IApplicationDbContext db, FaultNotifier faults, CommandConfirmer confirmer) : IOcppHandler
 {
     public async Task<object> HandleAsync(OcppSession session, JsonElement payload, CancellationToken cancellationToken)
     {
@@ -98,6 +105,20 @@ public sealed class StatusNotificationHandler(IApplicationDbContext db, FaultNot
 
         if (status == OcppConnectorStatus.Faulted)
             faults.Report(connector.Id, session.ChargePointId, connectorId, errorCode, info);
+
+        // Confirmations: the plug reporting the state we asked for.
+        await confirmer.ConfirmAsync(session.OcppChargePointId, "ChangeAvailability", r =>
+        {
+            var target = CommandConfirmer.Int(r, "connectorId") ?? -1;
+            if (target != 0 && target != connectorId) return false;
+            var inoperative = CommandConfirmer.Str(r, "type") == "Inoperative";
+            return inoperative ? status == OcppConnectorStatus.Unavailable : status != OcppConnectorStatus.Unavailable;
+        }, cancellationToken);
+        await confirmer.ConfirmAsync(session.OcppChargePointId, "UnlockConnector",
+            r => CommandConfirmer.Int(r, "connectorId") == connectorId && status is OcppConnectorStatus.Available or OcppConnectorStatus.Finishing, cancellationToken);
+        await confirmer.ConfirmAsync(session.OcppChargePointId, "TriggerMessage", r =>
+            CommandConfirmer.Str(r, "requestedMessage") == "StatusNotification"
+            && (CommandConfirmer.Int(r, "connectorId") is null or 0 || CommandConfirmer.Int(r, "connectorId") == connectorId), cancellationToken);
 
         return new { };
     }
@@ -142,13 +163,16 @@ public sealed class StartTransactionHandler(IApplicationDbContext db, TagAuthori
 }
 
 /// <summary>Stores samples by the charger's timestamp; a replay after an outage is a no-op (R1, R3).</summary>
-public sealed class MeterValuesHandler(IApplicationDbContext db, ILogger<MeterValuesHandler> log) : IOcppHandler
+public sealed class MeterValuesHandler(IApplicationDbContext db, CommandConfirmer confirmer, ILogger<MeterValuesHandler> log) : IOcppHandler
 {
     public async Task<object> HandleAsync(OcppSession session, JsonElement payload, CancellationToken cancellationToken)
     {
         var connectorId = OcppPayload.Int(payload, "connectorId") ?? 0;
         var transactionId = OcppPayload.Int(payload, "transactionId");
         var samples = OcppPayload.Array(payload, "meterValue");
+        await confirmer.ConfirmAsync(session.OcppChargePointId, "TriggerMessage", r =>
+            CommandConfirmer.Str(r, "requestedMessage") == "MeterValues"
+            && (CommandConfirmer.Int(r, "connectorId") is null or 0 || CommandConfirmer.Int(r, "connectorId") == connectorId), cancellationToken);
         if (samples is null) return new { };
 
         transactionId = await MeterValueWriter.ResolveTransactionAsync(db, session, transactionId, log, cancellationToken);

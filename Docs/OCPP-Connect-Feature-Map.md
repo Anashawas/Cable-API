@@ -78,11 +78,11 @@ network; and anything while the unit still points at another server (one charger
 | 4.1 | **Cable Connect** screen: fleet KPIs (online / reconnecting / offline, free plugs, faulted, charging now, kWh today, sessions today, stations without subscription, never connected, stale) | ✅ | — |
 | 4.2 | Chargers table: search, state / enabled filters, subscription chip, last seen | ✅ | — |
 | 4.3 | Register charger: station search dropdown, id (auto `CBL-{station}-{nn}` or the unit's own id, max 20 chars), heartbeat, password off by default (Security Profile 0) → one-time credentials sheet: URL and **port** as the server reports them, id, username, password | ✅ (port/URL/defaults Oct 7) | — |
-| 4.4 | Charger detail: unit info, connection (IP, since, last message), plugs with status / error / plug type / power, recent sessions (open / stale / orphan / rejected chips), message log viewer | ✅ | — |
+| 4.4 | Charger detail: unit info, connection (IP, since, last message), plugs with status / error / **plug type (dropdown)** / power, recent sessions (open / stale / orphan / rejected chips), message log viewer, **commissioning card** until the first boot (Waiting / Connected / Refused with the reason / Booted, polled every 4 s; the register flow opens it automatically) | ✅ (plug type + commissioning Oct 7) | — |
 | 4.5 | Edit charger, new / remove password, enable / disable (disable closes its socket within a minute), delete (refused while a session is open), edit plug type & power | ✅ | — |
 | 4.6 | Allowed cards per station: add / disable / expire / remove | ✅ | — |
 | 4.7 | Station page → **Cable Connect** tab: the station's chargers + **OcppConnect subscription panel** (record / renew payment) | ✅ | republish WebApi to dev to ship the latest build |
-| 4.8 | Remote buttons on the charger page: refresh now, soft / hard reset, unlock plug, out-of-service / back in service, command history (who / what / answer / took) | ✅ Oct 7 | — |
+| 4.8 | Remote buttons on the charger page: refresh now, soft / hard reset, unlock plug, out-of-service / back in service, command history (who / what / answer / took / **confirmed after N s** — the charger's follow-up message, not just its "Accepted") | ✅ Oct 7 | — |
 | 4.9 | Charger settings panel: read the unit's config keys, supported profiles as chips, inline edit of the writable ones | ✅ Oct 7 | — |
 | 4.10 | "Cards on the unit" chip per charger (Synced vN · when · count / Pending / Failed / Not supported) + "Sync cards now" | ✅ Oct 7 | — |
 | 4.11 | Reports: energy & sessions per station per day, plug utilization %, faults per month, Excel export | 💡 | data already stored |
@@ -98,7 +98,7 @@ mostly reuse plus ownership checks (`/api/provider/charging-points/{id}/chargers
 
 | # | Feature | Status | Depends on |
 |---|---|---|---|
-| 5.1 | **Fault push** when a plug reports Faulted (owner + active managers, inbox entry) | ✅ | — (already delivered to the inbox today) |
+| 5.1 | **Fault push** when a plug reports Faulted (owner + active managers, inbox entry) | ✅ backend · ⏳ **partner app must register its FCM token**: `PUT /api/notification-token` `{ token, osName, osVersion, appVersion, appType: 2 }` (2 = StationApp) after login and on token refresh — the endpoint exists, the app has a TODO where the call should be (`notification_service.dart:218/235`). Until then owners get inbox entries but no push | — |
 | 5.2 | Live view: each charger's plugs, state, the session in progress (kWh, power, SoC, duration) | ⏳ Phase D | provider API |
 | 5.3 | Session history: card, energy, duration, stop reason; day / week / month totals | ⏳ Phase D | provider API |
 | 5.4 | Allowed cards: add / disable / expire from the phone | ⏳ Phase D | reuse admin endpoints |

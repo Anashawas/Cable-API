@@ -68,18 +68,30 @@ public class GetOcppChargePointsRequestHandler(IApplicationDbContext db, ICurren
         {
             var page = await projected.ToPaginatedAsync(request.Page, request.PageSize, 20, 200, cancellationToken);
             var subs = await OcppSubscriptionGate.GetStatesAsync(db, page.Items.Select(x => x.ChargingPointId), cancellationToken);
-            return page.As(page.Items.Select(x => ToDto(x, subs, now)).ToList());
+            return page.As(await WithOnboardingAsync(page.Items.Select(x => ToDto(x, subs, now)).ToList(), cancellationToken));
         }
 
         // Connection state is derived from freshness, not stored: load the (small) fleet and page in memory.
         var all = await projected.ToListAsync(cancellationToken);
         var subsAll = await OcppSubscriptionGate.GetStatesAsync(db, all.Select(x => x.ChargingPointId), cancellationToken);
-        var filtered = all.Select(x => ToDto(x, subsAll, now))
+        var filtered = await WithOnboardingAsync(all.Select(x => ToDto(x, subsAll, now))
             .Where(d => string.Equals(d.ConnectionState, wantState, StringComparison.OrdinalIgnoreCase))
-            .ToList();
+            .ToList(), cancellationToken);
         var p = Math.Max(1, request.Page ?? 1);
         var size = Math.Clamp(request.PageSize ?? 20, 1, 200);
         return new PagedResult<OcppChargePointListItemDto>(filtered.Skip((p - 1) * size).Take(size).ToList(), filtered.Count, p, size);
+    }
+
+    /// <summary>Never-booted chargers get their onboarding state (Waiting / Connected / Refused) from the raw log — a handful of rows at most.</summary>
+    private async Task<List<OcppChargePointListItemDto>> WithOnboardingAsync(List<OcppChargePointListItemDto> items, CancellationToken ct)
+    {
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (items[i].LastBootAt is not null) continue;
+            var ob = await OcppOnboarding.ComputeAsync(db, items[i].ChargePointId, null, items[i].CreatedAt, ct);
+            items[i] = items[i] with { OnboardingState = ob.State, OnboardingReason = ob.Reason };
+        }
+        return items;
     }
 
     private static OcppChargePointListItemDto ToDto(Row x, Dictionary<int, OcppSubscriptionStateDto> subs, DateTime now) => new(
