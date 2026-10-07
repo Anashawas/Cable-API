@@ -1,4 +1,4 @@
-namespace Cable.Requests.ChargingPoints;
+﻿namespace Cable.Requests.ChargingPoints;
 
 /// <summary>
 /// Request to submit charging point update for admin approval
@@ -23,5 +23,5 @@ public record SubmitChargingPointUpdateRequest(
     string? OfferDescription,
     string? Address,
     List<int>? PlugTypeIds,
-    List<int>? AttachmentsToDelete
+    List<string>? AttachmentsToDelete
 );

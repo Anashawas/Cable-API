@@ -12,6 +12,9 @@ public interface IUploadFileService
     bool IsValidSize(IFormFileCollection files);
     string GetFilePath(UploadFileFolders folder, string fileName);
 
+    /// <summary>Stores generated content (e.g. a receipt PDF) under a fresh unique name; returns that name.</summary>
+    Task<string> SaveBytesAsync(byte[] content, string extension, UploadFileFolders folder, CancellationToken cancellationToken = default);
+
     void DeleteFiles(UploadFileFolders uploadFileFolders, string[] filesNames,
         CancellationToken cancellationToken);
 }

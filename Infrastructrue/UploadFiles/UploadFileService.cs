@@ -53,6 +53,18 @@ public class UploadFileService(ICurrentUserService currentUserService, IHttpCont
         return fileName;
     }
 
+    public async Task<string> SaveBytesAsync(byte[] content, string extension, UploadFileFolders folder,
+        CancellationToken cancellationToken = default)
+    {
+        if (content is not { Length: > 0 })
+            throw new DataValidationException(nameof(content), Resources.FileNullOrEmpty);
+        var ext = extension.StartsWith('.') ? extension : "." + extension;
+        var fileName = $"{Guid.CreateVersion7()}{ext}";
+        var filePath = UploadFilePathHelper.SetupFolderPath(_uploadFileOption.FileUploadPath, folder, fileName);
+        await File.WriteAllBytesAsync(filePath, content, cancellationToken);
+        return fileName;
+    }
+
     public bool IsValidExtension(IFormFileCollection files)
     {
         if (files.Any())

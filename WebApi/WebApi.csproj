@@ -6,6 +6,12 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <RootNamespace>Cable</RootNamespace>
         <EnvironmentName>Staging</EnvironmentName>
+        <!-- The SDK's implicit default-item globbing (Content, etc.) would
+             otherwise pick up wwwroot-admin's *.json/web.config files on its
+             own, colliding with the explicit Content item below that covers
+             the whole folder (including the .js/.css/.html files the
+             implicit glob does NOT cover). -->
+        <DefaultItemExcludes>$(DefaultItemExcludes);wwwroot-admin\**;wwwroot-partner\**</DefaultItemExcludes>
     </PropertyGroup>
 
     <ItemGroup>
@@ -28,6 +34,17 @@
       <None Remove="Properties\PublishProfiles\SmaterASP.pubxml" />
       <None Remove="Properties\PublishProfiles\anashawas-001-site1 - FTP.pubxml" />
       <None Remove="Properties\PublishProfiles\Test.pubxml" />
+    </ItemGroup>
+
+    <!--
+      wwwroot is auto-included by the Web SDK; wwwroot-admin (the Cable Admin
+      SPA, synced by Scripts/build-admin.ps1) is a differently-named sibling
+      folder and needs an explicit publish rule or it's silently left out of
+      the publish output.
+    -->
+    <ItemGroup>
+      <Content Include="wwwroot-admin\**" CopyToPublishDirectory="PreserveNewest" Exclude="wwwroot-admin\**\*.user" />
+      <Content Include="wwwroot-partner\**" CopyToPublishDirectory="PreserveNewest" Exclude="wwwroot-partner\**\*.user" />
     </ItemGroup>
 
 </Project>

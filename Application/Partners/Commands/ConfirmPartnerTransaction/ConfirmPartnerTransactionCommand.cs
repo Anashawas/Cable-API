@@ -21,6 +21,7 @@ public class ScanPartnerCodeCommandHandler(
     IApplicationDbContext applicationDbContext,
     ICurrentUserService currentUserService,
     ILoyaltyPointService loyaltyPointService,
+    ILoyaltyBoostService loyaltyBoostService,
     ISettlementService settlementService)
     : IRequestHandler<ScanPartnerCodeCommand, ScanPartnerCodeResult>
 {
@@ -112,6 +113,34 @@ public class ScanPartnerCodeCommandHandler(
             transaction.UserId = userId;
             transaction.CompletedAt = DateTime.UtcNow;
             transaction.Status = (int)PartnerTransactionStatus.Completed;
+
+            // Resolve the loyalty boost here rather than when the code was
+            // issued: the customer is unknown at that point, and both the
+            // first-charge rule and the per-user cap depend on who they are.
+            //
+            // This MUST run before the settlement upsert below — settlement
+            // reads PointsAwarded, so resolving afterwards would record the
+            // unboosted figure against the provider while the customer banks
+            // the boosted one, and the two would never reconcile.
+            transaction.BasePoints ??= transaction.PointsAwarded;
+
+            var boost = await loyaltyBoostService.ResolveAsync(
+                userId,
+                transaction.ProviderType,
+                transaction.ProviderId,
+                DateTime.UtcNow,
+                excludeTransactionId: transaction.Id,
+                cancellationToken: cancellationToken);
+
+            if (boost is not null)
+            {
+                // BoostId is null for the welcome bonus — it has no campaign row.
+                transaction.AppliedBoostId = boost.BoostId;
+                transaction.BoostMultiplier = boost.Multiplier;
+                transaction.IsWelcomeBonus = boost.IsWelcomeBonus;
+                transaction.PointsAwarded =
+                    (int)Math.Floor((transaction.BasePoints ?? 0) * boost.Multiplier);
+            }
 
             // Auto-update settlement for this transaction
             await settlementService.UpsertSettlementForPartnerTransactionAsync(transaction, cancellationToken);

@@ -4,6 +4,8 @@ using Cable.Core.Exceptions;
 using Cable.Core.Utilities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Application.Common.Security;
+using Cable.Core;
 
 namespace Application.ChargingPoints.Commands.UpdateChargingPoint;
 
@@ -48,6 +50,13 @@ public class UpdateChargingPointCommandHandler(
         var chargingPoint = await applicationDbContext.ChargingPoints
                                 .FirstOrDefaultAsync(x => !x.IsDeleted && x.Id == request.Id, cancellationToken)
                             ?? throw new NotFoundException($"can not find charging point with id {request.Id}");
+
+        // Previously any signed-in account could edit any station in the country,
+        // including flipping IsVerified on its own. Owner may edit operational
+        // data; only an admin may touch the trust flag.
+        var isAdmin = await AdminRoleGuard.IsAdminAsync(applicationDbContext, currentUserService, cancellationToken);
+        if (!isAdmin && chargingPoint.OwnerId != user.Id)
+            throw new ForbiddenAccessException("Only the station owner or an admin can update this charging point.");
         
         // Normalize phone numbers if provided
         var normalizedPhone = !string.IsNullOrEmpty(request.Phone) 
@@ -84,7 +93,11 @@ public class UpdateChargingPointCommandHandler(
         chargingPoint.StatusId = request.StatusId;
         chargingPoint.StationTypeId = request.StationTypeId;
         chargingPoint.OwnerPhone = normalizedOwnerPhone;
-        chargingPoint.IsVerified = request.IsVerified;
+        // IsVerified is a non-nullable bool on the request, so a caller that omits it
+        // sends false. Honouring it only for admins also protects an owner's own
+        // save from silently un-verifying their station.
+        if (isAdmin)
+            chargingPoint.IsVerified = request.IsVerified;
         chargingPoint.HasOffer = request.HasOffer;
         chargingPoint.Service = request.Service;
         chargingPoint.OfferDescription = request.OfferDescription;

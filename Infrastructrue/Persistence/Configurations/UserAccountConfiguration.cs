@@ -31,7 +31,15 @@ public partial class UserAccountConfiguration : IEntityTypeConfiguration<UserAcc
         entity.Property(e => e.Phone).HasMaxLength(50);
         entity.Property(e => e.RegistrationProvider).HasMaxLength(255);
         entity.Property(e => e.SecurityStamp).HasMaxLength(50);
+        entity.Property(e => e.ProviderSecurityStamp).HasMaxLength(50);
+        entity.Property(e => e.ProviderWebSecurityStamp).HasMaxLength(50);
         entity.Property(e => e.HasReadUpdateNotes).HasDefaultValue(false);
+
+        entity.Property(e => e.LastLoginAt);
+        entity.Property(e => e.LastSeenAt);
+
+        // Every activity report filters on LastSeenAt across the whole table.
+        entity.HasIndex(e => e.LastSeenAt);
         entity.Property(e => e.RoleId).HasColumnName("RoleID");
 
         entity.HasOne(d => d.Role).WithMany(p => p.UserAccounts)

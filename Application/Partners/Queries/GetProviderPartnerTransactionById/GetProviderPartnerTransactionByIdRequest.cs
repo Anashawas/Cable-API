@@ -25,10 +25,13 @@ public class GetProviderPartnerTransactionByIdRequestHandler(
                                               && !t.IsDeleted, cancellationToken)
                 ?? throw new NotFoundException($"Partner transaction with Id '{request.Id}' not found");
 
+        var isRated = await applicationDbContext.UserRates.AsNoTracking()
+            .AnyAsync(r => r.PartnerTransactionId == x.Id && !r.IsDeleted, cancellationToken);
+
         return new ProviderPartnerTransactionDto(
             x.Id, x.UserId, x.User?.Name, x.TransactionCode,
             x.Status, x.TransactionAmount, x.CurrencyCode,
             x.CommissionAmount, x.PointsAwarded,
-            x.CodeExpiresAt, x.CompletedAt, x.CreatedAt);
+            x.CodeExpiresAt, x.CompletedAt, x.CreatedAt, isRated);
     }
 }

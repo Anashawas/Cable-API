@@ -1,5 +1,6 @@
 ﻿using Application.Common.Extensions;
 using Application.Common.Interfaces.Repositories;
+using Application.Users;
 using Cable.Core;
 using Cable.Core.Exceptions;
 using Cable.Core.Utilities;
@@ -30,6 +31,11 @@ public class UpdateUserCommandHandler(IApplicationDbContext applicationDbContext
         user.Email = request.Email;
         user.Country = request.Country;
         user.City = request.City;
+
+        // Promoting to Provider/Worker must strip any Google/Apple identity, or
+        // the partner app refuses the account. Shared with ChangePassword so the
+        // conversion happens whichever of role/password is set last.
+        await ProviderAccountConverter.EnsureConvertedAsync(applicationDbContext, user, request.RoleId, cancellationToken);
 
         await applicationDbContext.SaveChanges(cancellationToken);
         var userAccount = await userAccountRepository.GetUserDetailsByIdAsync(user.Id, cancellationToken);

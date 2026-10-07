@@ -1,3 +1,4 @@
+using Application.Common.Security;
 using Cable.Core;
 using Cable.Core.Emuns;
 using Cable.Core.Exceptions;
@@ -36,6 +37,12 @@ public class InitiateOfferTransactionCommandHandler(
                                                    && x.ApprovalStatus == (int)OfferApprovalStatus.Approved,
                             cancellationToken)
                     ?? throw new NotFoundException($"Active offer with id {request.OfferId} not found");
+
+        // The offer names the provider, so the caller has to be checked against
+        // it — otherwise any signed-in account could mint a code for anyone.
+        await ProviderAccessGuard.EnsureCanActForProviderAsync(
+            applicationDbContext, currentUserService, offer.ProviderType, offer.ProviderId,
+            cancellationToken);
 
         // Check if provider is blocked from loyalty
         if (offer.ProviderType == "ChargingPoint")

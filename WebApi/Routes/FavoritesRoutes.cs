@@ -37,9 +37,12 @@ public static class FavoritesRoutes
                 async (IMediator mediator, [FromRoute] int chargingPointId, CancellationToken cancellationToken) =>
                 Results.Ok(await mediator.Send(new CheckIsFavoriteRequest(chargingPointId), cancellationToken)))
             .Produces<CheckIsFavoriteDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
             .ProducesInternalServerError()
             .WithName("Check Is Favorite")
             .WithSummary("Check if a charging point is in user's favorites")
+            .WithDescription("Requires a signed-in caller. Previously anonymous, which meant an expired token silently returned isFavorite=false instead of 401 — the heart rendered empty on a station the user had actually favorited.")
             .WithOpenApi();
 
         // Add to favorites

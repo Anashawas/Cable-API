@@ -10,6 +10,8 @@ using Application.ServiceProviders.Commands.RemoveFromFavoriteService;
 using Application.ServiceProviders.Commands.UpdateServiceProvider;
 using Application.ServiceProviders.Commands.UploadServiceProviderIcon;
 using Application.ServiceProviders.Commands.VerifyServiceProvider;
+using Application.Favorites.Queries.CheckIsFavorite;
+using Application.ServiceProviders.Queries.CheckIsFavoriteService;
 using Application.ServiceProviders.Queries.GetAllServiceProviders;
 using Application.ServiceProviders.Queries.GetMyFavoriteServices;
 using Application.ServiceProviders.Queries.GetNearbyServiceProviders;
@@ -300,6 +302,26 @@ public static class ServiceProviderRoutes
                 op.Parameters[0].Required = true;
                 op.Parameters[0].Description = "The ID of the service provider to rate";
                 op.RequestBody.Required = true;
+                return op;
+            });
+
+        // Check if favorited — mirrors GET /api/favorites/check/{id} for stations
+        app.MapGet("/CheckIsFavorite/{serviceProviderId:int}",
+                async (IMediator mediator, [FromRoute] int serviceProviderId,
+                        CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new CheckIsFavoriteServiceRequest(serviceProviderId),
+                        cancellationToken)))
+            .Produces<CheckIsFavoriteDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesInternalServerError()
+            .WithName("Check Service Provider Is Favorite")
+            .WithSummary("Check whether a service provider is in the caller's favorites")
+            .WithDescription("Returns the same shape as the charging-point check (isFavorite + favoriteId), so a client can share one model across both. Lets a detail screen render its favorite state without fetching the full favorites list.")
+            .WithOpenApi(op =>
+            {
+                op.Parameters[0].Required = true;
+                op.Parameters[0].Description = "The ID of the service provider";
                 return op;
             });
 

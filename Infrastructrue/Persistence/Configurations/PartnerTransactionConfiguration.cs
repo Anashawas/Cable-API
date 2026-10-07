@@ -12,6 +12,19 @@ public class PartnerTransactionConfiguration : IEntityTypeConfiguration<PartnerT
 
         builder.HasKey(e => e.Id);
 
+        builder.Property(e => e.BasePoints);
+        builder.Property(e => e.BoostMultiplier);
+        builder.Property(e => e.IsWelcomeBonus).IsRequired().HasDefaultValue(false);
+
+        // No cascade: deleting a campaign must not erase the record of the
+        // transactions it paid out on.
+        builder.HasOne(e => e.AppliedBoost)
+            .WithMany()
+            .HasForeignKey(e => e.AppliedBoostId)
+            .OnDelete(DeleteBehavior.NoAction);
+
+        builder.HasIndex(e => e.AppliedBoostId);
+
         builder.Property(e => e.TransactionCode)
             .IsRequired()
             .HasMaxLength(20);

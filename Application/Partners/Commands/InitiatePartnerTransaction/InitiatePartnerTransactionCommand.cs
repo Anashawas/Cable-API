@@ -1,3 +1,4 @@
+using Application.Common.Security;
 using Application.Common.Extensions;
 using Cable.Core;
 using Cable.Core.Emuns;
@@ -40,6 +41,12 @@ public class InitiatePartnerTransactionCommandHandler(
                                                        && x.IsActive,
                                 cancellationToken)
                         ?? throw new NotFoundException($"Active partner agreement with id {request.PartnerAgreementId} not found");
+
+        // Same exposure as the offer path: the agreement names the provider, so
+        // the caller must be checked against it rather than merely signed in.
+        await ProviderAccessGuard.EnsureCanActForProviderAsync(
+            applicationDbContext, currentUserService, agreement.ProviderType, agreement.ProviderId,
+            cancellationToken);
 
         // Check minimum transaction amount
         if (agreement.MinimumTransactionAmount.HasValue && request.TransactionAmount < agreement.MinimumTransactionAmount.Value)
@@ -138,6 +145,10 @@ public class InitiatePartnerTransactionCommandHandler(
                 PointsConversionRate = conversionRate,
                 PointsEligibleAmount = pointsEligibleAmount,
                 PointsAwarded = pointsToBeAwarded,
+                // Baseline before any boost. The boost is resolved at scan, when
+                // the customer is known; keeping the baseline here means the
+                // bonus is always PointsAwarded - BasePoints, boosted or not.
+                BasePoints = pointsToBeAwarded,
                 ConfirmedByUserId = staffUserId,
                 CodeExpiresAt = expiresAt,
                 WalletCoveredAmount = walletCoveredAmount

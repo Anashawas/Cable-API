@@ -16,8 +16,10 @@ public interface IAuthenticationService
     // Provider 2FA Authentication (Email/Password + OTP)
     Task<ProviderAuthSessionResult> LoginProvider(string email, string password, CancellationToken cancellationToken = default);
     Task<string> SendProviderOtpAsync(string sessionToken, CancellationToken cancellationToken = default);
-    Task<UserLoginResult> VerifyProviderOtpAsync(string sessionToken, string otp, CancellationToken cancellationToken = default);
+    Task<UserLoginResult> VerifyProviderOtpAsync(string sessionToken, string otp, CancellationToken cancellationToken = default,
+        string app = Cable.Core.Constants.AuthApps.Provider);
 
     // Session management
-    Task Logout(int userId, CancellationToken cancellationToken = default);
+    Task Logout(int userId, CancellationToken cancellationToken = default,
+        string app = Cable.Core.Constants.AuthApps.Consumer);
 }

@@ -1,4 +1,5 @@
 ﻿using Application.ChargingPoints.Queries.GetChargingPointById;
+using Cable.Core.Utilities;
 
 namespace Application.ChargingPoints.Queries;
 
@@ -40,4 +41,10 @@ public record GetAllChargingPointsDto(
     int? FavoritesCount = null,
     string? ViewImage = null,
     string? ViewImageStatus = null
-);
+)
+{
+    // Returned in dial-ready E.164 (+962...) so tel: links work without a
+    // mobile release. Storage is unchanged (962... in the DB).
+    public string? Phone { get; init; } = PhoneNumberUtility.ToE164OrOriginal(Phone);
+    public string? OwnerPhone { get; init; } = PhoneNumberUtility.ToE164OrOriginal(OwnerPhone);
+}

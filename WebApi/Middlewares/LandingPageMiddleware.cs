@@ -82,6 +82,7 @@ public static class LandingPageMiddlewareExtension
                 && !path.StartsWithSegments("/OpenApi")
                 && !path.StartsWithSegments("/Cable-API")
                 && !path.StartsWithSegments("/Cable-Jobs-Dashboard")
+                && !path.StartsWithSegments("/admin")
                 && notFoundPage is not null && File.Exists(notFoundPage))
             {
                 context.Response.StatusCode = StatusCodes.Status404NotFound;

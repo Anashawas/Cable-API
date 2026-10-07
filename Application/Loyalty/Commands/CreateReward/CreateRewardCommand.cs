@@ -1,6 +1,7 @@
 using Application.Common.Security;
 using Cable.Core;
 using FluentValidation;
+using Cable.Core.Utilities;
 
 namespace Application.Loyalty.Commands.CreateReward;
 
@@ -62,8 +63,8 @@ public class CreateRewardCommandHandler(
             CurrentRedemptions = 0,
             ImageUrl = request.ImageUrl,
             IsActive = true,
-            ValidFrom = request.ValidFrom,
-            ValidTo = request.ValidTo,
+            ValidFrom = JordanTime.ToUtc(request.ValidFrom),
+            ValidTo = JordanTime.ToUtc(request.ValidTo),
             
         };
 

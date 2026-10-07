@@ -1,4 +1,5 @@
-﻿using Cable.Core;
+﻿using Application.Users;
+using Cable.Core;
 using Cable.Core.Exceptions;
 using Cable.Security.Encryption.Interfaces;
 using Microsoft.EntityFrameworkCore;
@@ -30,6 +31,15 @@ public class ChangePasswordCommandHandler(IApplicationDbContext applicationDbCon
         // }
 
         user.Password = string.IsNullOrEmpty(request.Password) ? null : passwordHasher.HashPassword(request.Password);
+
+        // Setting the password can be the step that completes a social account's
+        // conversion to a partner login: if this user was already promoted to
+        // Provider/Worker but kept its Google/Apple identity (because the password
+        // did not exist at promotion time), clear it now that one exists.
+        // Without this, an admin who promotes THEN sets the password leaves the
+        // account permanently refused by the partner app.
+        await ProviderAccountConverter.EnsureConvertedAsync(applicationDbContext, user, user.RoleId, cancellationToken);
+
         await applicationDbContext.SaveChanges(cancellationToken);
     }
 }

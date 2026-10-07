@@ -1,5 +1,6 @@
 ﻿using System.Security.Claims;
 using Application.Common.Interfaces;
+using Cable.Core.Constants;
 using Cable.Core.Exceptions;
 using Cable.Core.Extenstions;
 using Domain.Enitites;
@@ -15,6 +16,7 @@ public class CurrentUserService( IHttpContextAccessor contextAccessor)
 
     public string Token => contextAccessor.HttpContext.Request.Headers[HeaderNames.Authorization].ToString()
         ?.Replace("Bearer", "", StringComparison.InvariantCultureIgnoreCase)?.Trim();
-    
 
+    public string App => AuthApps.NormalizeOrDefault(
+        contextAccessor.HttpContext?.User?.FindFirstValue(AuthApps.ClaimType));
 }

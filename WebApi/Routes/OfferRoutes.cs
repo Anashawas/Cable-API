@@ -10,6 +10,8 @@ using Application.Offers.Commands.UpdateOffer;
 using Application.Offers.Commands.AddWalletDeposit;
 using Application.Offers.Commands.UpdateSettlementStatus;
 using Application.Offers.Queries.GetActiveOffers;
+using Application.Offers.Queries.PreviewOfferCode;
+using Application.Offers.Queries.GetBestMatchOffer;
 using Application.Offers.Queries.GetMyOfferTransactions;
 using Application.Offers.Queries.GetOfferById;
 using Application.Offers.Queries.GetOffersForProvider;
@@ -66,6 +68,30 @@ public static class OfferRoutes
             .WithDescription("Returns currently active and approved offers. Optional filter by provider type.")
             .WithOpenApi();
 
+        // Best offer for a given city + points balance
+        app.MapGet("/GetBestMatchOffer",
+                async (IMediator mediator, [FromQuery] string city, [FromQuery] int points,
+                        [FromQuery] int? alternativesLimit, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(
+                        new GetBestMatchOfferRequest(city, points, alternativesLimit), cancellationToken)))
+            .Produces<GetBestMatchOfferResult>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Get Best Match Offer")
+            .WithSummary("Best offer in a city for a given points balance")
+            .WithDescription("Send a city and a points balance; returns the offer that balance best covers, plus alternatives. Best match is the MOST EXPENSIVE offer the points already cover, so the user gets the most value rather than the cheapest item. If nothing is affordable yet, the nearest offer above the balance is returned with isAffordable=false and the shortfall in pointsDifference, giving the app a target to show instead of an empty screen. City accepts Arabic or English (عمّان, Amman, al zarqa) and resolves to one of the 12 canonical Jordanian cities; an unrecognised city returns an empty result with resolvedCity=null rather than an error. Covers both charging points and service providers.")
+            .WithOpenApi(op =>
+            {
+                op.Parameters[0].Required = true;
+                op.Parameters[0].Description = "City name, Arabic or English (e.g. Amman, عمّان)";
+                op.Parameters[1].Required = true;
+                op.Parameters[1].Description = "The user's current points balance";
+                op.Parameters[2].Description = "Max alternatives to return (default 5)";
+                return op;
+            });
+
         // Get offer by ID
         app.MapGet("/GetOfferById/{id:int}",
                 async (IMediator mediator, [FromRoute] int id, CancellationToken cancellationToken) =>
@@ -79,6 +105,26 @@ public static class OfferRoutes
             {
                 op.Parameters[0].Required = true;
                 op.Parameters[0].Description = "The ID of the offer";
+                return op;
+            });
+
+        // Preview a scanned offer QR code (read-only — shown for confirmation)
+        app.MapGet("/PreviewOfferCode",
+                async (IMediator mediator, [FromQuery] string code, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new PreviewOfferCodeRequest(code), cancellationToken)))
+            .Produces<PreviewOfferCodeResult>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Preview Offer Code")
+            .WithSummary("Resolve a scanned offer QR code to its details, without redeeming it")
+            .WithDescription("Call immediately after the user scans, to populate the confirmation sheet: offer title, image, provider name, the points it will cost, the monetary value, the user's current balance, and the seconds left before the code expires. Deducts nothing and completes nothing - call ScanOfferCode once the user confirms. CanConfirm is false with a BlockReason when the user cannot complete it: loyalty account blocked, not enough points (pointsShortfall says how many are missing), or the per-user usage limit for this offer already reached. Returns 404 if the code is unknown or no longer awaiting a scan, and a validation error if it has expired.")
+            .WithOpenApi(op =>
+            {
+                op.Parameters[0].Required = true;
+                op.Parameters[0].Description = "The offer code from QR scan (e.g., CBL-7X9K2M)";
                 return op;
             });
 

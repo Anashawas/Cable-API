@@ -1,4 +1,4 @@
-using Application.Common.Interfaces;
+﻿using Application.Common.Interfaces;
 using Cable.Core.Emuns;
 using Cable.Core.Enums;
 using Cable.Core.Exceptions;
@@ -37,7 +37,10 @@ public record SubmitChargingPointUpdateRequestCommand(
     string? OfferDescription,
     string? Address,
     List<int>? PlugTypeIds,
-    List<int>? AttachmentsToDelete
+    // Stored file names (the last segment of each image URL). Partners never see
+    // attachment ids — the attachment endpoints expose URLs only — so the file
+    // name is the only handle the client can send back.
+    List<string>? AttachmentsToDelete
 ) : IRequest<int>;
 
 public class SubmitChargingPointUpdateRequestCommandHandler(
@@ -126,14 +129,47 @@ public class SubmitChargingPointUpdateRequestCommandHandler(
             }
         }
 
-        // 5. Save update request
+        // 5. Resolve requested deletions BEFORE anything is saved, so a bad file
+        //    name rejects the whole submission instead of leaving an orphaned
+        //    pending request behind. File names come from the client as the last
+        //    URL segment; a full URL is tolerated and reduced to its file name.
+        var deletions = new List<(int Id, string FileName)>();
+        if (request.AttachmentsToDelete is { Count: > 0 })
+        {
+            var names = request.AttachmentsToDelete
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .Select(n => Path.GetFileName(n.Trim()))
+                .Where(n => !string.IsNullOrEmpty(n))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            // Only this station's live attachments may be targeted. A name that
+            // belongs to another station, or to nothing, is refused outright —
+            // silently dropping it would let the partner believe it was queued.
+            var owned = await context.ChargingPointAttachments.AsNoTracking()
+                .Where(a => a.ChargingPointId == chargingPoint.Id && !a.IsDeleted && names.Contains(a.FileName))
+                .Select(a => new { a.Id, a.FileName })
+                .ToListAsync(ct);
+
+            var unknown = names
+                .Except(owned.Select(o => o.FileName), StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (unknown.Count > 0)
+                throw new DataValidationException("AttachmentsToDelete",
+                    $"These files do not belong to this charging point: {string.Join(", ", unknown)}");
+
+            deletions = owned.Select(o => (o.Id, o.FileName)).ToList();
+        }
+
+        // 6. Save update request
         context.ChargingPointUpdateRequests.Add(updateRequest);
         await context.SaveChanges(ct);
 
-        // 6. Handle attachment deletions (if any specified)
-        if (request.AttachmentsToDelete?.Any() == true)
+        // 7. Queue the deletions against the saved request. Applied — and the
+        //    physical file removed — only when an admin approves.
+        if (deletions.Count > 0)
         {
-            foreach (var attachmentId in request.AttachmentsToDelete)
+            foreach (var (attachmentId, _) in deletions)
             {
                 context.ChargingPointUpdateRequestAttachments.Add(new ChargingPointUpdateRequestAttachment
                 {

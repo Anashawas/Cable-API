@@ -24,11 +24,23 @@ public class GetMyProviderAssetsRequestHandler(
     {
         var userId = currentUserService.UserId!.Value;
 
-        // Get charging points owned by current user
+        // Charging points owned by the user OR assigned to them as a worker
+        // (the repository query already covers both cases).
         var chargingPoints = await chargingPointRepository.GetChargingPointsByOwner(
             userId, null, null, cancellationToken);
 
-        // Get service providers owned by current user
+        // Service providers this user is an active worker for, in addition to
+        // the ones they own — mirrors GetChargingPointsByOwner and
+        // GetMyServiceProviders, which both include worker assignments.
+        var workerServiceProviderIds = await applicationDbContext.ProviderManagers
+            .AsNoTracking()
+            .Where(pm => pm.ProviderType == "ServiceProvider"
+                      && pm.UserId == userId
+                      && pm.IsActive && !pm.IsDeleted)
+            .Select(pm => pm.ProviderId)
+            .ToListAsync(cancellationToken);
+
+        // Get service providers owned by, or worked on by, the current user
         var serviceProviders = await applicationDbContext.ServiceProviders
             .AsNoTracking()
             .Include(x => x.Owner)
@@ -36,7 +48,8 @@ public class GetMyProviderAssetsRequestHandler(
             .Include(x => x.Status)
             .Include(x => x.ServiceProviderRates.Where(r => !r.IsDeleted))
             .Include(x => x.ServiceProviderAttachments.Where(a => !a.IsDeleted))
-            .Where(x => !x.IsDeleted && x.OwnerId == userId)
+            .Where(x => !x.IsDeleted
+                        && (x.OwnerId == userId || workerServiceProviderIds.Contains(x.Id)))
             .OrderByDescending(x => x.CreatedAt)
             .ToListAsync(cancellationToken);
 

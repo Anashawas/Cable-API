@@ -1,3 +1,6 @@
+using Application.Settings;
+using Application.Subscriptions;
+using Cable.Core.Constants;
 using Cable.Core.Exceptions;
 using Microsoft.EntityFrameworkCore;
 
@@ -19,7 +22,11 @@ public record StationPremiumHistoryDto(
     bool IsPremiumActive,
     List<StationPremiumSubscriptionDto> History);
 
-/// <summary>Premium payment history for a station, newest first.</summary>
+/// <summary>
+/// Premium payment history for a station, newest first. Same response shape as
+/// before the payment-tracking work; it now reads the unified Subscription /
+/// Payment tables, and "active" honours the grace rule and the admin switch.
+/// </summary>
 public record GetStationPremiumHistoryRequest(int ChargingPointId) : IRequest<StationPremiumHistoryDto>;
 
 public class GetStationPremiumHistoryRequestHandler(IApplicationDbContext applicationDbContext)
@@ -36,19 +43,31 @@ public class GetStationPremiumHistoryRequestHandler(IApplicationDbContext applic
                             ?? throw new NotFoundException(
                                 $"can not find charging point with id {request.ChargingPointId}");
 
-        var history = await applicationDbContext.StationPremiumSubscriptions
-            .AsNoTracking()
-            .Where(x => x.ChargingPointId == request.ChargingPointId && !x.IsDeleted)
-            .OrderByDescending(x => x.PaymentDate)
-            .Select(x => new StationPremiumSubscriptionDto(
-                x.Id, x.PaymentDate, x.ExpiresAt, x.Amount, x.Note, x.CreatedAt, x.CreatedBy))
-            .ToListAsync(cancellationToken);
+        var subscription = await applicationDbContext.Subscriptions.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.EntityType == SubscriptionEntityTypes.StationPremium
+                                      && s.EntityId == request.ChargingPointId && !s.IsDeleted, cancellationToken);
+
+        var history = subscription == null
+            ? []
+            : await applicationDbContext.Payments.AsNoTracking()
+                .Where(p => p.SubscriptionId == subscription.Id && !p.IsDeleted && !p.IsVoid)
+                .OrderByDescending(p => p.PaidDate)
+                .Select(p => new StationPremiumSubscriptionDto(
+                    p.Id, p.PaidDate, p.PeriodEnd, p.Amount, p.Note, p.CreatedAt, p.CreatedBy))
+                .ToListAsync(cancellationToken);
+
+        var isActive = false;
+        if (subscription != null)
+        {
+            var grace = await AppSettingsProvider.GetSubscriptionGraceAsync(applicationDbContext, cancellationToken);
+            isActive = SubscriptionPeriodCalculator.IsOn(subscription, grace, DateTime.UtcNow);
+        }
 
         return new StationPremiumHistoryDto(
             request.ChargingPointId,
             chargingPoint.PremiumPaymentDate,
             chargingPoint.PremiumExpiresAt,
-            chargingPoint.PremiumExpiresAt.HasValue && chargingPoint.PremiumExpiresAt.Value > DateTime.UtcNow,
+            isActive,
             history);
     }
 }

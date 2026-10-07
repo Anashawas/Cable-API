@@ -1,4 +1,4 @@
-using Application.Common.Interfaces;
+﻿using Application.Common.Interfaces;
 using Application.NotificationInbox.Helpers;
 using Cable.Core.Enums;
 using MediatR;
@@ -41,7 +41,9 @@ public class SendNotificationByFilterCommandHandler(
         // 1. Build query to find matching users
         var usersQuery = applicationDbContext.UserAccounts
             .AsNoTracking()
-            .Where(x => !x.IsDeleted);
+            // IsActive as well as IsDeleted: a deactivated account is barred from
+            // the app, so pushing to it advertises a service its owner cannot open.
+            .Where(x => !x.IsDeleted && x.IsActive);
 
         // Filter by City if provided
         if (!string.IsNullOrWhiteSpace(request.City))

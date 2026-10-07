@@ -1,4 +1,4 @@
-using Application.Common.Interfaces;
+﻿using Application.Common.Interfaces;
 using Application.NotificationInbox.Helpers;
 using Cable.Core;
 using Cable.Core.Enums;
@@ -65,12 +65,12 @@ public static class FavoritesNotificationDelivery
     {
         return providerType == "ChargingPoint"
             ? await db.UserFavoriteChargingPoints.AsNoTracking()
-                .Where(f => !f.IsDeleted && f.ChargingPointId == providerId && !f.User.IsDeleted)
+                .Where(f => !f.IsDeleted && f.ChargingPointId == providerId && !f.User.IsDeleted && f.User.IsActive)
                 .Select(f => f.UserId)
                 .Distinct()
                 .ToListAsync(ct)
             : await db.UserFavoriteServiceProviders.AsNoTracking()
-                .Where(f => !f.IsDeleted && f.ServiceProviderId == providerId && !f.User.IsDeleted)
+                .Where(f => !f.IsDeleted && f.ServiceProviderId == providerId && !f.User.IsDeleted && f.User.IsActive)
                 .Select(f => f.UserId)
                 .Distinct()
                 .ToListAsync(ct);

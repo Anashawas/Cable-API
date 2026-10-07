@@ -15,7 +15,14 @@ public record ProviderPartnerTransactionDto(
     int? PointsAwarded,
     DateTime CodeExpiresAt,
     DateTime? CompletedAt,
-    DateTime? CreatedAt
+    DateTime? CreatedAt,
+    /// <summary>
+    /// Whether the provider has already rated this visit's driver. Lets the
+    /// provider app show "Rate customer" only where it can still be used —
+    /// the one-rating-per-transaction rule would otherwise surface as an error
+    /// after the fact.
+    /// </summary>
+    bool IsRated
 );
 
 public record GetProviderPartnerTransactionsRequest(
@@ -53,7 +60,8 @@ public class GetProviderPartnerTransactionsRequestHandler(
                 x.Id, x.UserId, x.User != null ? x.User.Name : null, x.TransactionCode,
                 x.Status, x.TransactionAmount, x.CurrencyCode,
                 x.CommissionAmount, x.PointsAwarded,
-                x.CodeExpiresAt, x.CompletedAt, x.CreatedAt))
+                x.CodeExpiresAt, x.CompletedAt, x.CreatedAt,
+                applicationDbContext.UserRates.Any(r => r.PartnerTransactionId == x.Id && !r.IsDeleted)))
             .ToOptionallyPaginatedAsync(request.Page, request.PageSize, cancellationToken: cancellationToken);
     }
 }

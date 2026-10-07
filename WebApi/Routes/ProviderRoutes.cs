@@ -11,7 +11,9 @@ using Application.ChargingPoints.Queries.GetPendingUpdateRequests;
 using Application.ChargingPoints.Queries.GetUpdateRequestById;
 using Application.Common.Interfaces;
 using Application.Common.Models;
+using Cable.Core.Constants;
 using Application.Providers.Commands.SendFavoritesNotification;
+using Application.Providers.Queries.GetAutoApproveWorkerNotifications;
 using Application.Providers.Commands.SetAutoApproveWorkerNotifications;
 using Application.Providers.Queries.GetFavoritesNotificationHistory;
 using Application.Providers.Queries.GetMyProviderAssets;
@@ -105,11 +107,16 @@ public static class ProviderRoutes
         app.MapPost("/verify-otp", async (
                 ProviderVerifyOtpRequest request,
                 IAuthenticationService authenticationService,
+                HttpContext httpContext,
                 CancellationToken cancellationToken) =>
+                // The optional X-Client-App header separates the partner WEB
+                // portal from the mobile app so each holds its own session.
+                // Mobile sends no header and resolves to the mobile slot.
                 Results.Ok(await authenticationService.VerifyProviderOtpAsync(
                     request.SessionToken,
                     request.OtpCode,
-                    cancellationToken))
+                    cancellationToken,
+                    AuthApps.ResolveProviderApp(httpContext.Request.Headers[AuthApps.ClientHeader])))
             )
             .AddEndpointFilter<ProviderVerifyOtpRequestValidationFilter>()
             .Produces<UserLoginResult>()
@@ -129,7 +136,10 @@ public static class ProviderRoutes
         app.MapPost("/logout", async (IAuthenticationService authenticationService,
                     ICurrentUserService currentUserService, CancellationToken cancellationToken) =>
                 {
-                    await authenticationService.Logout(currentUserService.UserId!.Value, cancellationToken);
+                    // Ends the provider-app session only; a Cable consumer-app
+                    // session for the same account stays signed in.
+                    await authenticationService.Logout(currentUserService.UserId!.Value, cancellationToken,
+                        currentUserService.App);
                     return Results.Ok();
                 })
             .RequireAuthorization()
@@ -261,6 +271,24 @@ public static class ProviderRoutes
             .ProducesInternalServerError()
             .WithName("Reject Favorites Notification")
             .WithSummary("F3: owner/admin rejects a worker's pending announcement — nothing is delivered")
+            .WithOpenApi();
+
+        app.MapGet("/favorites/{providerType}/{providerId:int}/auto-approve-worker-notifications",
+                async (IMediator mediator, [FromRoute] string providerType, [FromRoute] int providerId,
+                        CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(
+                        new GetAutoApproveWorkerNotificationsRequest(providerType, providerId),
+                        cancellationToken)))
+            .Produces<AutoApproveWorkerNotificationsDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Get Auto Approve Worker Notifications")
+            .WithSummary("F4: current state of the direct-send toggle for this provider's workers (owner/admin only)")
+            .WithDescription("providerType is 'ChargingPoint' or 'ServiceProvider'. Returns { providerType, providerId, enabled }.")
             .WithOpenApi();
 
         app.MapPut("/favorites/{providerType}/{providerId:int}/auto-approve-worker-notifications",

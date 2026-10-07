@@ -1,4 +1,5 @@
-using Application.Common.Models;
+﻿using Application.Common.Models;
+using Application.Offers.Queries.Common;
 using Cable.Core.Emuns;
 using Microsoft.EntityFrameworkCore;
 
@@ -39,6 +40,18 @@ public class GetAllServiceProvidersRequestHandler(
             .ToListAsync(cancellationToken);
         var partnerSet = partnerProviderIds.ToHashSet();
 
+        var offersByProvider = await ProviderOfferSummaryLoader.LoadByProviderAsync(
+            applicationDbContext, uploadFileService, "ServiceProvider", providerIds, cancellationToken);
+
+        // Follower counts for the admin list — the same figure the followers
+        // endpoint reports, batched so a page of providers is one query.
+        var favCounts = await applicationDbContext.UserFavoriteServiceProviders
+            .AsNoTracking()
+            .Where(f => !f.IsDeleted && providerIds.Contains(f.ServiceProviderId))
+            .GroupBy(f => f.ServiceProviderId)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Count, cancellationToken);
+
         return providers.Select(x => new ServiceProviderDto(
             x.Id,
             x.Name,
@@ -76,7 +89,9 @@ public class GetAllServiceProvidersRequestHandler(
             x.ServiceProviderAttachments.Select(a =>
                 uploadFileService.GetFilePath(UploadFileFolders.CableServiceProvider, a.FileName)).ToList(),
             x.CreatedAt,
-            partnerSet.Contains(x.Id)
+            partnerSet.Contains(x.Id),
+            favCounts.GetValueOrDefault(x.Id, 0),
+            offersByProvider.GetValueOrDefault(x.Id, [])
         )).ToList().ToOptionallyPaginated(request.Page, request.PageSize);
     }
 }

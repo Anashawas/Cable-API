@@ -1,4 +1,6 @@
-﻿namespace Application.ChargingPoints.Queries.GetChargingPointById;
+﻿using Cable.Core.Utilities;
+
+namespace Application.ChargingPoints.Queries.GetChargingPointById;
 
 public record GetChargingPointByIdDto(
     int Id,
@@ -41,7 +43,14 @@ public record GetChargingPointByIdDto(
     List<ChargerBrandSummary>? ChargerBrands = null,
     DateTime? CreatedAt = null,
     DateTime? ModifiedAt = null
-);
+)
+{
+    // Returned in dial-ready E.164 (+962...) so tel: links work without a
+    // mobile release. Storage is unchanged (962... in the DB).
+    public string? Phone { get; init; } = PhoneNumberUtility.ToE164OrOriginal(Phone);
+    public string? OwnerPhone { get; init; } = PhoneNumberUtility.ToE164OrOriginal(OwnerPhone);
+    public string? OwnerAccountPhone { get; init; } = PhoneNumberUtility.ToE164OrOriginal(OwnerAccountPhone);
+}
 
 /// <summary>A charger brand at the station and how many chargers of it.</summary>
 public record ChargerBrandSummary(int Id, string Name, int Count);

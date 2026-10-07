@@ -2,6 +2,7 @@ using Cable.Core.Exceptions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Cable.Core.Utilities;
 
 namespace Application.SharedLinks.Commands.CreateSharedLink;
 
@@ -34,7 +35,7 @@ public class CreateSharedLinkCommandHandler(
             LinkType = request.LinkType,
             TargetId = request.TargetId,
             Parameters = request.Parameters,
-            ExpiresAt = request.ExpiresAt,
+            ExpiresAt = JordanTime.ToUtc(request.ExpiresAt),
             MaxUsage = request.MaxUsage,
             CurrentUsage = 0,
             IsActive = true,

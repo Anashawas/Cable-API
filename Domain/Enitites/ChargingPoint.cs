@@ -68,7 +68,7 @@ public partial class ChargingPoint : BaseAuditableEntity
     public decimal? WalletCreditLimit { get; set; }
     public decimal WalletBalance { get; set; }
 
-    // Premium subscription (latest values; full history in StationPremiumSubscription)
+    // Premium subscription (latest values, synced from Subscription/Payment; history lives there)
     public DateTime? PremiumPaymentDate { get; set; }
     public DateTime? PremiumExpiresAt { get; set; }
 

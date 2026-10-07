@@ -1,6 +1,7 @@
 using Cable.Core;
 using Cable.Core.Exceptions;
 using Microsoft.EntityFrameworkCore;
+using Cable.Core.Utilities;
 
 namespace Application.Offers.Commands.UpdateOffer;
 
@@ -54,8 +55,8 @@ public class UpdateOfferCommandHandler(
         offer.MaxTotalUses = request.MaxTotalUses;
         offer.OfferCodeExpirySeconds = request.OfferCodeExpirySeconds;
         offer.ImageUrl = request.ImageUrl;
-        offer.ValidFrom = request.ValidFrom;
-        offer.ValidTo = request.ValidTo;
+        offer.ValidFrom = JordanTime.ToUtc(request.ValidFrom);
+        offer.ValidTo = JordanTime.ToUtc(request.ValidTo);
         offer.IsActive = request.IsActive;
 
         await applicationDbContext.SaveChanges(cancellationToken);

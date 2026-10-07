@@ -11,5 +11,7 @@ public enum UploadFileFolders
     CableSocialMediaIcons,
     CableCarTypes,
     CableViewImages,
-    CableAnnouncements
+    CableAnnouncements,
+    /// <summary>Generated payment receipts. Deliberately absent from AllowedUploadFiles: served only through the authorized receipt endpoint.</summary>
+    CableReceipts
 }

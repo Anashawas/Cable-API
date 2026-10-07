@@ -1,5 +1,6 @@
-using Application.Common.Models;
+﻿using Application.Common.Models;
 using Application.Common.Interfaces;
+using Application.Offers.Queries.Common;
 using Application.ServiceProviders.Queries.GetAllServiceProviders;
 using Cable.Core.Emuns;
 using Microsoft.EntityFrameworkCore;
@@ -61,6 +62,9 @@ public class GetMyServiceProvidersRequestHandler(
             .Select(g => new { g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.Key, x => x.Count, cancellationToken);
 
+        var offersByProvider = await ProviderOfferSummaryLoader.LoadByProviderAsync(
+            applicationDbContext, uploadFileService, "ServiceProvider", providerIds, cancellationToken);
+
         return providers.Select(x => new ServiceProviderDto(
             x.Id,
             x.Name,
@@ -99,7 +103,8 @@ public class GetMyServiceProvidersRequestHandler(
                 uploadFileService.GetFilePath(UploadFileFolders.CableServiceProvider, a.FileName)).ToList(),
             x.CreatedAt,
             partnerSet.Contains(x.Id),
-            favCounts.GetValueOrDefault(x.Id, 0)
+            favCounts.GetValueOrDefault(x.Id, 0),
+            offersByProvider.GetValueOrDefault(x.Id, [])
         )).ToList().ToOptionallyPaginated(request.Page, request.PageSize);
     }
 }

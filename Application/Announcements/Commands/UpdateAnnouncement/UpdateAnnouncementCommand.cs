@@ -4,6 +4,7 @@ using Cable.Core;
 using Cable.Core.Exceptions;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
+using Cable.Core.Utilities;
 
 namespace Application.Announcements.Commands.UpdateAnnouncement;
 
@@ -82,8 +83,8 @@ public class UpdateAnnouncementCommandHandler(
         announcement.CenterLng = request.CenterLng;
         announcement.RadiusKm = request.RadiusKm;
         announcement.Audience = request.Audience;
-        announcement.StartDate = request.StartDate;
-        announcement.EndDate = request.EndDate;
+        announcement.StartDate = JordanTime.ToUtc(request.StartDate);
+        announcement.EndDate = JordanTime.ToUtc(request.EndDate);
         announcement.MaxPerDay = request.MaxPerDay;
         announcement.CooldownHours = request.CooldownHours;
         announcement.MaxLifetime = request.MaxLifetime;

@@ -33,5 +33,23 @@ public class ProposeOfferCommandValidator : AbstractValidator<ProposeOfferComman
 
         RuleFor(x => x.OfferCodeExpirySeconds)
             .GreaterThan(0).WithMessage("Offer code expiry must be greater than 0 seconds");
+
+        RuleFor(x => x.ValidTo)
+            .Must((cmd, validTo) => validTo == null || validTo > cmd.ValidFrom)
+            .WithMessage("Valid to must be after valid from");
+
+        // Left unvalidated until now, and production has an offer sitting at -9.
+        // Redemption tests `usesSoFar >= MaxUsesPerUser`, so any value <= 0 makes
+        // that true on the first attempt: the provider can still generate a QR,
+        // the customer scans it, and only then is told they have hit a limit they
+        // never had. Code generation succeeds and redemption always fails.
+        RuleFor(x => x.MaxUsesPerUser)
+            .GreaterThan(0).When(x => x.MaxUsesPerUser.HasValue)
+            .WithMessage("Max uses per user must be greater than 0, or left empty for unlimited");
+
+        RuleFor(x => x.MaxTotalUses)
+            .GreaterThan(0).When(x => x.MaxTotalUses.HasValue)
+            .WithMessage("Max total uses must be greater than 0, or left empty for unlimited");
+
     }
 }

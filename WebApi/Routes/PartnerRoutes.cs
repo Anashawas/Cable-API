@@ -15,6 +15,7 @@ using Application.Partners.Queries.GetProviderBalance;
 using Application.Partners.Queries.GetProviderPartnerAgreement;
 using Application.Partners.Queries.GetProviderPartnerTransactionById;
 using Application.Partners.Queries.GetProviderPartnerTransactions;
+using Application.Partners.Queries.PreviewPartnerCode;
 using Cable.Requests.Partners;
 using Cable.WebApi.OpenAPI;
 using MediatR;
@@ -71,7 +72,22 @@ public static class PartnerRoutes
                 return op;
             });
 
-        // Scan partner QR code (user scans → earns points)
+        // Preview a scanned partner QR code (read-only — shown for confirmation)
+        app.MapGet("/PreviewPartnerCode",
+                async (IMediator mediator, [FromQuery] string code, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new PreviewPartnerCodeRequest(code), cancellationToken)))
+            .Produces<PreviewPartnerCodeResult>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Preview Partner Code")
+            .WithSummary("Resolve a scanned partner QR code to its details, without completing it")
+            .WithDescription("Call immediately after the user scans, to populate the confirmation sheet: provider name, amount, currency, commission, points to be awarded, and the seconds left before the code expires. Awards nothing and does not complete the transaction — call ScanPartnerCode once the user confirms. CanConfirm is false with a BlockReason when the user's loyalty account is blocked, so the block surfaces before they commit. Returns 404 if the code is unknown or no longer awaiting a scan, and a validation error if it has expired.")
+            .WithOpenApi();
+
+        // Scan partner QR code (user confirms → transaction completes, points awarded)
         app.MapPost("/ScanPartnerCode",
                 async (IMediator mediator, [FromQuery] string code, CancellationToken cancellationToken) =>
                     Results.Ok(await mediator.Send(new ScanPartnerCodeCommand(code), cancellationToken)))
@@ -82,8 +98,8 @@ public static class PartnerRoutes
             .ProducesValidationProblem()
             .ProducesInternalServerError()
             .WithName("Scan Partner Code")
-            .WithSummary("Scan a partner QR code to complete transaction and earn points")
-            .WithDescription("User scans the QR code shown by provider staff. System validates the code, completes the transaction, and awards loyalty points.")
+            .WithSummary("Confirm a scanned partner QR code to complete the transaction and earn points")
+            .WithDescription("Called once the user confirms the details returned by PreviewPartnerCode. Validates the code, completes the transaction, updates the settlement, and awards loyalty points — all in one database transaction. Safe to call directly without a preview; the same validation runs either way.")
             .WithOpenApi();
 
         // Get my partner transactions

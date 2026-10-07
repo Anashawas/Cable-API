@@ -118,7 +118,7 @@ public class ChargingPointRepository(ApplicationDbContext applicationDbContext, 
             .SqlQueryRaw<ChargingPointsResult>(sql, parameters.ToArray())
             .ToListAsync(cancellationToken);
 
-        return MapToListDtos(results);
+        return await AttachFollowerCountsAsync(MapToListDtos(results), cancellationToken);
     }
 
     public async Task<PagedResult<GetAllChargingPointsDto>> GetChargingPointsPaged(
@@ -305,8 +305,33 @@ public class ChargingPointRepository(ApplicationDbContext applicationDbContext, 
         // Preserve the sorted page order (grouping does not guarantee it).
         var order = ids.Select((id, i) => (id, i)).ToDictionary(x => x.id, x => x.i);
         dtos = dtos.OrderBy(d => order.GetValueOrDefault(d.Id, int.MaxValue)).ToList();
+        dtos = await AttachFollowerCountsAsync(dtos, cancellationToken);
 
         return new PagedResult<GetAllChargingPointsDto>(dtos, totalCount, page, pageSize ?? totalCount);
+    }
+
+    /// <summary>
+    /// Fills <c>FavoritesCount</c> for a batch of stations in one query. The list
+    /// endpoints are raw SQL for performance, and the follower count was only
+    /// ever computed on the owner-scoped query — so the admin stations table
+    /// showed 0 followers for every station while the followers endpoint
+    /// reported real numbers for the same ids.
+    /// </summary>
+    private async Task<List<GetAllChargingPointsDto>> AttachFollowerCountsAsync(
+        List<GetAllChargingPointsDto> dtos, CancellationToken cancellationToken)
+    {
+        if (dtos.Count == 0)
+            return dtos;
+
+        var ids = dtos.Select(d => d.Id).ToList();
+        var favCounts = await applicationDbContext.UserFavoriteChargingPoints
+            .AsNoTracking()
+            .Where(f => !f.IsDeleted && ids.Contains(f.ChargingPointId))
+            .GroupBy(f => f.ChargingPointId)
+            .Select(g => new { g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.Key, x => x.Count, cancellationToken);
+
+        return dtos.Select(d => d with { FavoritesCount = favCounts.GetValueOrDefault(d.Id, 0) }).ToList();
     }
 
     private List<GetAllChargingPointsDto> MapToListDtos(List<ChargingPointsResult> results)

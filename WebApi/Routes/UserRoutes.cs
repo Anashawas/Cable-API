@@ -3,6 +3,7 @@ using Application.Authentication.Commands.VerifyOtp;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Users.Commands.AddUser;
+using Application.Users.Queries.GetUserActivityStats;
 using Application.Users.Commands.ChangePassword;
 using Application.Users.Commands.AdminChangePhone;
 using Application.Users.Commands.DeleteUser;
@@ -447,7 +448,9 @@ public static class UserRoutes
         app.MapPost("/logout", async (IAuthenticationService authenticationService,
                     ICurrentUserService currentUserService, CancellationToken cancellationToken) =>
                 {
-                    await authenticationService.Logout(currentUserService.UserId!.Value, cancellationToken);
+                    // Ends only the session the caller's token belongs to.
+                    await authenticationService.Logout(currentUserService.UserId!.Value, cancellationToken,
+                        currentUserService.App);
                     return Results.Ok();
                 })
             .RequireAuthorization()
@@ -455,6 +458,18 @@ public static class UserRoutes
             .ProducesInternalServerError()
             .WithName("Logout")
             .WithSummary("Logs out the user by invalidating all active sessions")
+            .WithOpenApi();
+
+        app.MapGet("/activity-stats", async (IMediator mediator, CancellationToken cancellationToken) =>
+                Results.Ok(await mediator.Send(new GetUserActivityStatsRequest(), cancellationToken)))
+            .Produces<UserActivityStatsDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Get user activity stats")
+            .WithSummary("Admin: how many people are actually using the app")
+            .WithDescription("Daily/weekly/monthly active users based on LastSeenAt, which is stamped on any authenticated request (throttled to one write per user per 15 minutes). Also returns registrations for the same windows. LoggedInLast30Days counts users who actually re-authenticated and will be far lower than MonthlyActiveUsers - access tokens are long-lived, so active users rarely sign in again. NeverSeen starts near the total user count and falls as people return, since tracking only begins when this deploys.")
             .WithOpenApi();
 
         return app;

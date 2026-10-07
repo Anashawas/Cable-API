@@ -9,6 +9,9 @@ public partial class BannerDuration : BaseAuditableEntity
     public DateOnly StartDate { get; set; }
     public DateOnly EndDate { get; set; }
 
+    /// <summary>Set when this run was bought through a Subscription; null for manually scheduled runs.</summary>
+    public int? SubscriptionId { get; set; }
+
     public Banner Banner { get; set; } = null!;
     
 }

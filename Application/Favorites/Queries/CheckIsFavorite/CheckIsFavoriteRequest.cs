@@ -1,3 +1,4 @@
+using Cable.Core;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Favorites.Queries.CheckIsFavorite;
@@ -12,10 +13,11 @@ public class CheckIsFavoriteQueryHandler(
     public async Task<CheckIsFavoriteDto> Handle(CheckIsFavoriteRequest request,
         CancellationToken cancellationToken)
     {
-        var userId = currentUserService.UserId;
-
-        if (userId == null)
-            return new CheckIsFavoriteDto(false, null);
+        // The route requires authentication, so a missing user is a broken
+        // caller rather than a signed-out one. Returning "not favorited" here
+        // (the previous behaviour) turned an expired token into a wrong answer.
+        var userId = currentUserService.UserId
+                     ?? throw new NotAuthorizedAccessException("User not authenticated");
 
         var favorite = await applicationDbContext.UserFavoriteChargingPoints
             .AsNoTracking()

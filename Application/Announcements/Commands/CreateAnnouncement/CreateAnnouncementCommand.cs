@@ -3,6 +3,7 @@ using Application.Common.Security;
 using Cable.Core;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
+using Cable.Core.Utilities;
 
 namespace Application.Announcements.Commands.CreateAnnouncement;
 
@@ -90,8 +91,8 @@ public class CreateAnnouncementCommandHandler(
             CenterLng = request.CenterLng,
             RadiusKm = request.RadiusKm,
             Audience = request.Audience,
-            StartDate = request.StartDate ?? DateTime.UtcNow,
-            EndDate = request.EndDate,
+            StartDate = JordanTime.ToUtc(request.StartDate) ?? DateTime.UtcNow,
+            EndDate = JordanTime.ToUtc(request.EndDate),
             MaxPerDay = request.MaxPerDay,
             CooldownHours = request.CooldownHours,
             MaxLifetime = request.MaxLifetime,

@@ -43,6 +43,6 @@
         <value>الرجاء ارفاق ملف</value>
     </data>
     <data name="OtpMessage" xml:space="preserve">
-        <value>رمز التحقق الخاص بك في تطبيق Cable هو: {0}. ستنتهي صلاحية هذا الرمز خلال {1} دقيقة.</value>
+        <value>رمز التحقق في Cable: {0}. صالح لمدة {1} دقائق.</value>
     </data>
 </root>

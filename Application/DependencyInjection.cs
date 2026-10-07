@@ -21,6 +21,9 @@ public static class DependencyInjection
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(PerformanceBehaviour<,>));
         
         
+        // Shared by RecordPayment and the legacy premium endpoint.
+        services.AddScoped<Subscriptions.PaymentRecorder>();
+
         return services;
     }
 }

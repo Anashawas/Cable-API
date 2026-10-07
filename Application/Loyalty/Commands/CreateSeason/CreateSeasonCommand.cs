@@ -3,6 +3,7 @@ using Cable.Core;
 using Cable.Core.Exceptions;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
+using Cable.Core.Utilities;
 
 namespace Application.Loyalty.Commands.CreateSeason;
 
@@ -52,8 +53,8 @@ public class CreateSeasonCommandHandler(
         {
             Name = request.Name,
             Description = request.Description,
-            StartDate = request.StartDate,
-            EndDate = request.EndDate,
+            StartDate = JordanTime.ToUtc(request.StartDate),
+            EndDate = JordanTime.ToUtc(request.EndDate),
             IsActive = request.ActivateImmediately,
             CreatedAt = now,
             CreatedBy = userId

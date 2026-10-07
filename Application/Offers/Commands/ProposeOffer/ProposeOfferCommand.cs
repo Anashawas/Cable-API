@@ -1,5 +1,6 @@
 using Cable.Core;
 using Cable.Core.Emuns;
+using Cable.Core.Utilities;
 
 namespace Application.Offers.Commands.ProposeOffer;
 
@@ -52,8 +53,9 @@ public class ProposeOfferCommandHandler(
             CurrentTotalUses = 0,
             OfferCodeExpirySeconds = request.OfferCodeExpirySeconds > 0 ? request.OfferCodeExpirySeconds : 60,
             ImageUrl = request.ImageUrl,
-            ValidFrom = request.ValidFrom,
-            ValidTo = request.ValidTo,
+            // Entered as Amman wall-clock; stored and compared as UTC.
+            ValidFrom = JordanTime.ToUtc(request.ValidFrom),
+            ValidTo = JordanTime.ToUtc(request.ValidTo),
             IsActive = false // Not active until approved
         };
 

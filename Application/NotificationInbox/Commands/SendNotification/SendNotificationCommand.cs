@@ -1,4 +1,4 @@
-using Application.Common.Interfaces;
+﻿using Application.Common.Interfaces;
 using Application.NotificationInbox.Helpers;
 using Cable.Core.Enums;
 using MediatR;
@@ -44,7 +44,14 @@ public class SendNotificationCommandHandler(
             // Get all user IDs that have tokens registered for the specified app type
             var allUserIds = await applicationDbContext.NotificationTokens
                 .AsNoTracking()
-                .Where(x => x.AppType == request.AppType)
+                // A token outlives the account that registered it: DeleteUser only
+                // flips IsDeleted, and nothing clears NotificationToken. Without
+                // this join a broadcast still pushes to deleted and deactivated
+                // accounts — the sibling senders (by-category, favourites) both
+                // filter the user, so this path was the odd one out.
+                .Where(x => x.AppType == request.AppType
+                            && !x.UserAccount.IsDeleted
+                            && x.UserAccount.IsActive)
                 .Select(x => x.UserId)
                 .Distinct()
                 .ToListAsync(cancellationToken);
@@ -69,7 +76,13 @@ public class SendNotificationCommandHandler(
         // Get user tokens for the specified app type only
         var userTokens = await applicationDbContext.NotificationTokens
             .AsNoTracking()
-            .Where(x => request.UserIds.Contains(x.UserId) && x.AppType == request.AppType)
+            // Same guard on the targeted path: an explicit UserIds list is only as
+            // good as its source, and a stale admin selection must not resurrect a
+            // deleted account's device.
+            .Where(x => request.UserIds.Contains(x.UserId)
+                        && x.AppType == request.AppType
+                        && !x.UserAccount.IsDeleted
+                        && x.UserAccount.IsActive)
             .Select(x => new { x.UserId, x.Token })
             .ToListAsync(cancellationToken);
 

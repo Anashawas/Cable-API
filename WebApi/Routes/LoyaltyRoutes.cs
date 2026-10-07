@@ -1,3 +1,5 @@
+using Application.Loyalty.Commands.ManageBoosts;
+using Application.Loyalty.Queries.GetLoyaltyBoosts;
 using Application.Loyalty.Commands.AdminAdjustPoints;
 using Application.Loyalty.Commands.BlockProviderFromLoyalty;
 using Application.Loyalty.Commands.BlockUserFromLoyalty;
@@ -804,6 +806,88 @@ public static class LoyaltyRoutes
                 op.RequestBody.Required = true;
                 return op;
             });
+
+        // ==========================================
+        // BOOSTS (admin) — multiplied points campaigns
+        // ==========================================
+
+        app.MapGet("/boosts",
+                // Nullable so both filters are genuinely optional: a non-nullable
+                // bool is bound as REQUIRED and a bare GET /boosts 500s.
+                async (IMediator mediator, [FromQuery] bool? activeOnly, [FromQuery] bool? currentOnly,
+                        CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(
+                        new GetLoyaltyBoostsRequest(activeOnly ?? false, currentOnly ?? false), cancellationToken)))
+            .Produces<List<LoyaltyBoostDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Get Loyalty Boosts")
+            .WithSummary("Admin: list points-multiplier campaigns, with bonus points spent to date")
+            .WithDescription("activeOnly filters on the IsActive flag; currentOnly on the date window. Each row reports BonusPointsSpent and BoostedTransactions.")
+            .WithOpenApi();
+
+        app.MapGet("/boosts/{id:int}",
+                async (IMediator mediator, [FromRoute] int id, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new GetLoyaltyBoostByIdRequest(id), cancellationToken)))
+            .Produces<LoyaltyBoostDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesInternalServerError()
+            .WithName("Get Loyalty Boost By Id")
+            .WithSummary("Admin: one campaign with its targeted providers and spend to date")
+            .WithOpenApi();
+
+        app.MapPost("/boosts",
+                async (IMediator mediator, CreateLoyaltyBoostCommand command,
+                        CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(command, cancellationToken)))
+            .Produces<int>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Create Loyalty Boost")
+            .WithSummary("Admin: create a points-multiplier campaign")
+            .WithDescription("Multiplier > 1. StartsAt/EndsAt are UTC. DailyStartMinute/DailyEndMinute are minutes from midnight in JORDAN local time (start > end crosses midnight). DaysOfWeekMask bit 0 = Sunday.")
+            .WithOpenApi(op => { op.RequestBody.Required = true; return op; });
+
+        app.MapPut("/boosts/{id:int}",
+                async (IMediator mediator, [FromRoute] int id, UpdateLoyaltyBoostCommand command,
+                        CancellationToken cancellationToken) =>
+                {
+                    await mediator.Send(command with { Id = id }, cancellationToken);
+                    return Results.NoContent();
+                })
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Update Loyalty Boost")
+            .WithSummary("Admin: edit a campaign that has not started yet")
+            .WithDescription("Rejected once StartsAt has passed — a running campaign is a record of the terms customers were given. Use deactivate to end one early.")
+            .WithOpenApi(op => { op.RequestBody.Required = true; return op; });
+
+        app.MapPut("/boosts/{id:int}/deactivate",
+                async (IMediator mediator, [FromRoute] int id, CancellationToken cancellationToken) =>
+                {
+                    await mediator.Send(new DeactivateLoyaltyBoostCommand(id), cancellationToken);
+                    return Results.NoContent();
+                })
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesInternalServerError()
+            .WithName("Deactivate Loyalty Boost")
+            .WithSummary("Admin: end a campaign immediately, including mid-flight")
+            .WithOpenApi();
 
         return app;
     }

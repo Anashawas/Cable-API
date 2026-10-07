@@ -5,6 +5,7 @@ using Cable.Core.Utilities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Application.Common.Security;
 
 namespace Application.ChargingPoints.Commands.AddChargingPoint;
 
@@ -50,6 +51,14 @@ public class AddChargingPointCommandHandler(
 
         // Owner defaults to the caller; an explicit OwnerId lets an admin create
         // the station on behalf of a provider.
+        var isAdmin = await AdminRoleGuard.IsAdminAsync(applicationDbContext, currentUserService, cancellationToken);
+
+        // Creating a station on someone else's behalf is an admin action; a
+        // non-admin passing another OwnerId was otherwise assigning stations to
+        // arbitrary accounts.
+        if (request.OwnerId.HasValue && request.OwnerId.Value != user.Id && !isAdmin)
+            throw new ForbiddenAccessException("Only an admin can create a station for another owner.");
+
         var ownerId = user.Id;
         if (request.OwnerId.HasValue)
         {
@@ -98,7 +107,8 @@ public class AddChargingPointCommandHandler(
             OwnerPhone = normalizedOwnerPhone,
             OwnerId = ownerId,
             IsDeleted = false,
-            IsVerified = request.IsVerified,
+            // A self-registered station is never born verified; that badge is the admin's to grant.
+            IsVerified = isAdmin && request.IsVerified,
             HasOffer = request.HasOffer,
             Service = request.Service,
             OfferDescription = request.OfferDescription,

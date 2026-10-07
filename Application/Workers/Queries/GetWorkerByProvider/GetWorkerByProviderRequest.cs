@@ -1,4 +1,5 @@
 using Application.Common.Interfaces;
+using Cable.Core.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Application.Workers.Queries.GetWorkerByProvider;
@@ -11,7 +12,12 @@ public record WorkerDto(
     string?   Email,
     bool      IsActive,
     DateTime? AssignedAt
-);
+)
+{
+    // Returned in dial-ready E.164 (+962...) so tel: links work on the clients.
+    // Storage is unchanged (962... in the DB).
+    public string? Phone { get; init; } = PhoneNumberUtility.ToE164OrOriginal(Phone);
+}
 
 /// <summary>
 /// Returns the single worker assigned to a provider, or null if none.

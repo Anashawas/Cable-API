@@ -5,6 +5,7 @@ using Cable.Core;
 using Cable.Core.Exceptions;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
+using Cable.Core.Utilities;
 
 namespace Application.Ads.Commands.ManageCampaigns;
 
@@ -45,8 +46,8 @@ public class CreateCampaignCommandHandler(
             AdvertiserId = request.AdvertiserId,
             Type = request.Type,
             CityArea = request.CityArea,
-            StartDate = request.StartDate,
-            EndDate = request.EndDate,
+            StartDate = JordanTime.ToUtc(request.StartDate),
+            EndDate = JordanTime.ToUtc(request.EndDate),
             Price = request.Price,
             Status = request.Status
         };
@@ -74,8 +75,8 @@ public class UpdateCampaignCommandHandler(
                        ?? throw new NotFoundException($"can not find campaign with id {request.Id}");
 
         campaign.CityArea = request.CityArea;
-        campaign.StartDate = request.StartDate;
-        campaign.EndDate = request.EndDate;
+        campaign.StartDate = JordanTime.ToUtc(request.StartDate);
+        campaign.EndDate = JordanTime.ToUtc(request.EndDate);
         campaign.Price = request.Price;
         campaign.Status = request.Status;
         await applicationDbContext.SaveChanges(cancellationToken);

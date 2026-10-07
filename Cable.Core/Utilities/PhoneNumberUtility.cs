@@ -138,6 +138,61 @@ public static class PhoneNumberUtility
     }
 
     /// <summary>
+    /// Converts a stored number to dial-ready E.164 (+962XXXXXXXXX) for API
+    /// responses, returning the ORIGINAL value untouched when it isn't a
+    /// recognisable Jordan mobile.
+    ///
+    /// Why: storage keeps the "962XXXXXXXXX" convention (no +) because the SMS
+    /// gateway expects it, but a tel: link without the + is read by the dialer
+    /// as a NATIONAL number — so "tel:962791234567" fails to dial. Emitting
+    /// the + fixes calling for every client without a mobile release.
+    ///
+    /// Deliberately mobile-only. Landlines ("065885000") are left as stored:
+    /// they already dial correctly inside Jordan, and converting them would
+    /// round-trip through NormalizePhoneNumber's 11-digit branch on save and
+    /// be silently rewritten into a wrong mobile number.
+    ///
+    /// Round-trip safe for mobiles: NormalizePhoneNumber("+962791234567")
+    /// returns "962791234567", so a client that saves the value back stores
+    /// the unchanged canonical form.
+    /// </summary>
+    public static string? ToE164OrOriginal(string? phoneNumber)
+    {
+        var normalized = NormalizePhoneNumber(ToAsciiDigits(phoneNumber ?? string.Empty));
+        return normalized is not null ? $"+{normalized}" : phoneNumber;
+    }
+
+    /// <summary>
+    /// Formats a number for a wa.me / WhatsApp deep link. Unlike tel:, wa.me
+    /// requires bare digits with the country code and NO leading + or 0
+    /// (962XXXXXXXXX). Mobile-only by design — WhatsApp does not work on
+    /// landlines. Returns null when the value is not a usable mobile number.
+    /// </summary>
+    public static string? FormatForWhatsApp(string? phoneNumber) =>
+        NormalizePhoneNumber(ToAsciiDigits(phoneNumber ?? string.Empty));
+
+    /// <summary>
+    /// Folds Arabic-Indic (٠-٩) and Extended Arabic-Indic (۰-۹) digits to ASCII.
+    /// </summary>
+    private static string ToAsciiDigits(string input)
+    {
+        Span<char> buffer = stackalloc char[input.Length];
+
+        for (var i = 0; i < input.Length; i++)
+        {
+            var c = input[i];
+            buffer[i] = c switch
+            {
+                >= '٠' and <= '٩' => (char)(c - '٠' + '0'), // Arabic-Indic
+                >= '۰' and <= '۹' => (char)(c - '۰' + '0'), // Extended Arabic-Indic
+                _ => c
+            };
+        }
+
+        return new string(buffer);
+    }
+
+    /// <summary>
     /// Gets supported phone number format examples
     /// </summary>
     /// <returns>List of example formats</returns>

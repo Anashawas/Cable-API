@@ -23,8 +23,45 @@ public partial class UserAccount :BaseAuditableEntity
     public bool IsPhoneVerified { get; set; }
     public DateTime? PhoneVerifiedAt { get; set; }
 
-    // Single-device session enforcement
+    // Single-device session enforcement, tracked per client app so the Cable
+    // consumer app, the Provider/Worker mobile app and the partner web portal
+    // do not evict each other. SecurityStamp = consumer app;
+    // ProviderSecurityStamp = provider mobile; ProviderWebSecurityStamp = partner web.
     public string? SecurityStamp { get; set; }
+    public string? ProviderSecurityStamp { get; set; }
+    public string? ProviderWebSecurityStamp { get; set; }
+
+    /// <summary>
+    /// Last successful sign-in (UTC). Written on every login path.
+    ///
+    /// This is NOT a usage metric. Access tokens are long-lived, so somebody who
+    /// opens the app daily may not have re-authenticated in months — use
+    /// <see cref="LastSeenAt"/> for "is this user active".
+    /// </summary>
+    public DateTime? LastLoginAt { get; set; }
+
+    /// <summary>
+    /// Last authenticated request (UTC) — the activity signal behind DAU/WAU/MAU.
+    ///
+    /// Written by middleware and deliberately throttled, so a burst of requests
+    /// costs one write rather than hundreds. That makes it accurate to within the
+    /// throttle window, which is far finer than any reporting period.
+    /// </summary>
+    public DateTime? LastSeenAt { get; set; }
+
+    /// <summary>
+    /// Last sign-in through a PARTNER client (provider mobile app or partner web
+    /// portal), UTC. <see cref="LastLoginAt"/> is written by every app including
+    /// the consumer one, and most station owners are also drivers — so it cannot
+    /// answer "does this owner use the partner app". This can.
+    /// </summary>
+    public DateTime? PartnerLastLoginAt { get; set; }
+
+    /// <summary>
+    /// Last authenticated request from a PARTNER client, UTC. Same throttling as
+    /// <see cref="LastSeenAt"/>; the client is read from the token's "app" claim.
+    /// </summary>
+    public DateTime? PartnerLastSeenAt { get; set; }
 
     // Update notes
     public bool HasReadUpdateNotes { get; set; }

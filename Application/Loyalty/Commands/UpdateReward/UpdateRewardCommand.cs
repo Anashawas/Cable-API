@@ -2,6 +2,7 @@ using Application.Common.Security;
 using Cable.Core;
 using Cable.Core.Exceptions;
 using Microsoft.EntityFrameworkCore;
+using Cable.Core.Utilities;
 
 namespace Application.Loyalty.Commands.UpdateReward;
 
@@ -50,8 +51,8 @@ public class UpdateRewardCommandHandler(
         reward.MaxRedemptions = request.MaxRedemptions;
         reward.ImageUrl = request.ImageUrl;
         reward.IsActive = request.IsActive;
-        reward.ValidFrom = request.ValidFrom;
-        reward.ValidTo = request.ValidTo;
+        reward.ValidFrom = JordanTime.ToUtc(request.ValidFrom);
+        reward.ValidTo = JordanTime.ToUtc(request.ValidTo);
         reward.ModifiedAt = now;
         reward.ModifiedBy = userId;
 

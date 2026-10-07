@@ -1,3 +1,4 @@
+﻿using Application.Offers.Queries.Common;
 using Application.ServiceProviders.Queries.GetAllServiceProviders;
 using Cable.Core.Emuns;
 using Cable.Core.Exceptions;
@@ -32,6 +33,13 @@ public class GetServiceProviderByIdRequestHandler(
             .AsNoTracking()
             .AnyAsync(pa => pa.ProviderType == "ServiceProvider" && pa.ProviderId == x.Id
                             && pa.IsActive && !pa.IsDeleted, cancellationToken);
+
+        var offersByProvider = await ProviderOfferSummaryLoader.LoadByProviderAsync(
+            applicationDbContext, uploadFileService, "ServiceProvider", [x.Id], cancellationToken);
+
+        var favoritesCount = await applicationDbContext.UserFavoriteServiceProviders
+            .AsNoTracking()
+            .CountAsync(f => !f.IsDeleted && f.ServiceProviderId == x.Id, cancellationToken);
 
         return new ServiceProviderDto(
             x.Id,
@@ -70,7 +78,9 @@ public class GetServiceProviderByIdRequestHandler(
             x.ServiceProviderAttachments.Select(a =>
                 uploadFileService.GetFilePath(UploadFileFolders.CableServiceProvider, a.FileName)).ToList(),
             x.CreatedAt,
-            isPartner
+            isPartner,
+            favoritesCount,
+            offersByProvider.GetValueOrDefault(x.Id, [])
         );
     }
 }
