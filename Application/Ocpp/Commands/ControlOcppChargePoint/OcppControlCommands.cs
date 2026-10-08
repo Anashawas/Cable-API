@@ -325,3 +325,19 @@ public class SyncOcppLocalListCommandHandler(IApplicationDbContext db, ICurrentU
         return new OcppLocalListStateDto(fresh.LocalListStatus, fresh.LocalListVersion, fresh.LocalListSyncedAt, cards, confirmed == 1);
     }
 }
+
+// ---------------------------------------------------------------------------
+// N-6 — recompute reliability on demand (the daily job does it at 03:30 UTC)
+// ---------------------------------------------------------------------------
+
+public record RecomputeOcppReliabilityCommand : IRequest<int>;
+
+public class RecomputeOcppReliabilityCommandHandler(IApplicationDbContext db, ICurrentUserService currentUser, IBackgroundJobService jobs)
+    : IRequestHandler<RecomputeOcppReliabilityCommand, int>
+{
+    public async Task<int> Handle(RecomputeOcppReliabilityCommand request, CancellationToken cancellationToken)
+    {
+        await AdminRoleGuard.EnsureAdminAsync(db, currentUser, cancellationToken);
+        return await jobs.ComputeOcppReliabilityAsync(cancellationToken);
+    }
+}

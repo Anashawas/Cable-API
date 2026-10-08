@@ -61,7 +61,11 @@ public record StationLiveDto(
     string? UnavailableReason,
     DateTime? UpdatedAt,
     List<PlugTypeLiveDto> PlugTypes,
-    List<ChargerLiveDto> Chargers);
+    List<ChargerLiveDto> Chargers,
+    /// <summary>N-6: true when the station's worst charger scores ≥ the threshold. Drivers get true or null — never a bad number.</summary>
+    bool? Reliable = null,
+    /// <summary>N-6: the station score (lowest charger), owner / admin only; null for drivers.</summary>
+    decimal? ReliabilityPct = null);
 
 /// <summary>Lightweight form for the map / list badge.</summary>
 public record PlugTypeFreeDto(int? PlugTypeId, string Name, int Free, int Total);
@@ -93,7 +97,7 @@ internal static class StationLiveBuilder
             .OrderBy(c => c.Id)
             .Select(c => new
             {
-                c.Id, c.DisplayName, c.IsConnected, c.LastMessageAt, c.DisconnectedAt, c.HeartbeatInterval,
+                c.Id, c.DisplayName, c.IsConnected, c.LastMessageAt, c.DisconnectedAt, c.HeartbeatInterval, c.ReliabilityPct,
                 Plugs = c.Connectors.Where(k => k.ConnectorId > 0).OrderBy(k => k.ConnectorId)
                     .Select(k => new { k.ConnectorId, k.Status, k.PlugTypeId, PlugTypeName = k.PlugType != null ? k.PlugType.Name : null, PlugTypeFamily = k.PlugType != null ? k.PlugType.PlugTypeFamily : null, k.PowerKw })
                     .ToList(),
@@ -130,7 +134,14 @@ internal static class StationLiveBuilder
             .ToList();
 
         var updatedAt = chargerDtos.Where(c => c.Online).Select(c => c.UpdatedAt).Max();
-        return new StationLiveDto(chargingPointId, anyOnline, anyOnline ? null : LiveUnavailableReason.Offline, updatedAt, plugTypes, chargerDtos);
+
+        // N-6: the station is as reliable as its worst cabinet. Drivers see only "reliable" (true) or nothing.
+        var scores = chargers.Where(c => c.ReliabilityPct != null).Select(c => c.ReliabilityPct!.Value).ToList();
+        decimal? stationPct = scores.Count == 0 ? null : scores.Min();
+        bool? reliable = stationPct is null ? null : stationPct >= OcppLimits.ReliableThresholdPct ? true : (enforceGates ? null : false);
+
+        return new StationLiveDto(chargingPointId, anyOnline, anyOnline ? null : LiveUnavailableReason.Offline, updatedAt, plugTypes, chargerDtos,
+            reliable, enforceGates ? null : stationPct);
     }
 
     public static StationLiveSummaryDto Summarize(StationLiveDto live) => new(

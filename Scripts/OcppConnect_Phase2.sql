@@ -132,3 +132,18 @@ FROM dbo.ChargingPoint cp
 WHERE cp.ShareLiveStatus = 0 AND cp.ShareLiveStatusSetAt IS NULL
   AND EXISTS (SELECT 1 FROM dbo.Subscription s WHERE s.EntityType = 'OcppConnect' AND s.EntityId = cp.Id AND s.IsDeleted = 0);
 GO
+
+-- N-6: reliability score per charger (daily job).
+IF COL_LENGTH('dbo.OcppChargePoint', 'ReliabilityPct') IS NULL
+BEGIN
+    ALTER TABLE dbo.OcppChargePoint ADD
+        ReliabilityPct              DECIMAL(5,2) NULL,   -- minutes reachable AND fault-free / counted minutes, last 30 days
+        ReliabilityOnlinePct        DECIMAL(5,2) NULL,
+        ReliabilityFaultFreePct     DECIMAL(5,2) NULL,
+        ReliabilityOfflineIncidents INT          NULL,
+        ReliabilityFaultIncidents   INT          NULL,
+        ReliabilityComputedAt       DATETIME2(0) NULL;
+    PRINT 'Added OcppChargePoint.Reliability* columns';
+END
+ELSE PRINT 'SKIP OcppChargePoint.Reliability* columns exist';
+GO

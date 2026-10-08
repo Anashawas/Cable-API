@@ -127,6 +127,12 @@ public static class OcppLimits
     /// <summary>Commands whose effect the unit proves with a later message — the ones duplicate protection applies to.</summary>
     public static readonly string[] ConfirmableCommands = ["Reset", "ChangeAvailability", "UnlockConnector", "RemoteStopTransaction"];
 
+    /// <summary>N-6: reliability is computed over this many days (bounded by the raw-log retention).</summary>
+    public const int ReliabilityWindowDays = 30;
+
+    /// <summary>N-6: a station at or above this reliability shows a "reliable" badge to drivers; below it shows nothing (never a bad number in public).</summary>
+    public const decimal ReliableThresholdPct = 95m;
+
     /// <summary>Same connector + same error code within this window = one notification.</summary>
     public static readonly TimeSpan FaultNotificationDedupe = TimeSpan.FromMinutes(30);
 }

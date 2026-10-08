@@ -167,6 +167,12 @@ app.MapHangfireDashboard("/Cable-Jobs-Dashboard");
 // Register Hangfire Recurring Jobs
 // ==========================================
 // Cable Connect alerts: charger offline / plug Faulted / session open too long → push + inbox.
+// Cable Connect reliability (N-6): 30-day score per charger, daily at 03:30 UTC.
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "compute-ocpp-reliability",
+    service => service.ComputeOcppReliabilityAsync(CancellationToken.None),
+    "30 3 * * *");
+
 RecurringJob.AddOrUpdate<IBackgroundJobService>(
     "check-ocpp-alerts",
     service => service.CheckOcppAlertsAsync(CancellationToken.None),

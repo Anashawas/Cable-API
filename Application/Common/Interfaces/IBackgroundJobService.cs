@@ -55,4 +55,11 @@ public interface IBackgroundJobService
     /// thresholds; closes it (and tells them) when the condition clears. Returns alerts opened.
     /// </summary>
     Task<int> CheckOcppAlertsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// N-6, daily: per charger, the share of minutes in the last OcppLimits.ReliabilityWindowDays
+    /// it was reachable and had no Faulted plug, from the raw log; our own restarts excluded.
+    /// Stored on OcppChargePoint.Reliability*. Returns chargers computed.
+    /// </summary>
+    Task<int> ComputeOcppReliabilityAsync(CancellationToken cancellationToken = default);
 }

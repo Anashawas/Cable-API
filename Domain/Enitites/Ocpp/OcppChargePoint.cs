@@ -57,6 +57,17 @@ public class OcppChargePoint : BaseAuditableEntity
     /// <summary>See OcppLocalListStatus: Synced | Pending | Failed | NotSupported. Null = never attempted.</summary>
     public string? LocalListStatus { get; set; }
 
+    // N-6 reliability over the last OcppLimits.ReliabilityWindowDays, recomputed daily by
+    // ComputeOcppReliabilityAsync from the raw log (CONNECT / DISCONNECT / StatusNotification).
+    // Pct = share of minutes the unit was reachable AND had no Faulted plug; our own restarts
+    // ("server shutting down" disconnects) are excluded from the denominator.
+    public decimal? ReliabilityPct { get; set; }
+    public decimal? ReliabilityOnlinePct { get; set; }
+    public decimal? ReliabilityFaultFreePct { get; set; }
+    public int? ReliabilityOfflineIncidents { get; set; }
+    public int? ReliabilityFaultIncidents { get; set; }
+    public DateTime? ReliabilityComputedAt { get; set; }
+
     public virtual ChargingPoint ChargingPoint { get; set; } = null!;
     public virtual ICollection<OcppConnector> Connectors { get; set; } = new List<OcppConnector>();
     public virtual ICollection<OcppTransaction> Transactions { get; set; } = new List<OcppTransaction>();

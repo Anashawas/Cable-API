@@ -74,7 +74,12 @@ public record OcppChargePointListItemDto(
     DateTime CreatedAt,
     /// <summary>Only until the first BootNotification: Waiting | Connected | Refused. Null once the unit has booted.</summary>
     string? OnboardingState = null,
-    string? OnboardingReason = null);
+    string? OnboardingReason = null,
+    /// <summary>N-6: % of the last 30 days reachable and fault-free; null until the daily job ran.</summary>
+    decimal? ReliabilityPct = null);
+
+/// <summary>N-6 breakdown for one charger (admin + partner).</summary>
+public record OcppReliabilityDto(decimal? Pct, decimal? OnlinePct, decimal? FaultFreePct, int? OfflineIncidents, int? FaultIncidents, DateTime? ComputedAt, int WindowDays, bool Reliable);
 
 public record OcppChargePointTodayDto(int Sessions, decimal EnergyKwh, int Faults);
 
@@ -121,6 +126,7 @@ public record OcppChargePointDetailDto(
     OcppChargePointTodayDto Today,
     OcppLocalListStateDto LocalList,
     OcppOnboardingDto Onboarding,
+    OcppReliabilityDto Reliability,
     DateTime CreatedAt,
     DateTime? ModifiedAt);
 

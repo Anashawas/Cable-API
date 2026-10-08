@@ -37,6 +37,10 @@ public class OcppChargePointConfiguration : IEntityTypeConfiguration<OcppChargeP
         builder.Property(e => e.LockedUntil).HasColumnType("datetime2(0)");
         builder.Property(e => e.LocalListSyncedAt).HasColumnType("datetime2(3)");
         builder.Property(e => e.LocalListStatus).HasMaxLength(20);
+        builder.Property(e => e.ReliabilityPct).HasColumnType("decimal(5,2)");
+        builder.Property(e => e.ReliabilityOnlinePct).HasColumnType("decimal(5,2)");
+        builder.Property(e => e.ReliabilityFaultFreePct).HasColumnType("decimal(5,2)");
+        builder.Property(e => e.ReliabilityComputedAt).HasColumnType("datetime2(0)");
         builder.Property(e => e.CreatedAt).HasColumnType("datetime");
         builder.Property(e => e.ModifiedAt).HasColumnType("datetime");
 

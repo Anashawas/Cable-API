@@ -907,6 +907,129 @@ public class BackgroundJobService(
         }
     }
 
+    public async Task<int> ComputeOcppReliabilityAsync(CancellationToken cancellationToken = default)
+    {
+        var now = DateTime.UtcNow;
+        var windowStart = now.AddDays(-OcppLimits.ReliabilityWindowDays);
+        var minutes = (int)(now - windowStart).TotalMinutes;
+
+        var chargers = await applicationDbContext.OcppChargePoints
+            .Where(c => !c.IsDeleted)
+            .ToListAsync(cancellationToken);
+        var computed = 0;
+
+        foreach (var cp in chargers)
+        {
+            // ---- events in the window, oldest first
+            var sys = await applicationDbContext.OcppRawMessages.AsNoTracking()
+                .Where(m => m.ChargePointId == cp.ChargePointId && m.Direction == "sys" && m.CreatedAt >= windowStart
+                            && (m.Action == "CONNECT" || m.Action == "DISCONNECT"))
+                .OrderBy(m => m.Id)
+                .Select(m => new { m.Action, m.Payload, m.CreatedAt })
+                .ToListAsync(cancellationToken);
+            var statuses = await applicationDbContext.OcppRawMessages.AsNoTracking()
+                .Where(m => m.ChargePointId == cp.ChargePointId && m.Direction == "in " && m.Action == "StatusNotification" && m.CreatedAt >= windowStart)
+                .OrderBy(m => m.Id)
+                .Select(m => new { m.Payload, m.CreatedAt })
+                .ToListAsync(cancellationToken);
+
+            // A unit that never connected in the window and never booted at all has no score.
+            if (sys.Count == 0 && cp.LastBootAt == null)
+            {
+                cp.ReliabilityPct = null; cp.ReliabilityOnlinePct = null; cp.ReliabilityFaultFreePct = null;
+                cp.ReliabilityOfflineIncidents = null; cp.ReliabilityFaultIncidents = null; cp.ReliabilityComputedAt = now;
+                continue;
+            }
+
+            // ---- state at the window start: the last connect/disconnect before it
+            var before = await applicationDbContext.OcppRawMessages.AsNoTracking()
+                .Where(m => m.ChargePointId == cp.ChargePointId && m.Direction == "sys" && m.CreatedAt < windowStart
+                            && (m.Action == "CONNECT" || m.Action == "DISCONNECT"))
+                .OrderByDescending(m => m.Id)
+                .Select(m => m.Action)
+                .FirstOrDefaultAsync(cancellationToken);
+            var online = before == "CONNECT";
+            var excluded = false;   // inside one of our own restarts
+
+            var onlineMin = new bool[minutes];
+            var excludedMin = new bool[minutes];
+            var faultedMin = new bool[minutes];
+            int Idx(DateTime t) => Math.Clamp((int)(t - windowStart).TotalMinutes, 0, minutes - 1);
+
+            var cursor = 0;
+            var offlineIncidents = 0;
+            foreach (var e in sys)
+            {
+                var at = Idx(e.CreatedAt);
+                for (var i = cursor; i < at; i++) { onlineMin[i] = online; excludedMin[i] = excluded; }
+                cursor = at;
+                if (e.Action == "CONNECT") { online = true; excluded = false; }
+                else
+                {
+                    online = false;
+                    // "server shutting down" = our process stopped, not the charger: the gap until it reconnects is not counted.
+                    excluded = e.Payload != null && e.Payload.Contains("server shutting down", StringComparison.OrdinalIgnoreCase);
+                    if (!excluded) offlineIncidents++;
+                }
+            }
+            for (var i = cursor; i < minutes; i++) { onlineMin[i] = online; excludedMin[i] = excluded; }
+
+            // ---- faulted plugs: StatusNotification Faulted … until the next status for that connector
+            var faultSince = new Dictionary<int, int>();
+            var faultIncidents = 0;
+            foreach (var st in statuses)
+            {
+                int connectorId; string? status;
+                try
+                {
+                    using var doc = JsonDocument.Parse(st.Payload ?? "[]");
+                    var root = doc.RootElement;
+                    if (root.ValueKind != JsonValueKind.Array || root.GetArrayLength() < 4) continue;
+                    var body = root[3];
+                    connectorId = body.TryGetProperty("connectorId", out var c) && c.TryGetInt32(out var cv) ? cv : 0;
+                    status = body.TryGetProperty("status", out var sv) ? sv.GetString() : null;
+                }
+                catch (JsonException) { continue; }
+
+                var at = Idx(st.CreatedAt);
+                if (status == OcppConnectorStatus.Faulted)
+                {
+                    if (!faultSince.ContainsKey(connectorId)) { faultSince[connectorId] = at; faultIncidents++; }
+                }
+                else if (faultSince.Remove(connectorId, out var from))
+                {
+                    for (var i = from; i < at; i++) faultedMin[i] = true;
+                }
+            }
+            foreach (var from in faultSince.Values)           // still faulted now
+                for (var i = from; i < minutes; i++) faultedMin[i] = true;
+
+            // ---- the numbers
+            int counted = 0, onlineCount = 0, faultFree = 0, good = 0;
+            for (var i = 0; i < minutes; i++)
+            {
+                if (excludedMin[i]) continue;
+                counted++;
+                if (onlineMin[i]) onlineCount++;
+                if (!faultedMin[i]) faultFree++;
+                if (onlineMin[i] && !faultedMin[i]) good++;
+            }
+            if (counted == 0) continue;
+
+            cp.ReliabilityPct = Math.Round(100m * good / counted, 2);
+            cp.ReliabilityOnlinePct = Math.Round(100m * onlineCount / counted, 2);
+            cp.ReliabilityFaultFreePct = Math.Round(100m * faultFree / counted, 2);
+            cp.ReliabilityOfflineIncidents = offlineIncidents;
+            cp.ReliabilityFaultIncidents = faultIncidents;
+            cp.ReliabilityComputedAt = now;
+            computed++;
+        }
+
+        await applicationDbContext.SaveChanges(cancellationToken);
+        logger.LogInformation("ComputeOcppReliability: {Count} charger(s) scored over {Days} days", computed, OcppLimits.ReliabilityWindowDays);
+        return computed;
+    }
+
     /// <summary>Who, what, since when — one shape for all three alert rules.</summary>
     private sealed record AlertTarget(int ChargePointRowId, string ChargePointId, string? DisplayName, int ChargingPointId, string? StationName, int? OwnerId,
         int? ConnectorId, int? TransactionId, DateTime Since, string? Detail)

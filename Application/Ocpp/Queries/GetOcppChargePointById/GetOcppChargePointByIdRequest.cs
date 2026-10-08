@@ -62,6 +62,8 @@ public class GetOcppChargePointByIdRequestHandler(IApplicationDbContext db, ICur
                 faultsToday),
             new OcppLocalListStateDto(cp.LocalListStatus, cp.LocalListVersion, cp.LocalListSyncedAt, cardsAtStation, cp.LocalListStatus == Cable.Core.Constants.OcppLocalListStatus.Synced),
             onboarding,
+            new OcppReliabilityDto(cp.ReliabilityPct, cp.ReliabilityOnlinePct, cp.ReliabilityFaultFreePct, cp.ReliabilityOfflineIncidents, cp.ReliabilityFaultIncidents,
+                cp.ReliabilityComputedAt, OcppLimits.ReliabilityWindowDays, cp.ReliabilityPct >= OcppLimits.ReliableThresholdPct),
             cp.CreatedAt, cp.ModifiedAt);
     }
 }

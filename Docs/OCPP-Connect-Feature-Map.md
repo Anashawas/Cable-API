@@ -107,6 +107,7 @@ mostly reuse plus ownership checks (`/api/provider/charging-points/{id}/chargers
 | 5.7 | Monthly statement: energy sold, sessions, revenue (once tariffs exist), export | 💡 | 4.12 |
 | 5.8 | Remote start / stop for a customer on site | 💡 Phase 3 | 3.9 |
 | 5.9 | Power cap per plug / schedule (load management) | 💡 | 3.11 + unit support |
+| 5.11 | **Reliability score (N-6)**: % of the last 30 days each charger was reachable and fault-free (our own restarts excluded), daily job + "Recompute" in Admin; owner sees the number (`reliabilityPct` on `GET /api/provider/charging-points/{id}/live`), drivers get only `reliable: true` at ≥ 95 % on the station live endpoint, never a bad number | ✅ API Oct 9 · ⏳ app screens | — |
 | 5.10 | Name each cabinet for drivers (N-3) | ✅ API Oct 8 (`PUT /api/provider/charging-points/{id}/chargers/{ocppId}/display-name`) · ⏳ app screen | — |
 
 ## 6. Cable app (drivers)

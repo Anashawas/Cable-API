@@ -354,6 +354,14 @@ public static class OcppRoutes
             .WithSummary("Admin: push the station's allowed cards into this charger now (SendLocalList Full + ClearCache). The automatic push runs after every card change and when a Pending unit boots.")
             .WithOpenApi();
 
+        app.MapPost("/reliability/recompute", async (IMediator mediator, CancellationToken ct) =>
+                Results.Ok(new { chargers = await mediator.Send(new RecomputeOcppReliabilityCommand(), ct) }))
+            .Produces(200)
+            .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesInternalServerError()
+            .WithName("Recompute OCPP reliability")
+            .WithSummary("Admin: recompute the 30-day reliability score of every charger now (the daily job runs at 03:30 UTC)")
+            .WithOpenApi();
+
         app.MapGet("/charge-points/{id:int}/commands", async (IMediator mediator, [FromRoute] int id, [FromQuery] int? take, CancellationToken ct) =>
                 Results.Ok(await mediator.Send(new GetOcppCommandsRequest(id, take), ct)))
             .Produces<List<OcppCommandDto>>()

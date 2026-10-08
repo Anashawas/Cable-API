@@ -25,7 +25,7 @@ public class GetOcppChargePointsRequestHandler(IApplicationDbContext db, ICurren
         string? Vendor, string? Model, string? FirmwareVersion,
         bool IsEnabled, bool IsConnected, DateTime? ConnectedAt, DateTime? DisconnectedAt, DateTime? LastMessageAt, DateTime? LastBootAt,
         bool HasPassword, DateTime? LockedUntil, int HeartbeatInterval, DateTime CreatedAt,
-        int ConnectorCount, int FreeConnectors, int FaultedConnectors, int OpenSessions);
+        int ConnectorCount, int FreeConnectors, int FaultedConnectors, int OpenSessions, decimal? ReliabilityPct);
 
     public async Task<PagedResult<OcppChargePointListItemDto>> Handle(GetOcppChargePointsRequest request, CancellationToken cancellationToken)
     {
@@ -61,7 +61,8 @@ public class GetOcppChargePointsRequestHandler(IApplicationDbContext db, ICurren
                 c.Connectors.Count(k => k.ConnectorId > 0),
                 c.Connectors.Count(k => k.ConnectorId > 0 && k.Status == OcppConnectorStatus.Available),
                 c.Connectors.Count(k => k.Status == OcppConnectorStatus.Faulted),
-                c.Transactions.Count(t => t.IsOpen)));
+                c.Transactions.Count(t => t.IsOpen),
+                c.ReliabilityPct));
 
         var wantState = string.IsNullOrWhiteSpace(request.ConnectionState) ? null : request.ConnectionState.Trim();
         if (wantState is null)
@@ -103,5 +104,6 @@ public class GetOcppChargePointsRequestHandler(IApplicationDbContext db, ICurren
         x.HasPassword, x.LockedUntil,
         x.ConnectorCount, x.FreeConnectors, x.FaultedConnectors, x.OpenSessions,
         subs[x.ChargingPointId],
-        x.CreatedAt);
+        x.CreatedAt,
+        ReliabilityPct: x.ReliabilityPct);
 }

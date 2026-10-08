@@ -310,6 +310,15 @@ because RH4 has a separate port field that still says 4435 (SafeerSoft); the tec
 to 443 or the unit silently never connects. Charge Point ID is limited to 20 characters (OCPP
 CiString20) and "require password" is off by default (Security Profile 0 units cannot send one).
 
+**Reliability score, N-6 (Oct 9).** `ComputeOcppReliabilityAsync` (daily 03:30 UTC, or `POST
+/api/admin/ocpp/reliability/recompute`) walks the last 30 days of the raw log per charger in
+one-minute buckets: online from CONNECT / DISCONNECT rows (state before the window from the last
+row before it), faulted from StatusNotification frames (Faulted until the next status of that
+connector), and excludes the minutes after a DISCONNECT whose reason is "server shutting down"
+(our restart, not the charger). Pct = good / counted minutes; also online %, fault-free %, offline
+and fault incident counts. Station score = its worst charger. Drivers only ever get
+`reliable: true` (≥ `OcppLimits.ReliableThresholdPct`, 95) or null.
+
 **Station live picture for drivers, N-3 / N-4 / N-7 (Oct 8).** `GET /api/charging-points/{id}/live`
 (anonymous, like the station page) returns, when the N-2 gates are open and at least one charger
 is Online: `plugTypes[]` (per plug type: total / free / busy / outOfOrder / unknown / maxPowerKw),
