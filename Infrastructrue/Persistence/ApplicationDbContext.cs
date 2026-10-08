@@ -145,6 +145,12 @@ public partial class ApplicationDbContext(
     public DbSet<OcppAlert> OcppAlerts { get; set; }
     public DbSet<OcppUserIdTag> OcppUserIdTags { get; set; }
 
+    // Time-of-use tariff + price alerts
+    public DbSet<TouTariff> TouTariffs { get; set; }
+    public DbSet<TouTariffWindow> TouTariffWindows { get; set; }
+    public DbSet<UserPriceAlert> UserPriceAlerts { get; set; }
+    public DbSet<PriceAlertLog> PriceAlertLogs { get; set; }
+
     #endregion
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

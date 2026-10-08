@@ -62,4 +62,14 @@ public interface IBackgroundJobService
     /// Stored on OcppChargePoint.Reliability*. Returns chargers computed.
     /// </summary>
     Task<int> ComputeOcppReliabilityAsync(CancellationToken cancellationToken = default);
+
+    // ==========================================
+    // Price alerts (time-of-use tariff)
+    // ==========================================
+    /// <summary>
+    /// Every 5 min: for each tariff window about to start (lead 15/30/45/60 min, Asia/Amman),
+    /// one multicast push per language to the subscribed users, skipped inside the quiet hours,
+    /// never twice for the same (user, window, date). Returns pushes sent.
+    /// </summary>
+    Task<int> SendPriceAlertsAsync(CancellationToken cancellationToken = default);
 }

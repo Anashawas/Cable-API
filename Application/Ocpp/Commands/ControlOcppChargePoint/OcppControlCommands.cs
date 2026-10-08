@@ -24,13 +24,23 @@ internal static class OcppCommandRunner
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
+    /// <param name="ownerStationId">
+    /// When set, the caller is a station owner / manager acting on that station (partner app):
+    /// the owner guard applies instead of the admin guard, and the charger must belong to the station.
+    /// </param>
     public static async Task<OcppCommandResultDto> RunAsync(
         IApplicationDbContext db, ICurrentUserService currentUser, IOcppCommandClient client,
         int ocppChargePointId, string action, IDictionary<string, object> payload,
-        CancellationToken cancellationToken, int? timeoutSeconds = null)
+        CancellationToken cancellationToken, int? timeoutSeconds = null, int? ownerStationId = null)
     {
-        await AdminRoleGuard.EnsureAdminAsync(db, currentUser, cancellationToken);
+        if (ownerStationId is int stationId)
+            await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, stationId, cancellationToken);
+        else
+            await AdminRoleGuard.EnsureAdminAsync(db, currentUser, cancellationToken);
+
         var cp = await OcppChargePointLookup.TrackedAsync(db, ocppChargePointId, cancellationToken);
+        if (ownerStationId is int sid && cp.ChargingPointId != sid)
+            throw new NotFoundException("cannot find charger " + ocppChargePointId + " at this station");
         if (!cp.IsEnabled)
             throw new DataValidationException("Id", $"Charger {cp.ChargePointId} is disabled. Enable it before sending commands.");
 

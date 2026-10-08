@@ -167,6 +167,12 @@ app.MapHangfireDashboard("/Cable-Jobs-Dashboard");
 // Register Hangfire Recurring Jobs
 // ==========================================
 // Cable Connect alerts: charger offline / plug Faulted / session open too long → push + inbox.
+// Price alerts: a push before a tariff window starts, for users who asked (every 5 min).
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "send-price-alerts",
+    service => service.SendPriceAlertsAsync(CancellationToken.None),
+    "*/5 * * * *");
+
 // Cable Connect reliability (N-6): 30-day score per charger, daily at 03:30 UTC.
 RecurringJob.AddOrUpdate<IBackgroundJobService>(
     "compute-ocpp-reliability",
@@ -300,7 +306,8 @@ app.MapUserRoutes()
     .MapAnalyticsRoutes()
     .MapChargerBrandRoutes()
     .MapSubscriptionRoutes()
-    .MapOcppRoutes();
+    .MapOcppRoutes()
+    .MapPricingRoutes();
 
 // Unknown non-API URLs get the landing 404 page; API-ish paths keep JSON-style 404s.
 app.MapLandingPageFallback();

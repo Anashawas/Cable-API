@@ -26,6 +26,7 @@ public partial class NotificationTokenConfiguration : IEntityTypeConfiguration<N
         builder.Property(x => x.Token).IsRequired();
         builder.Property(x => x.OsName).HasMaxLength(100).HasColumnName("OSName").IsRequired();
         builder.Property(x => x.AppVersion).HasMaxLength(100).IsRequired();
+        builder.Property(x => x.Language).HasMaxLength(5);
         builder.Property(x => x.OsVersion).HasMaxLength(100).HasColumnName("OSVersion").IsRequired();
         builder.Property(x => x.CreatedAt).IsRequired().HasDefaultValueSql("getdate()");
         builder.Property(x => x.UpdatedAt).IsRequired().HasDefaultValueSql("getdate()");

@@ -310,6 +310,15 @@ because RH4 has a separate port field that still says 4435 (SafeerSoft); the tec
 to 443 or the unit silently never connects. Charge Point ID is limited to 20 characters (OCPP
 CiString20) and "require password" is off by default (Security Profile 0 units cannot send one).
 
+**Owner maintenance (Oct 9).** Partner-app endpoints under `/api/provider/charging-points/{id}`:
+`chargers/{ocppId}/commands/{reset | unlock-connector | change-availability | remote-stop |
+trigger-message}` (same bodies as the admin ones), `chargers/{ocppId}/commands` (history),
+`sessions?chargerId=&from=&to=&page=` (newest first, rejected / orphan rows excluded). The guard is
+owner-or-active-manager of that station and the charger must belong to it; everything else
+(audit row, confirmation, rate limit, duplicate protection, unlock-while-charging refusal) is the
+shared `OcppCommandRunner`. Reliability windows now start at the charger's first CONNECT when
+that is later than 30 days ago, so a new unit is not scored for weeks it was not with us.
+
 **Reliability score, N-6 (Oct 9).** `ComputeOcppReliabilityAsync` (daily 03:30 UTC, or `POST
 /api/admin/ocpp/reliability/recompute`) walks the last 30 days of the raw log per charger in
 one-minute buckets: online from CONNECT / DISCONNECT rows (state before the window from the last
@@ -399,6 +408,22 @@ All of them pull from the same queues and all run the recurring-job scheduler. C
   who is alive (`win6061…` = SmarterASP, your machine name = local).
 - Production has only the production API, so this does not apply there — as long as nobody
   points a local run at the production database.
+
+## 9e. Price alerts (not OCPP — PRICE_ALERTS_BE_SPEC, Oct 9)
+
+Tariff source of truth: `TouTariff` (one active row, `Version` bumps on edit) + `TouTariffWindow`
+(stable `Key`, minutes from midnight Asia/Amman, `EndMin` > 1440 crosses midnight, `PriceFils`,
+names en/ar). `GET /api/pricing/tou` is public; `PUT /api/admin/pricing/tou` replaces the windows
+as a new version (must cover 1440 min, unique keys). Preferences: `UserPriceAlert`
+(`GET/PUT /api/users/me/price-alerts`: enabled, leadMinutes 15|30|45|60, window keys — unknown
+key or other lead → 400). Job `send-price-alerts` every 5 min: looks back 10 min, one multicast
+per language (device language stored with the push token — the app must send `language` on
+`PUT /api/notification-token`; null = Arabic), FCM chunks of 500, quiet hours from AppSetting
+`PriceAlerts.QuietFrom` / `QuietTo` (23:30–06:30; an alert inside is cancelled, never delayed),
+`PriceAlertLog` unique on (user, window, date) so a late or repeated run never sends twice. Texts
+per spec §5.2, prices filled from the tariff at send time. Dry run for any Jordan time:
+`GET /api/admin/pricing/price-alerts/preview?at=2026-10-09T16:30`. Jordan has no DST (UTC+3
+since 2022). Script: `Scripts/PriceAlerts_Phase1.sql`.
 
 ## 10. What is NOT built yet
 

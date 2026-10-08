@@ -13,5 +13,8 @@ public partial class NotificationToken
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public FirebaseAppType AppType { get; set; } = FirebaseAppType.UserApp;
+
+    /// <summary>The device's UI language ("ar" | "en"), sent by the app with the token so job-sent pushes can be localised. Null = Arabic.</summary>
+    public string? Language { get; set; }
     public virtual UserAccount UserAccount { get; set; } = null!;
 }

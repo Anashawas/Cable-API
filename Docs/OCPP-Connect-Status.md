@@ -31,6 +31,7 @@ Both repos are committed and pushed (`Anashawas/Cable-API`, `Anashawas/Cable-Adm
 ### API (`WebApi`) + jobs
 - Admin endpoints under `/api/admin/ocpp`: fleet health, chargers (list / detail / register / update / rotate password / enable / delete), connectors (plug type + kW), allowed cards, raw log, the six commands + history, sync-local-list, alerts.
 - Hangfire jobs: stale sessions, raw-log purge, fault push, local-list sync, **alert rules every 5 min**: charger offline > 15 min, plug Faulted > 15 min, session open > 6 h, **parked after charging (your N-5)** > 20 min (driver first when the card is linked, then station). Push + inbox; "back online / fault cleared" on resolve.
+- **Owner maintenance endpoints (Oct 9)**: the partner app can reset, unlock, take out of service, stop a session and trigger a report on the station's own chargers, read the command history and the session history — same mechanism, audit, guards and rate limit as the admin path, with the owner-or-manager check. Reliability now counts from a charger's first connection, not from the window start.
 - **N-6 reliability (Oct 9)**: daily job `compute-ocpp-reliability` (03:30 UTC) scores every charger over 30 days from the raw log — minutes reachable AND fault-free over counted minutes, our own restarts excluded — stored on `OcppChargePoint.Reliability*`. Admin: column in the chargers table, breakdown on the charger page, "Recompute reliability" button. Partner: `reliabilityPct` on the station live endpoint. Drivers: `reliable: true` only at ≥ 95 %.
 - **N-2 live-data visibility (Oct 8)**: `ChargingPoint.ShareLiveStatus` (owner consent, ON at first activation unless decided) + `LiveStatusBlocked` (admin veto with reason). Admin: "Live data for drivers" panel on the station's Cable Connect tab (gates, owner switch on request, block / unblock). Partner app endpoints ready: `GET/PUT /api/provider/charging-points/{id}/live-visibility[/share]`. `OcppLiveVisibility.IsVisibleAsync` is the one check the driver-app endpoint (Phase E) must call.
 - Credentials sheet data (your P0-1 / P0-2): `webSocketBaseUrl` and `port` come from the API's `OcppServer:Url`, never from the admin's config.
@@ -67,7 +68,7 @@ Both repos are committed and pushed (`Anashawas/Cable-API`, `Anashawas/Cable-Adm
 | # | Item | Depends on |
 |---|---|---|
 | 8 | **Partner app**: register the FCM token (`PUT /api/notification-token`, `appType: 2`) and fill `_handleNotificationTap` — unlocks every push built so far | nothing |
-| 9 | Partner app Phase D: live plugs & session, history, allowed cards, maintenance buttons (reset / unlock / out-of-service), **the N-2 sharing switch (endpoint ready)** | provider endpoints (3 d API) |
+| 9 | Partner app Phase D — **API complete (Oct 9)**: live plugs (`GET …/charging-points/{id}/live`), sessions (`GET …/{id}/sessions`), allowed cards (existing `/api/admin/ocpp/authorized-tags`, owner-allowed), maintenance commands (`POST …/{id}/chargers/{ocppId}/commands/{reset\|unlock-connector\|change-availability\|remote-stop\|trigger-message}`), command history, sharing switch, cabinet names, reliability | app screens only |
 | 10 | Driver app Phase E: "N of M free" **per plug type**, faults visible, driver-facing charger names, station-level aggregation — **API done Oct 8**: `GET /api/charging-points/{id}/live`, `GET /api/charging-points/live-summary?ids=`; partner: `GET …/charging-points/{id}/live`, `PUT …/chargers/{ocppId}/display-name` | app screens only (N-3, N-4, N-7) |
 
 ## 5. Pending — decisions (parked until agreed)
@@ -86,6 +87,17 @@ Both repos are committed and pushed (`Anashawas/Cable-API`, `Anashawas/Cable-Adm
 | 15 | Production switch: apply Phase 0–2 scripts to the production DB, add `OcppServer` config to the production API, `appsettings.Production.json` + `EnvironmentName` for Cable.Ocpp, publish both | backend, after the pilot |
 | 16 | Uptime monitor on `https://ocpp.cable-app.com/health` (UptimeRobot free tier) | ops |
 | 17 | Database retention: raw log 30 → 7 days, thin meter samples after 90 days (the capacity numbers in the hosting doc assume this) | backend, 0.5 d |
+
+## 6b. Outside Cable Connect — price alerts (PRICE_ALERTS_BE_SPEC, Oct 9)
+
+Built on the API: `GET /api/pricing/tou` (public tariff, seeded v1 with the app's four windows),
+`GET/PUT /api/users/me/price-alerts` (enabled, leadMinutes 15|30|45|60, window keys),
+`PUT /api/admin/pricing/tou` (new version, old kept inactive), `GET /api/admin/pricing/price-alerts/preview?at=`
+(dry run for any Jordan time), job `send-price-alerts` every 5 min (one multicast per language,
+quiet hours 23:30–06:30 from AppSetting `PriceAlerts.QuietFrom/To`, `PriceAlertLog` unique per
+user + window + date). The app must send `language` ("ar"|"en") with the push token
+(`PUT /api/notification-token`) so job pushes are localised — otherwise Arabic. Script:
+`Scripts/PriceAlerts_Phase1.sql` (applied to dev).
 
 ## 7. How to check the status yourself
 

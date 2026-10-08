@@ -11,7 +11,9 @@ public record RefreshNotificationTokenCommand(
     string OsName,
     string OsVersion,
     string AppVersion,
-    FirebaseAppType AppType = FirebaseAppType.UserApp
+    FirebaseAppType AppType = FirebaseAppType.UserApp,
+    /// <summary>Device UI language, "ar" | "en" — used to localise pushes sent by jobs (price alerts). Optional.</summary>
+    string? Language = null
 ) : IRequest;
 
 public record RefreshNotificationTokenCommandHandler(
@@ -39,6 +41,7 @@ public record RefreshNotificationTokenCommandHandler(
             existingToken.OsName = request.OsName;
             existingToken.OsVersion = request.OsVersion;
             existingToken.AppVersion = request.AppVersion;
+            if (!string.IsNullOrWhiteSpace(request.Language)) existingToken.Language = request.Language.Trim().ToLowerInvariant()[..Math.Min(5, request.Language.Trim().Length)];
             existingToken.UpdatedAt = DateTime.UtcNow;
         }
         else
@@ -53,6 +56,7 @@ public record RefreshNotificationTokenCommandHandler(
                 OsVersion = request.OsVersion,
                 AppVersion = request.AppVersion,
                 AppType = request.AppType,
+                Language = string.IsNullOrWhiteSpace(request.Language) ? null : request.Language.Trim().ToLowerInvariant()[..Math.Min(5, request.Language.Trim().Length)],
                 CreatedAt = now,
                 UpdatedAt = now
             };

@@ -3,6 +3,7 @@ using Application.Ocpp.Commands.AddOcppAuthorizedTag;
 using Application.Ocpp;
 using Application.Ocpp.Commands.ControlOcppChargePoint;
 using Application.Ocpp.Commands.ManageLiveVisibility;
+using Application.Ocpp.Commands.OwnerChargerCommands;
 using Application.Ocpp.Commands.ManageOcppAuthorizedTags;
 using Application.Ocpp.Commands.ManageOcppChargePoint;
 using Application.Ocpp.Commands.RegisterOcppChargePoint;
@@ -58,7 +59,8 @@ public static class OcppRoutes
         app.MapGroup("/api/provider/charging-points")
             .WithTags("Provider - Charging Points")
             .MapProviderLiveVisibilityRoutes()
-            .MapProviderLiveRoutes();
+            .MapProviderLiveRoutes()
+            .MapProviderMaintenanceRoutes();
 
         // Drivers (Cable app): the live picture of a station, gated by N-2.
         app.MapGroup("/api/charging-points")
@@ -90,6 +92,49 @@ public static class OcppRoutes
             .WithName("Get stations live summary (driver app)")
             .WithSummary("Badge data for the stations on screen: ids=1,2,3 (max 50). Per station: available, free / total per plug type, updatedAt. Stations without chargers are omitted.")
             .WithOpenApi();
+
+        return app;
+    }
+
+    /// <summary>Phase D: maintenance commands, session and command history for the owner / managers.</summary>
+    private static RouteGroupBuilder MapProviderMaintenanceRoutes(this RouteGroupBuilder app)
+    {
+        static Task<OcppCommandResultDto> Send(IMediator m, OwnerChargerCommand c, CancellationToken ct) => m.Send(c, ct);
+
+        app.MapPost("/{chargingPointId:int}/chargers/{ocppChargePointId:int}/commands/reset", async (IMediator mediator, [FromRoute] int chargingPointId, [FromRoute] int ocppChargePointId, ResetRequest body, CancellationToken ct) =>
+                Results.Ok(await Send(mediator, new OwnerChargerCommand(chargingPointId, ocppChargePointId, "Reset", Type: body.Type), ct)))
+            .Produces<OcppCommandResultDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("Provider: reset charger").WithSummary("Owner / manager: reboot one of the station's chargers (Soft after the running session, Hard now).").WithOpenApi();
+
+        app.MapPost("/{chargingPointId:int}/chargers/{ocppChargePointId:int}/commands/unlock-connector", async (IMediator mediator, [FromRoute] int chargingPointId, [FromRoute] int ocppChargePointId, UnlockConnectorRequest body, CancellationToken ct) =>
+                Results.Ok(await Send(mediator, new OwnerChargerCommand(chargingPointId, ocppChargePointId, "UnlockConnector", ConnectorId: body.ConnectorId), ct)))
+            .Produces<OcppCommandResultDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("Provider: unlock connector").WithSummary("Owner / manager: release a stuck cable (refused while the plug is Charging).").WithOpenApi();
+
+        app.MapPost("/{chargingPointId:int}/chargers/{ocppChargePointId:int}/commands/change-availability", async (IMediator mediator, [FromRoute] int chargingPointId, [FromRoute] int ocppChargePointId, ChangeAvailabilityRequest body, CancellationToken ct) =>
+                Results.Ok(await Send(mediator, new OwnerChargerCommand(chargingPointId, ocppChargePointId, "ChangeAvailability", ConnectorId: body.ConnectorId, Type: body.Type), ct)))
+            .Produces<OcppCommandResultDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("Provider: change availability").WithSummary("Owner / manager: take a plug (or the unit, connectorId 0) out of service / back in service.").WithOpenApi();
+
+        app.MapPost("/{chargingPointId:int}/chargers/{ocppChargePointId:int}/commands/remote-stop", async (IMediator mediator, [FromRoute] int chargingPointId, [FromRoute] int ocppChargePointId, RemoteStopRequest body, CancellationToken ct) =>
+                Results.Ok(await Send(mediator, new OwnerChargerCommand(chargingPointId, ocppChargePointId, "RemoteStopTransaction", TransactionId: body.TransactionId), ct)))
+            .Produces<OcppCommandResultDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("Provider: stop session").WithSummary("Owner / manager: end a running session on their charger (the unit's StopTransaction confirms it).").WithOpenApi();
+
+        app.MapPost("/{chargingPointId:int}/chargers/{ocppChargePointId:int}/commands/trigger-message", async (IMediator mediator, [FromRoute] int chargingPointId, [FromRoute] int ocppChargePointId, TriggerMessageRequest body, CancellationToken ct) =>
+                Results.Ok(await Send(mediator, new OwnerChargerCommand(chargingPointId, ocppChargePointId, "TriggerMessage", ConnectorId: body.ConnectorId, RequestedMessage: body.RequestedMessage), ct)))
+            .Produces<OcppCommandResultDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("Provider: trigger message").WithSummary("Owner / manager: ask the charger to report now (StatusNotification / Heartbeat / MeterValues).").WithOpenApi();
+
+        app.MapGet("/{chargingPointId:int}/chargers/{ocppChargePointId:int}/commands", async (IMediator mediator, [FromRoute] int chargingPointId, [FromRoute] int ocppChargePointId, [FromQuery] int? take, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetMyChargerCommandsRequest(chargingPointId, ocppChargePointId, take), ct)))
+            .Produces<List<OcppCommandDto>>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesInternalServerError()
+            .WithName("Provider: charger command history").WithSummary("Owner / manager: commands sent to this charger, newest first, with who sent them and whether the unit confirmed.").WithOpenApi();
+
+        app.MapGet("/{chargingPointId:int}/sessions", async (IMediator mediator, [FromRoute] int chargingPointId, [FromQuery] int? chargerId, [FromQuery] DateTime? from, [FromQuery] DateTime? to, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetMyStationSessionsRequest(chargingPointId, chargerId, from, to, page, pageSize), ct)))
+            .Produces<PagedResult<OwnerSessionDto>>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesInternalServerError()
+            .WithName("Provider: station sessions").WithSummary("Owner / manager: charging sessions at the station, newest first (chargerId, from, to in UTC; page / pageSize, default 20).").WithOpenApi();
 
         return app;
     }

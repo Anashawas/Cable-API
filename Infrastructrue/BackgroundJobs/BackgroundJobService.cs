@@ -9,6 +9,8 @@ using Cable.Core.Enums;
 using System.Text.Json;
 using Application.NotificationInbox.Helpers;
 using Cable.Core.Constants;
+using Application.Pricing;
+using Cable.Core.Utilities;
 
 namespace Infrastructrue.BackgroundJobs;
 
@@ -910,8 +912,7 @@ public class BackgroundJobService(
     public async Task<int> ComputeOcppReliabilityAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
-        var windowStart = now.AddDays(-OcppLimits.ReliabilityWindowDays);
-        var minutes = (int)(now - windowStart).TotalMinutes;
+        var fullWindowStart = now.AddDays(-OcppLimits.ReliabilityWindowDays);
 
         var chargers = await applicationDbContext.OcppChargePoints
             .Where(c => !c.IsDeleted)
@@ -920,6 +921,17 @@ public class BackgroundJobService(
 
         foreach (var cp in chargers)
         {
+            // A unit is judged only from the moment it first reached us: a charger that joined
+            // last week is not punished for the three weeks before (they were not its fault).
+            var firstConnect = await applicationDbContext.OcppRawMessages.AsNoTracking()
+                .Where(m => m.ChargePointId == cp.ChargePointId && m.Direction == "sys" && m.Action == "CONNECT")
+                .OrderBy(m => m.Id)
+                .Select(m => (DateTime?)m.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+            var windowStart = firstConnect is DateTime fc && fc > fullWindowStart ? fc : fullWindowStart;
+            var minutes = (int)(now - windowStart).TotalMinutes;
+            if (minutes < 60) { cp.ReliabilityComputedAt = now; continue; }   // less than an hour of history: no score yet
+
             // ---- events in the window, oldest first
             var sys = await applicationDbContext.OcppRawMessages.AsNoTracking()
                 .Where(m => m.ChargePointId == cp.ChargePointId && m.Direction == "sys" && m.CreatedAt >= windowStart
@@ -1028,6 +1040,69 @@ public class BackgroundJobService(
         await applicationDbContext.SaveChanges(cancellationToken);
         logger.LogInformation("ComputeOcppReliability: {Count} charger(s) scored over {Days} days", computed, OcppLimits.ReliabilityWindowDays);
         return computed;
+    }
+
+    public async Task<int> SendPriceAlertsAsync(CancellationToken cancellationToken = default)
+    {
+        var tariff = await TouTariffLoader.LoadAsync(applicationDbContext, cancellationToken);
+        if (tariff is null) return 0;
+        var quiet = await PriceAlertQuietHours.GetAsync(applicationDbContext, cancellationToken);
+        var nowUtc = DateTime.UtcNow;
+        var nowLocal = JordanTime.FromUtc(nowUtc);
+
+        var sent = 0;
+        foreach (var a in PriceAlertPlanner.Due(tariff, nowLocal, TimeSpan.FromMinutes(10), quiet))
+        {
+            if (a.Quiet) continue;   // cancelled, never delayed (§6)
+
+            var subscribers = await applicationDbContext.UserPriceAlerts.AsNoTracking()
+                .Where(p => p.IsEnabled && p.LeadMinutes == a.LeadMinutes && ("," + p.Windows + ",").Contains("," + a.WindowKey + ","))
+                .Select(p => p.UserAccountId).ToListAsync(cancellationToken);
+            if (subscribers.Count == 0) continue;
+
+            var already = await applicationDbContext.PriceAlertLogs.AsNoTracking()
+                .Where(l => l.WindowKey == a.WindowKey && l.AlertDate == a.AlertDate && subscribers.Contains(l.UserAccountId))
+                .Select(l => l.UserAccountId).ToListAsync(cancellationToken);
+            var pending = subscribers.Except(already).ToList();
+            if (pending.Count == 0) continue;
+
+            var tokens = await applicationDbContext.NotificationTokens.AsNoTracking()
+                .Where(t => pending.Contains(t.UserId) && t.AppType == FirebaseAppType.UserApp)
+                .Select(t => new { t.UserId, t.Token, t.Language }).ToListAsync(cancellationToken);
+
+            var data = new Dictionary<string, string>
+            {
+                ["type"] = "price_alert",
+                ["windowKey"] = a.WindowKey,
+                ["startsAt"] = a.WindowStartLocal.ToString("yyyy-MM-dd'T'HH:mm:ss"),
+            };
+
+            // One multicast per language, in FCM-sized chunks (500 tokens).
+            foreach (var group in tokens.GroupBy(t => string.Equals(t.Language, "en", StringComparison.OrdinalIgnoreCase) ? "en" : "ar"))
+            {
+                var (title, body) = PriceAlertComposer.Compose(a, group.Key);
+                foreach (var chunk in group.Select(t => t.Token).Distinct().Chunk(500))
+                {
+                    try { await notificationService.SendMessagesAsync(chunk, title, body, FirebaseAppType.UserApp, data); sent += chunk.Length; }
+                    catch (Exception ex) { logger.LogWarning(ex, "PriceAlerts: FCM send failed for {Window} ({Lang})", a.WindowKey, group.Key); }
+                }
+            }
+
+            // Log every pending subscriber — with or without a token — so the next run never repeats them.
+            var tokenLang = tokens.GroupBy(t => t.UserId).ToDictionary(g => g.Key, g => g.First().Language);
+            foreach (var userId in pending)
+                applicationDbContext.PriceAlertLogs.Add(new PriceAlertLog
+                {
+                    UserAccountId = userId, WindowKey = a.WindowKey, AlertDate = a.AlertDate, SentAt = nowUtc,
+                    LeadMinutes = a.LeadMinutes, Language = tokenLang.GetValueOrDefault(userId),
+                });
+            try { await applicationDbContext.SaveChanges(cancellationToken); }
+            catch (DbUpdateException ex) { logger.LogWarning(ex, "PriceAlerts: log insert raced with another run for {Window} {Date}", a.WindowKey, a.AlertDate); }
+
+            logger.LogInformation("PriceAlerts: {Window} on {Date} (lead {Lead} min): {Users} user(s), {Tokens} device(s)",
+                a.WindowKey, a.AlertDate, a.LeadMinutes, pending.Count, tokens.Count);
+        }
+        return sent;
     }
 
     /// <summary>Who, what, since when — one shape for all three alert rules.</summary>

@@ -100,10 +100,10 @@ mostly reuse plus ownership checks (`/api/provider/charging-points/{id}/chargers
 |---|---|---|---|
 | 5.1 | **Fault push** when a plug reports Faulted (owner + active managers, inbox entry) | ✅ backend · ⏳ **partner app must register its FCM token**: `PUT /api/notification-token` `{ token, osName, osVersion, appVersion, appType: 2 }` (2 = StationApp) after login and on token refresh — the endpoint exists, the app has a TODO where the call should be (`notification_service.dart:218/235`). Until then owners get inbox entries but no push | — |
 | 5.2 | Live view: each charger's plugs, state, the session in progress (kWh, power, SoC, duration) | ⏳ Phase D (plug states: ✅ `GET /api/provider/charging-points/{id}/live` Oct 8; session detail still ⏳) | provider API |
-| 5.3 | Session history: card, energy, duration, stop reason; day / week / month totals | ⏳ Phase D | provider API |
+| 5.3 | Session history: card, energy, duration, stop reason; day / week / month totals | ✅ API Oct 9 (`GET /api/provider/charging-points/{id}/sessions`, filters chargerId / from / to, paged) · ⏳ app screen; totals = app-side sums for now | — |
 | 5.4 | Allowed cards: add / disable / expire from the phone | ⏳ Phase D | reuse admin endpoints |
 | 5.5 | More pushes: charger offline > 15 min, plug faulted > 15 min, session > 6 h, back online / fault cleared | ✅ Oct 7 (push + inbox already reach the owner; the partner app only needs to open them) | — |
-| 5.6 | Maintenance buttons with confirmation: refresh, reset, unlock, out-of-service | ⏳ Phase 2 | 3.3–3.6 |
+| 5.6 | Maintenance buttons with confirmation: refresh, reset, unlock, out-of-service, **stop session** | ✅ API Oct 9 (`POST /api/provider/charging-points/{id}/chargers/{ocppId}/commands/…`, owner-or-manager guard, same audit / confirmation / rate limit) · ⏳ app screen | — |
 | 5.7 | Monthly statement: energy sold, sessions, revenue (once tariffs exist), export | 💡 | 4.12 |
 | 5.8 | Remote start / stop for a customer on site | 💡 Phase 3 | 3.9 |
 | 5.9 | Power cap per plug / schedule (load management) | 💡 | 3.11 + unit support |

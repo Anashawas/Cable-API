@@ -132,5 +132,11 @@ public interface IApplicationDbContext
     DbSet<OcppAlert> OcppAlerts { get; set; }
     DbSet<OcppUserIdTag> OcppUserIdTags { get; set; }
 
+    // Time-of-use tariff + price alerts
+    DbSet<TouTariff> TouTariffs { get; set; }
+    DbSet<TouTariffWindow> TouTariffWindows { get; set; }
+    DbSet<UserPriceAlert> UserPriceAlerts { get; set; }
+    DbSet<PriceAlertLog> PriceAlertLogs { get; set; }
+
     Task<int> SaveChanges(CancellationToken cancellationToken = default);
 }
