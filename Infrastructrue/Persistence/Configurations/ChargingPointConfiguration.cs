@@ -17,6 +17,11 @@ public partial class ChargingPointConfiguration : IEntityTypeConfiguration<Charg
         builder.ToTable("ChargingPoint");
 
         builder.Property(e => e.CityName).HasMaxLength(500);
+        builder.Property(e => e.ShareLiveStatus).IsRequired().HasDefaultValue(false);
+        builder.Property(e => e.ShareLiveStatusSetAt).HasColumnType("datetime2(0)");
+        builder.Property(e => e.LiveStatusBlocked).IsRequired().HasDefaultValue(false);
+        builder.Property(e => e.LiveStatusBlockedAt).HasColumnType("datetime2(0)");
+        builder.Property(e => e.LiveStatusBlockReason).HasMaxLength(300);
         builder.Property(e => e.CountryName).HasMaxLength(500);
         builder.Property(e => e.CreatedAt).HasColumnType("datetime");
         builder.Property(e => e.FromTime).HasMaxLength(8);

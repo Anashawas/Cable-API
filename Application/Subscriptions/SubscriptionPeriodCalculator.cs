@@ -111,6 +111,18 @@ public static class SubscriptionEntitySync
                 }
                 break;
             }
+            case SubscriptionEntityTypes.OcppConnect:
+            {
+                // N-2: sharing live data with drivers is the product. It turns ON with the first
+                // activation unless the owner has already made a decision; it is never turned
+                // off here — lapsing hides the data through the subscription gate instead.
+                if (!on) break;
+                var cp = await db.ChargingPoints.FirstOrDefaultAsync(x => x.Id == s.EntityId && !x.IsDeleted, ct);
+                if (cp == null) break;
+                if (cp.ShareLiveStatusSetAt == null && !cp.ShareLiveStatus)
+                    cp.ShareLiveStatus = true;
+                break;
+            }
             case SubscriptionEntityTypes.Banner:
             {
                 var todayLocal = DateOnly.FromDateTime(JordanTime.FromUtc(nowUtc));

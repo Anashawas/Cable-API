@@ -1,6 +1,8 @@
 using Application.Common.Models;
 using Application.Ocpp.Commands.AddOcppAuthorizedTag;
+using Application.Ocpp;
 using Application.Ocpp.Commands.ControlOcppChargePoint;
+using Application.Ocpp.Commands.ManageLiveVisibility;
 using Application.Ocpp.Commands.ManageOcppAuthorizedTags;
 using Application.Ocpp.Commands.ManageOcppChargePoint;
 using Application.Ocpp.Commands.RegisterOcppChargePoint;
@@ -38,6 +40,8 @@ public static class OcppRoutes
     public record GetConfigurationRequest(List<string>? Keys);
     public record ChangeConfigurationRequest(string Key, string Value);
     public record RemoteStopRequest(int TransactionId);
+    public record ShareLiveStatusRequest(bool Share);
+    public record LiveStatusBlockRequest(bool Blocked, string? Reason);
 
     public static IEndpointRouteBuilder MapOcppRoutes(this IEndpointRouteBuilder app)
     {
@@ -45,7 +49,65 @@ public static class OcppRoutes
             .WithTags("OCPP")
             .MapChargePointRoutes()
             .MapControlRoutes()
+            .MapLiveVisibilityRoutes()
             .MapAuthorizedTagRoutes();
+
+        // Station owner / managers (partner app): the sharing switch.
+        app.MapGroup("/api/provider/charging-points")
+            .WithTags("Provider - Charging Points")
+            .MapProviderLiveVisibilityRoutes();
+
+        return app;
+    }
+
+    /// <summary>N-2: live-data visibility gates — admin side (read + veto).</summary>
+    private static RouteGroupBuilder MapLiveVisibilityRoutes(this RouteGroupBuilder app)
+    {
+        app.MapGet("/stations/{chargingPointId:int}/live-visibility", async (IMediator mediator, [FromRoute] int chargingPointId, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetLiveVisibilityRequest(chargingPointId), ct)))
+            .Produces<OcppLiveVisibilityDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesInternalServerError()
+            .WithName("Get OCPP live visibility")
+            .WithSummary("Admin / owner: the gates between this station's live charger data and the driver app — subscription, owner sharing switch, admin block — and the resulting yes/no")
+            .WithOpenApi();
+
+        app.MapPut("/stations/{chargingPointId:int}/live-visibility/block", async (IMediator mediator, [FromRoute] int chargingPointId, LiveStatusBlockRequest body, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new SetLiveStatusBlockedCommand(chargingPointId, body.Blocked, body.Reason), ct)))
+            .Produces<OcppLiveVisibilityDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("Set OCPP live visibility block")
+            .WithSummary("Admin veto: hide this station's live data from drivers (reason required, shown to the owner). It cannot turn sharing on — only the owner can.")
+            .WithOpenApi();
+
+        app.MapPut("/stations/{chargingPointId:int}/live-visibility/share", async (IMediator mediator, [FromRoute] int chargingPointId, ShareLiveStatusRequest body, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new SetShareLiveStatusCommand(chargingPointId, body.Share), ct)))
+            .Produces<OcppLiveVisibilityDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesInternalServerError()
+            .WithName("Set OCPP sharing (admin on behalf of the owner)")
+            .WithSummary("Admin acting for the owner (e.g. by phone request): sets the owner's sharing switch. Recorded as the admin's decision.")
+            .WithOpenApi();
+
+        return app;
+    }
+
+    /// <summary>N-2: the owner's switch, for the partner app.</summary>
+    private static RouteGroupBuilder MapProviderLiveVisibilityRoutes(this RouteGroupBuilder app)
+    {
+        app.MapGet("/{chargingPointId:int}/live-visibility", async (IMediator mediator, [FromRoute] int chargingPointId, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetLiveVisibilityRequest(chargingPointId), ct)))
+            .Produces<OcppLiveVisibilityDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesInternalServerError()
+            .WithName("Provider: get live visibility")
+            .WithSummary("Owner / manager: is this station's live charger data shown to drivers, and why not (subscription off, sharing off, blocked by Cable with a reason)")
+            .WithOpenApi();
+
+        app.MapPut("/{chargingPointId:int}/live-visibility/share", async (IMediator mediator, [FromRoute] int chargingPointId, ShareLiveStatusRequest body, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new SetShareLiveStatusCommand(chargingPointId, body.Share), ct)))
+            .Produces<OcppLiveVisibilityDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesInternalServerError()
+            .WithName("Provider: set live sharing")
+            .WithSummary("Owner / manager: share this station's live plug states (free / charging / faulted, plug type, power) with drivers in the Cable app. On by default with the Cable Connect subscription; switching it off hides the data at once.")
+            .WithOpenApi();
 
         return app;
     }

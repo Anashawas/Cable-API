@@ -75,6 +75,19 @@ public partial class ChargingPoint : BaseAuditableEntity
     /// <summary>Part B F4: when on, a worker's fan announcement sends directly (no owner approval).</summary>
     public bool AutoApproveWorkerNotifications { get; set; }
 
+    // Cable Connect — live charger data visible to drivers only when ALL gates are open:
+    // active OcppConnect subscription (admin) · ShareLiveStatus (the owner's consent) ·
+    // !LiveStatusBlocked (admin veto: may switch OFF what the owner switched on, never the
+    // reverse) · fresh data (per charger). ShareLiveStatus turns on with the first
+    // subscription activation unless the owner already decided (ShareLiveStatusSetAt).
+    public bool ShareLiveStatus { get; set; }
+    public DateTime? ShareLiveStatusSetAt { get; set; }
+    public int? ShareLiveStatusSetByUserId { get; set; }
+    public bool LiveStatusBlocked { get; set; }
+    public DateTime? LiveStatusBlockedAt { get; set; }
+    public int? LiveStatusBlockedByUserId { get; set; }
+    public string? LiveStatusBlockReason { get; set; }
+
     public virtual ICollection<ChargingPointAttachment> ChargingPointAttachments { get; set; } =
         new List<ChargingPointAttachment>();
 

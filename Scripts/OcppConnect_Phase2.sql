@@ -108,3 +108,27 @@ BEGIN
 END
 ELSE PRINT 'SKIP OcppAlert.EscalatedAt exists';
 GO
+
+-- N-2: live-data sharing consent (owner) + admin veto on the station.
+IF COL_LENGTH('dbo.ChargingPoint', 'ShareLiveStatus') IS NULL
+BEGIN
+    ALTER TABLE dbo.ChargingPoint ADD
+        ShareLiveStatus            BIT           NOT NULL CONSTRAINT DF_ChargingPoint_ShareLiveStatus DEFAULT 0,  -- owner's consent; set ON at first OcppConnect activation
+        ShareLiveStatusSetAt       DATETIME2(0)  NULL,     -- when the owner last decided (NULL = never; activation may set it ON)
+        ShareLiveStatusSetByUserId INT           NULL,
+        LiveStatusBlocked          BIT           NOT NULL CONSTRAINT DF_ChargingPoint_LiveStatusBlocked DEFAULT 0, -- admin veto
+        LiveStatusBlockedAt        DATETIME2(0)  NULL,
+        LiveStatusBlockedByUserId  INT           NULL,
+        LiveStatusBlockReason      NVARCHAR(300) NULL;
+    PRINT 'Added ChargingPoint.ShareLiveStatus / LiveStatusBlocked';
+END
+ELSE PRINT 'SKIP ChargingPoint.ShareLiveStatus exists';
+GO
+
+-- Backfill: stations that already hold a Cable Connect subscription start with sharing ON
+-- (the owner has not decided yet; the activation hook only runs on new payments).
+UPDATE cp SET cp.ShareLiveStatus = 1
+FROM dbo.ChargingPoint cp
+WHERE cp.ShareLiveStatus = 0 AND cp.ShareLiveStatusSetAt IS NULL
+  AND EXISTS (SELECT 1 FROM dbo.Subscription s WHERE s.EntityType = 'OcppConnect' AND s.EntityId = cp.Id AND s.IsDeleted = 0);
+GO

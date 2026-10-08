@@ -310,6 +310,17 @@ because RH4 has a separate port field that still says 4435 (SafeerSoft); the tec
 to 443 or the unit silently never connects. Charge Point ID is limited to 20 characters (OCPP
 CiString20) and "require password" is off by default (Security Profile 0 units cannot send one).
 
+**Live-data visibility, N-2 (Oct 8).** Four gates between a station's live plug states and a
+driver's screen: active OcppConnect subscription (admin) · `ChargingPoint.ShareLiveStatus`
+(owner consent; set ON at the first activation unless `ShareLiveStatusSetAt` says the owner
+already decided; never switched off by the system) · `!LiveStatusBlocked` (admin veto with a
+reason the owner sees; it can hide what the owner shares, never share what the owner hid) ·
+freshness per charger (`OcppLiveness`). `OcppLiveVisibility.GetAsync / IsVisibleAsync` is the
+one place to ask. Endpoints: admin `GET /api/admin/ocpp/stations/{id}/live-visibility`,
+`PUT …/block {blocked, reason}`, `PUT …/share {share}` (on the owner's request); partner app
+`GET/PUT /api/provider/charging-points/{id}/live-visibility[/share]`. Backfill in the Phase 2
+script turns sharing on for stations that already subscribe.
+
 **Rate limit & duplicates (Oct 8).** The API refuses more than 10 commands to one charger per
 minute (`OcppLimits.CommandsPerChargerPerMinute`) and refuses an identical Reset /
 ChangeAvailability / UnlockConnector / RemoteStopTransaction while the previous one is still

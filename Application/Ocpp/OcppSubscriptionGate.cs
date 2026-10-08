@@ -52,6 +52,51 @@ public static class OcppSubscriptionGate
 }
 
 /// <summary>
+/// N-2: the four gates between a station's live charger data and a driver's screen.
+/// Freshness is per charger and is checked by the caller (OcppLiveness); this answers the
+/// three station-level ones. The driver app's remote-config kill switch is client-side.
+/// </summary>
+public record OcppLiveVisibilityDto(
+    bool VisibleToDrivers,
+    bool SubscriptionOn,
+    bool OwnerSharing,
+    DateTime? OwnerDecidedAt,
+    bool AdminBlocked,
+    DateTime? AdminBlockedAt,
+    string? AdminBlockReason);
+
+public static class OcppLiveVisibility
+{
+    public static async Task<Dictionary<int, OcppLiveVisibilityDto>> GetAsync(IApplicationDbContext db, IEnumerable<int> chargingPointIds, CancellationToken ct)
+    {
+        var ids = chargingPointIds.Distinct().ToList();
+        if (ids.Count == 0) return new Dictionary<int, OcppLiveVisibilityDto>();
+
+        var subs = await OcppSubscriptionGate.GetStatesAsync(db, ids, ct);
+        var stations = await db.ChargingPoints.AsNoTracking()
+            .Where(c => ids.Contains(c.Id))
+            .Select(c => new { c.Id, c.ShareLiveStatus, c.ShareLiveStatusSetAt, c.LiveStatusBlocked, c.LiveStatusBlockedAt, c.LiveStatusBlockReason })
+            .ToListAsync(ct);
+
+        return ids.ToDictionary(id => id, id =>
+        {
+            var st = stations.FirstOrDefault(x => x.Id == id);
+            var subOn = subs[id].IsOn;
+            var sharing = st?.ShareLiveStatus ?? false;
+            var blocked = st?.LiveStatusBlocked ?? false;
+            return new OcppLiveVisibilityDto(subOn && sharing && !blocked, subOn, sharing, st?.ShareLiveStatusSetAt, blocked, st?.LiveStatusBlockedAt, st?.LiveStatusBlockReason);
+        });
+    }
+
+    public static async Task<OcppLiveVisibilityDto> GetAsync(IApplicationDbContext db, int chargingPointId, CancellationToken ct)
+        => (await GetAsync(db, [chargingPointId], ct))[chargingPointId];
+
+    /// <summary>The single yes/no the B2C queries use.</summary>
+    public static async Task<bool> IsVisibleAsync(IApplicationDbContext db, int chargingPointId, CancellationToken ct)
+        => (await GetAsync(db, chargingPointId, ct)).VisibleToDrivers;
+}
+
+/// <summary>
 /// Three display states, derived from the charger row the OCPP process keeps up to date.
 /// "Connected" alone is not enough: if Cable.Ocpp dies hard (host recycle) the flag
 /// stays true, so freshness of LastMessageAt is what actually says "online".

@@ -22,7 +22,7 @@ Apps: **Server** = `Cable.Ocpp` (the OCPP endpoint) · **API** = `WebApi` · **A
 | 1.4 | Charger identity: Charge Point ID + optional HTTP Basic password, 10 failures → 15-min lock | ✅ | Server | RH4 runs Security Profile 0 → register it **without** password |
 | 1.5 | Raw message log (every frame in/out + connect/disconnect), 30-day purge job | ✅ | Server + API | retention to shorten to 7 days (see 7.2) |
 | 1.6 | Process-restart counter (`OcppProcessStart`) | ✅ | Server | tells us how often the host restarts us |
-| 1.7 | Subscription gate: a station needs an active **OcppConnect** subscription for its charger data to show | ✅ | API + Admin | chargers keep working when it lapses; only the views hide |
+| 1.7 | Subscription gate: a station needs an active **OcppConnect** subscription for its charger data to show. **N-2 (Oct 8):** plus the owner's "share live data" switch (on with the first activation unless the owner decided) and an admin veto with a reason — `OcppLiveVisibility` answers the single yes/no the driver app will use | ✅ | API + Admin (+ partner endpoints) | chargers keep working when it lapses; only the views hide |
 | 1.8 | Switch AWS to the **production** database | ⏳ | Server | apply `Scripts/OcppConnect_Phase0.sql` + `Phase1.sql` to prod, add `appsettings.Production.json`, republish |
 | 1.9 | External uptime monitor on `/health` | ⏳ | — | UptimeRobot free tier; nothing on AWS alerts us by itself |
 | 1.10 | Load test (50 simulated chargers) | 💡 | Server | estimate today: ~500 chargers per $22 box; the DB is the real limit (~20–50 chargers/year at 4 GB) |

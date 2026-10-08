@@ -31,6 +31,7 @@ Both repos are committed and pushed (`Anashawas/Cable-API`, `Anashawas/Cable-Adm
 ### API (`WebApi`) + jobs
 - Admin endpoints under `/api/admin/ocpp`: fleet health, chargers (list / detail / register / update / rotate password / enable / delete), connectors (plug type + kW), allowed cards, raw log, the six commands + history, sync-local-list, alerts.
 - Hangfire jobs: stale sessions, raw-log purge, fault push, local-list sync, **alert rules every 5 min**: charger offline > 15 min, plug Faulted > 15 min, session open > 6 h, **parked after charging (your N-5)** > 20 min (driver first when the card is linked, then station). Push + inbox; "back online / fault cleared" on resolve.
+- **N-2 live-data visibility (Oct 8)**: `ChargingPoint.ShareLiveStatus` (owner consent, ON at first activation unless decided) + `LiveStatusBlocked` (admin veto with reason). Admin: "Live data for drivers" panel on the station's Cable Connect tab (gates, owner switch on request, block / unblock). Partner app endpoints ready: `GET/PUT /api/provider/charging-points/{id}/live-visibility[/share]`. `OcppLiveVisibility.IsVisibleAsync` is the one check the driver-app endpoint (Phase E) must call.
 - Credentials sheet data (your P0-1 / P0-2): `webSocketBaseUrl` and `port` come from the API's `OcppServer:Url`, never from the admin's config.
 - Charge Point ID limited to 20 characters (P0-5).
 
@@ -57,7 +58,6 @@ Both repos are committed and pushed (`Anashawas/Cable-API`, `Anashawas/Cable-Adm
 | # | Item | Est. | Source |
 |---|---|---|---|
 | 1 | Reports page: energy & sessions per station per day / week / month, plug utilization, faults per month, Excel export | 2–3 d | feature map 4.11 |
-| 3 | Share-live-data switch for the partner + admin veto, default ON with the subscription (`ChargingPoint.ShareLiveStatus`, `LiveStatusBlocked`) | 1 d + partner app switch | N-2 |
 | 5 | Reliability score, partner-only first; "reliable" badge ≥ 95 % later | 1 d | N-6 |
 | 6 | Admin screen to link a card to a user (`OcppUserIdTag` exists, no UI yet) — only needed if automatic points go the card route | 0.5 d | P1-6 item 4 |
 | 7 | Alert thresholds configurable per station (constants today: 15 min / 15 min / 6 h / 20 min) | 0.5 d | N-5 |
@@ -67,7 +67,7 @@ Both repos are committed and pushed (`Anashawas/Cable-API`, `Anashawas/Cable-Adm
 | # | Item | Depends on |
 |---|---|---|
 | 8 | **Partner app**: register the FCM token (`PUT /api/notification-token`, `appType: 2`) and fill `_handleNotificationTap` — unlocks every push built so far | nothing |
-| 9 | Partner app Phase D: live plugs & session, history, allowed cards, maintenance buttons (reset / unlock / out-of-service) | provider endpoints (3 d API) |
+| 9 | Partner app Phase D: live plugs & session, history, allowed cards, maintenance buttons (reset / unlock / out-of-service), **the N-2 sharing switch (endpoint ready)** | provider endpoints (3 d API) |
 | 10 | Driver app Phase E: "N of M free" **per plug type**, faults visible, driver-facing charger names, station-level aggregation | B2C station endpoint (2 d API) — N-3, N-4, N-7 |
 
 ## 5. Pending — decisions (parked until agreed)
