@@ -14,6 +14,7 @@ using Application.Ocpp.Queries.GetOcppChargePoints;
 using Application.Ocpp.Queries.GetOcppCommands;
 using Application.Ocpp.Queries.GetOcppFleetHealth;
 using Application.Ocpp.Queries.GetOcppRawMessages;
+using Application.Ocpp.Queries.GetStationLive;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -42,6 +43,7 @@ public static class OcppRoutes
     public record RemoteStopRequest(int TransactionId);
     public record ShareLiveStatusRequest(bool Share);
     public record LiveStatusBlockRequest(bool Blocked, string? Reason);
+    public record ChargerDisplayNameRequest(string? DisplayName);
 
     public static IEndpointRouteBuilder MapOcppRoutes(this IEndpointRouteBuilder app)
     {
@@ -52,10 +54,67 @@ public static class OcppRoutes
             .MapLiveVisibilityRoutes()
             .MapAuthorizedTagRoutes();
 
-        // Station owner / managers (partner app): the sharing switch.
+        // Station owner / managers (partner app): the sharing switch, their live picture, cabinet names.
         app.MapGroup("/api/provider/charging-points")
             .WithTags("Provider - Charging Points")
-            .MapProviderLiveVisibilityRoutes();
+            .MapProviderLiveVisibilityRoutes()
+            .MapProviderLiveRoutes();
+
+        // Drivers (Cable app): the live picture of a station, gated by N-2.
+        app.MapGroup("/api/charging-points")
+            .WithTags("Charging Points")
+            .MapDriverLiveRoutes();
+
+        return app;
+    }
+
+    /// <summary>N-3 / N-4 / N-7: what the driver app shows on a station.</summary>
+    private static RouteGroupBuilder MapDriverLiveRoutes(this RouteGroupBuilder app)
+    {
+        app.MapGet("/{id:int}/live", async (IMediator mediator, [FromRoute] int id, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetStationLiveRequest(id), ct)))
+            .Produces<StationLiveDto>()
+            .ProducesNotFound().ProducesInternalServerError()
+            .WithName("Get station live (driver app)")
+            .WithSummary("The station as a driver sees it: free / busy / out-of-order per plug, grouped per plug type, all cabinets aggregated, owner-named. Empty with unavailableReason (NoSubscription | NotShared | Blocked | NoChargers | Offline) unless the sharing gates are open and a charger is online.")
+            .WithOpenApi();
+
+        app.MapGet("/live-summary", async (IMediator mediator, [FromQuery] string ids, CancellationToken ct) =>
+            {
+                var list = ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Select(x => int.TryParse(x, out var v) ? v : 0).Where(v => v > 0).ToList();
+                return Results.Ok(await mediator.Send(new GetStationsLiveSummaryRequest(list), ct));
+            })
+            .Produces<List<StationLiveSummaryDto>>()
+            .ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("Get stations live summary (driver app)")
+            .WithSummary("Badge data for the stations on screen: ids=1,2,3 (max 50). Per station: available, free / total per plug type, updatedAt. Stations without chargers are omitted.")
+            .WithOpenApi();
+
+        return app;
+    }
+
+    /// <summary>Partner app: live picture of the owner's station and cabinet naming.</summary>
+    private static RouteGroupBuilder MapProviderLiveRoutes(this RouteGroupBuilder app)
+    {
+        app.MapGet("/{chargingPointId:int}/live", async (IMediator mediator, [FromRoute] int chargingPointId, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetMyStationLiveRequest(chargingPointId), ct)))
+            .Produces<StationLiveDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesInternalServerError()
+            .WithName("Provider: get station live")
+            .WithSummary("Owner / manager: the same live picture drivers get, without the sharing gates (it is their own data).")
+            .WithOpenApi();
+
+        app.MapPut("/{chargingPointId:int}/chargers/{ocppChargePointId:int}/display-name", async (IMediator mediator, [FromRoute] int chargingPointId, [FromRoute] int ocppChargePointId, ChargerDisplayNameRequest body, CancellationToken ct) =>
+            {
+                await mediator.Send(new SetChargerDisplayNameCommand(chargingPointId, ocppChargePointId, body.DisplayName), ct);
+                return Results.Ok();
+            })
+            .Produces(200)
+            .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("Provider: set charger display name")
+            .WithSummary("Owner / manager: name a cabinet the way drivers recognise it (\"the right-hand charger\"). Empty = app default. The OCPP id is never shown to drivers.")
+            .WithOpenApi();
 
         return app;
     }

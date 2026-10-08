@@ -99,7 +99,7 @@ mostly reuse plus ownership checks (`/api/provider/charging-points/{id}/chargers
 | # | Feature | Status | Depends on |
 |---|---|---|---|
 | 5.1 | **Fault push** when a plug reports Faulted (owner + active managers, inbox entry) | ✅ backend · ⏳ **partner app must register its FCM token**: `PUT /api/notification-token` `{ token, osName, osVersion, appVersion, appType: 2 }` (2 = StationApp) after login and on token refresh — the endpoint exists, the app has a TODO where the call should be (`notification_service.dart:218/235`). Until then owners get inbox entries but no push | — |
-| 5.2 | Live view: each charger's plugs, state, the session in progress (kWh, power, SoC, duration) | ⏳ Phase D | provider API |
+| 5.2 | Live view: each charger's plugs, state, the session in progress (kWh, power, SoC, duration) | ⏳ Phase D (plug states: ✅ `GET /api/provider/charging-points/{id}/live` Oct 8; session detail still ⏳) | provider API |
 | 5.3 | Session history: card, energy, duration, stop reason; day / week / month totals | ⏳ Phase D | provider API |
 | 5.4 | Allowed cards: add / disable / expire from the phone | ⏳ Phase D | reuse admin endpoints |
 | 5.5 | More pushes: charger offline > 15 min, plug faulted > 15 min, session > 6 h, back online / fault cleared | ✅ Oct 7 (push + inbox already reach the owner; the partner app only needs to open them) | — |
@@ -107,6 +107,7 @@ mostly reuse plus ownership checks (`/api/provider/charging-points/{id}/chargers
 | 5.7 | Monthly statement: energy sold, sessions, revenue (once tariffs exist), export | 💡 | 4.12 |
 | 5.8 | Remote start / stop for a customer on site | 💡 Phase 3 | 3.9 |
 | 5.9 | Power cap per plug / schedule (load management) | 💡 | 3.11 + unit support |
+| 5.10 | Name each cabinet for drivers (N-3) | ✅ API Oct 8 (`PUT /api/provider/charging-points/{id}/chargers/{ocppId}/display-name`) · ⏳ app screen | — |
 
 ## 6. Cable app (drivers)
 
@@ -114,9 +115,9 @@ Nothing is built yet. Everything here is gated by the station's OcppConnect subs
 
 | # | Feature | Status | Depends on |
 |---|---|---|---|
-| 6.1 | **"N of M plugs free"** live badge on the station card and page, with plug type & max power | ⏳ Phase E | B2C API endpoint |
+| 6.1 | **"N of M plugs free"** live badge on the station card and page, **per plug type** with max power | ✅ API Oct 8 (`GET /api/charging-points/{id}/live`, `GET /api/charging-points/live-summary?ids=`) · ⏳ app screens | gated by N-2 + freshness |
 | 6.2 | "Notify me when a plug is free" | 💡 | 6.1 + small job |
-| 6.3 | Charger-level detail on the station page: each plug's live state | 💡 | 6.1 |
+| 6.3 | Charger-level detail on the station page: each cabinet (owner-named, N-3) with its plugs Free / Busy / **OutOfOrder (N-4)** / Unknown, all cabinets in one answer (N-7) | ✅ API Oct 8 · ⏳ app screens | same endpoint as 6.1 |
 | 6.4 | **Start charging from the app** on a chosen plug (a virtual card id per app user, no physical card), stop from the app | 💡 Phase 3 | 3.9 + `OcppUserIdTag` (table exists since Oct 7; admin screen to link a card to a user still ⏳) |
 | 6.5 | Live session screen: kWh so far, charging power, battery % if the car reports it, elapsed time, cost so far | 💡 Phase 3 | 6.4 + tariffs |
 | 6.6 | Pushes: charging started, car stopped drawing, charging complete, cable still plugged | 💡 Phase 3 | 6.4 |

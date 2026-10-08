@@ -68,7 +68,7 @@ Both repos are committed and pushed (`Anashawas/Cable-API`, `Anashawas/Cable-Adm
 |---|---|---|
 | 8 | **Partner app**: register the FCM token (`PUT /api/notification-token`, `appType: 2`) and fill `_handleNotificationTap` — unlocks every push built so far | nothing |
 | 9 | Partner app Phase D: live plugs & session, history, allowed cards, maintenance buttons (reset / unlock / out-of-service), **the N-2 sharing switch (endpoint ready)** | provider endpoints (3 d API) |
-| 10 | Driver app Phase E: "N of M free" **per plug type**, faults visible, driver-facing charger names, station-level aggregation | B2C station endpoint (2 d API) — N-3, N-4, N-7 |
+| 10 | Driver app Phase E: "N of M free" **per plug type**, faults visible, driver-facing charger names, station-level aggregation — **API done Oct 8**: `GET /api/charging-points/{id}/live`, `GET /api/charging-points/live-summary?ids=`; partner: `GET …/charging-points/{id}/live`, `PUT …/chargers/{ocppId}/display-name` | app screens only (N-3, N-4, N-7) |
 
 ## 5. Pending — decisions (parked until agreed)
 

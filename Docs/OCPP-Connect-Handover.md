@@ -310,6 +310,16 @@ because RH4 has a separate port field that still says 4435 (SafeerSoft); the tec
 to 443 or the unit silently never connects. Charge Point ID is limited to 20 characters (OCPP
 CiString20) and "require password" is off by default (Security Profile 0 units cannot send one).
 
+**Station live picture for drivers, N-3 / N-4 / N-7 (Oct 8).** `GET /api/charging-points/{id}/live`
+(anonymous, like the station page) returns, when the N-2 gates are open and at least one charger
+is Online: `plugTypes[]` (per plug type: total / free / busy / outOfOrder / unknown / maxPowerKw),
+`chargers[]` (ordinal, owner-given `displayName` or null, online, `plugs[]` with Free | Busy |
+OutOfOrder | Unknown — Faulted and Unavailable both read OutOfOrder, offline chargers read
+Unknown). Otherwise `available=false` with `unavailableReason` NoSubscription | NotShared |
+Blocked | NoChargers | Offline. `GET /api/charging-points/live-summary?ids=1,2,3` is the badge
+form (max 50). Partner: `GET /api/provider/charging-points/{id}/live` (no gates) and
+`PUT …/chargers/{ocppId}/display-name`. The OCPP id is never in a driver response.
+
 **Live-data visibility, N-2 (Oct 8).** Four gates between a station's live plug states and a
 driver's screen: active OcppConnect subscription (admin) · `ChargingPoint.ShareLiveStatus`
 (owner consent; set ON at the first activation unless `ShareLiveStatusSetAt` says the owner
