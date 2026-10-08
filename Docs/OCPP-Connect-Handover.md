@@ -310,6 +310,11 @@ because RH4 has a separate port field that still says 4435 (SafeerSoft); the tec
 to 443 or the unit silently never connects. Charge Point ID is limited to 20 characters (OCPP
 CiString20) and "require password" is off by default (Security Profile 0 units cannot send one).
 
+**Rate limit & duplicates (Oct 8).** The API refuses more than 10 commands to one charger per
+minute (`OcppLimits.CommandsPerChargerPerMinute`) and refuses an identical Reset /
+ChangeAvailability / UnlockConnector / RemoteStopTransaction while the previous one is still
+unconfirmed and younger than 90 s. Cable.Ocpp applies the same per-minute cap on its own.
+
 **Safety guards (Oct 7).** `ChangeConfiguration` refuses protected keys (central system URL,
 identity, authorization key, security profile, APN…) and `UnlockConnector` refuses a plug that is
 Charging — both in the API command and again inside Cable.Ocpp, so nothing holding the internal

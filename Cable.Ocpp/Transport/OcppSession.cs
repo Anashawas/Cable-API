@@ -51,6 +51,9 @@ public sealed class OcppSession(
     /// <summary>Server-initiated calls awaiting their reply (phase 2 control messages).</summary>
     public Protocol.PendingCalls Pending { get; } = new();
 
+    /// <summary>Timestamps of the last central-system commands sent on this socket (rate limit).</summary>
+    public ConcurrentQueue<DateTime> RecentCommands { get; } = new();
+
     public void TouchIn(string? action)
     {
         LastMessageAt = DateTime.UtcNow;

@@ -24,7 +24,7 @@ Both repos are committed and pushed (`Anashawas/Cable-API`, `Anashawas/Cable-Adm
 - All nine charger-initiated messages handled and persisted; raw frame log; restart counter; liveness (Online / Reconnecting / Offline by freshness).
 - Charger identity: id + optional Basic password, 10 failures → 15-min lock. Subscription gate (`OcppConnect` type).
 - **Phase 2 control**: TriggerMessage, Reset, UnlockConnector, ChangeAvailability, GetConfiguration, ChangeConfiguration, **RemoteStopTransaction** (Oct 8) — sent from the API through the internal `/commands` endpoint, reply matched by uniqueId, audited in `OcppCommand`, **confirmed** when the charger's follow-up message proves the effect (`CompletedAt`).
-- **Safety (your P1-6)**: protected configuration keys refused in code (server address / identity / auth key / security profile / APN…), UnlockConnector refused while a plug is Charging — both in the API and again inside the OCPP server.
+- **Safety (your P1-6)**: **rate limit** (10 commands per charger per minute, API and OCPP server) and **duplicate protection** (an identical Reset / ChangeAvailability / Unlock / RemoteStop is refused while the previous one is unconfirmed and under 90 s old); protected configuration keys refused in code (server address / identity / auth key / security profile / APN…), UnlockConnector refused while a plug is Charging — both in the API and again inside the OCPP server.
 - **SendLocalList (your 3.7, "build first")**: the station's cards are pushed into every charger after each card change and when a Pending unit boots; ClearCache follows; status per charger (Synced / Pending / Failed / NotSupported).
 - AWS Lightsail production host prepared: Always Running pool, Let's Encrypt, verified 25-min silent socket and 28/28 heartbeats with 0 restarts.
 
@@ -39,7 +39,7 @@ Both repos are committed and pushed (`Anashawas/Cable-API`, `Anashawas/Cable-Adm
 - Charger page: **Remote control** (refresh menu, soft / hard reset, unit & per-plug out-of-service, unlock, command history with "confirmed after N s"), **Charger settings** (read keys, supported profiles, inline edit), **Cards on the unit** chip + Sync now, **commissioning card** until the first boot (Waiting / Connected / Refused with reason / Booted, polled every 4 s — P0-4), connectors with **plug type dropdown** (P1-1) and kW, sessions, raw log.
 - Register dialog: password **off by default** (P0-3), id max 20, sheet shows URL + **port** with the 4435 warning (P0-1); the new charger opens automatically after the sheet.
 - Station page → Cable Connect tab: chargers, OcppConnect subscription panel, allowed cards.
-- `config.production.js` has `ocpp.url` (P1-2). Arabic + English for everything.
+- `config.production.js` has `ocpp.url` (P1-2); `config.staging.js` now holds Cable's staging hosts instead of the old Kuwait project. P2 quality items done: search debounce, per-row pending flags, expiry sent as UTC instant, kWh with two decimals. Arabic + English for everything.
 
 ### Simulator (`Cable.Ocpp.TestClient`)
 - Sessions, outage replay, faults, idle survival, answers every central-system command (reset really reboots, availability survives reboot, local list, config list incl. protected keys), `--charge-seconds` hold for UI tests.
@@ -58,7 +58,6 @@ Both repos are committed and pushed (`Anashawas/Cable-API`, `Anashawas/Cable-Adm
 |---|---|---|---|
 | 1 | Reports page: energy & sessions per station per day / week / month, plug utilization, faults per month, Excel export | 2–3 d | feature map 4.11 |
 | 3 | Share-live-data switch for the partner + admin veto, default ON with the subscription (`ChargingPoint.ShareLiveStatus`, `LiveStatusBlocked`) | 1 d + partner app switch | N-2 |
-| 4 | Review quality items: search debounce, per-row pending flags, `expiresAt` UTC consistency, two decimals on kWh, leftover `config.staging.js` | 0.5 d | P2 |
 | 5 | Reliability score, partner-only first; "reliable" badge ≥ 95 % later | 1 d | N-6 |
 | 6 | Admin screen to link a card to a user (`OcppUserIdTag` exists, no UI yet) — only needed if automatic points go the card route | 0.5 d | P1-6 item 4 |
 | 7 | Alert thresholds configurable per station (constants today: 15 min / 15 min / 6 h / 20 min) | 0.5 d | N-5 |

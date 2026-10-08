@@ -34,13 +34,40 @@ internal static class OcppCommandRunner
         if (!cp.IsEnabled)
             throw new DataValidationException("Id", $"Charger {cp.ChargePointId} is disabled. Enable it before sending commands.");
 
+        var requestJson = JsonSerializer.Serialize(payload, Json);
+        var now = DateTime.UtcNow;
+
+        // Rate limit: at most N commands per charger per minute, whoever sends them.
+        var lastMinute = await db.OcppCommands.AsNoTracking()
+            .CountAsync(c => c.OcppChargePointId == cp.Id && !c.IsDeleted && c.CreatedAt >= now.AddMinutes(-1), cancellationToken);
+        if (lastMinute >= Cable.Core.Constants.OcppLimits.CommandsPerChargerPerMinute)
+            throw new DataValidationException("Id",
+                $"Too many commands to {cp.ChargePointId}: {lastMinute} in the last minute (limit {Cable.Core.Constants.OcppLimits.CommandsPerChargerPerMinute}). Wait a moment.");
+
+        // Duplicate protection: the same confirmable command, still unconfirmed and recent, is not sent twice
+        // (a Reset that was accepted but has not rebooted yet must not be followed by another Reset).
+        if (Cable.Core.Constants.OcppLimits.ConfirmableCommands.Contains(action))
+        {
+            var since = now - Cable.Core.Constants.OcppLimits.DuplicateCommandWindow;
+            var pendingTwin = await db.OcppCommands.AsNoTracking()
+                .Where(c => c.OcppChargePointId == cp.Id && c.Action == action && c.RequestPayload == requestJson && !c.IsDeleted
+                            && c.Status == "Answered" && c.CompletedAt == null && c.CreatedAt >= since
+                            && c.ResultStatus != "Rejected" && c.ResultStatus != "NotSupported" && c.ResultStatus != "UnlockFailed")
+                .OrderByDescending(c => c.Id)
+                .Select(c => new { c.Id, c.CreatedAt })
+                .FirstOrDefaultAsync(cancellationToken);
+            if (pendingTwin is not null)
+                throw new DataValidationException("Id",
+                    $"The same {action} was accepted {(int)(now - pendingTwin.CreatedAt).TotalSeconds} s ago and the charger has not confirmed it yet. Wait for the confirmation (or up to {(int)Cable.Core.Constants.OcppLimits.DuplicateCommandWindow.TotalSeconds} s) before sending it again.");
+        }
+
         var outcome = await client.SendAsync(cp.ChargePointId, action, payload, cancellationToken, timeoutSeconds);
 
         var row = new OcppCommand
         {
             OcppChargePointId = cp.Id,
             Action = action,
-            RequestPayload = JsonSerializer.Serialize(payload, Json),
+            RequestPayload = requestJson,
             Status = outcome.Status,
             ResultStatus = outcome.Answered ? ReadStatus(outcome.Payload) : null,
             ResponsePayload = outcome.Payload,

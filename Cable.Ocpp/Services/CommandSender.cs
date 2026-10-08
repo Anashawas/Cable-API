@@ -61,6 +61,14 @@ public sealed class CommandSender(ConnectionRegistry registry, RawMessageStore s
             && state.Status == Cable.Core.Constants.OcppConnectorStatus.Charging)
             return CommandOutcome.Failed(OcppCommandStatus.Invalid, $"connector {connectorId} is Charging; unlocking a live cable is refused");
 
+        // Rate limit (second line of defence after the API's): N commands per charger per minute.
+        var cutoff = DateTime.UtcNow.AddMinutes(-1);
+        while (session.RecentCommands.TryPeek(out var oldest) && oldest < cutoff)
+            session.RecentCommands.TryDequeue(out _);
+        if (session.RecentCommands.Count >= Cable.Core.Constants.OcppLimits.CommandsPerChargerPerMinute)
+            return CommandOutcome.Failed(OcppCommandStatus.Invalid, $"rate limit: {session.RecentCommands.Count} commands to {chargePointId} in the last minute");
+        session.RecentCommands.Enqueue(DateTime.UtcNow);
+
         var uniqueId = Guid.NewGuid().ToString("N")[..16];
         var frame = OcppFrame.Call(uniqueId, action, payload);
         var pending = session.Pending.Register(uniqueId, action);

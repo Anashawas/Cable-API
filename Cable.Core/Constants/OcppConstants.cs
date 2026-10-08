@@ -118,6 +118,15 @@ public static class OcppLimits
     /// <summary>Still parked this long after the driver was told → tell the station owner / managers.</summary>
     public static readonly TimeSpan ParkedEscalateAfter = TimeSpan.FromMinutes(20);
 
+    /// <summary>Commands to one charger per minute; above this the API refuses with a clear message (a nervous click-storm must not reboot a unit five times).</summary>
+    public const int CommandsPerChargerPerMinute = 10;
+
+    /// <summary>An identical command (same action + payload) to the same charger is refused while the previous one is still unconfirmed and younger than this.</summary>
+    public static readonly TimeSpan DuplicateCommandWindow = TimeSpan.FromSeconds(90);
+
+    /// <summary>Commands whose effect the unit proves with a later message — the ones duplicate protection applies to.</summary>
+    public static readonly string[] ConfirmableCommands = ["Reset", "ChangeAvailability", "UnlockConnector", "RemoteStopTransaction"];
+
     /// <summary>Same connector + same error code within this window = one notification.</summary>
     public static readonly TimeSpan FaultNotificationDedupe = TimeSpan.FromMinutes(30);
 }
