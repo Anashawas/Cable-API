@@ -191,6 +191,43 @@ public class ChangeOcppAvailabilityCommandHandler(IApplicationDbContext db, ICur
 }
 
 // ---------------------------------------------------------------------------
+// RemoteStopTransaction — end a running session from the admin / partner app
+// ---------------------------------------------------------------------------
+
+/// <summary>
+/// Phase 2 safety tool (not the phase-3 remote start): stops the open session with this
+/// transaction id. The unit answers Accepted / Rejected and then sends its own
+/// StopTransaction (reason Remote), which closes the session row and confirms the command.
+/// </summary>
+public record RemoteStopOcppTransactionCommand(int Id, int TransactionId) : IRequest<OcppCommandResultDto>;
+
+public class RemoteStopOcppTransactionCommandValidator : AbstractValidator<RemoteStopOcppTransactionCommand>
+{
+    public RemoteStopOcppTransactionCommandValidator()
+    {
+        RuleFor(x => x.TransactionId).GreaterThan(0);
+    }
+}
+
+public class RemoteStopOcppTransactionCommandHandler(IApplicationDbContext db, ICurrentUserService currentUser, IOcppCommandClient client)
+    : IRequestHandler<RemoteStopOcppTransactionCommand, OcppCommandResultDto>
+{
+    public async Task<OcppCommandResultDto> Handle(RemoteStopOcppTransactionCommand request, CancellationToken cancellationToken)
+    {
+        var tx = await db.OcppTransactions.AsNoTracking()
+            .Where(t => t.Id == request.TransactionId && t.OcppChargePointId == request.Id)
+            .Select(t => new { t.IsOpen, t.IsStale, t.ConnectorId })
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new NotFoundException("cannot find session " + request.TransactionId + " on this charger");
+        if (!tx.IsOpen)
+            throw new DataValidationException(nameof(request.TransactionId), "Session " + request.TransactionId + " is already closed.");
+
+        return await OcppCommandRunner.RunAsync(db, currentUser, client, request.Id, "RemoteStopTransaction",
+            new Dictionary<string, object> { ["transactionId"] = request.TransactionId }, cancellationToken);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // GetConfiguration / ChangeConfiguration — the unit's settings
 // ---------------------------------------------------------------------------
 

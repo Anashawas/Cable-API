@@ -183,7 +183,7 @@ public sealed class MeterValuesHandler(IApplicationDbContext db, CommandConfirme
 }
 
 /// <summary>Closes the session whenever the Stop arrives (R6); an unknown id becomes an orphan row, not a lost message.</summary>
-public sealed class StopTransactionHandler(IApplicationDbContext db, ILogger<StopTransactionHandler> log) : IOcppHandler
+public sealed class StopTransactionHandler(IApplicationDbContext db, CommandConfirmer confirmer, ILogger<StopTransactionHandler> log) : IOcppHandler
 {
     public async Task<object> HandleAsync(OcppSession session, JsonElement payload, CancellationToken cancellationToken)
     {
@@ -223,6 +223,10 @@ public sealed class StopTransactionHandler(IApplicationDbContext db, ILogger<Sto
         // A meter that went backwards (replaced / reset) is flagged by a null, never a negative kWh.
         tx.EnergyKwh = !tx.IsOrphan && meterStop >= tx.MeterStartWh ? (meterStop - tx.MeterStartWh) / 1000m : null;
         await db.SaveChanges(cancellationToken);
+
+        // A RemoteStopTransaction we sent is confirmed by this very message.
+        if (!tx.IsOrphan)
+            await confirmer.ConfirmAsync(session.OcppChargePointId, "RemoteStopTransaction", r => CommandConfirmer.Int(r, "transactionId") == tx.Id, cancellationToken);
 
         // transactionData carries the final samples (context Transaction.End).
         var samples = OcppPayload.Array(payload, "transactionData");

@@ -37,6 +37,7 @@ public static class OcppRoutes
     public record ChangeAvailabilityRequest(int ConnectorId, string Type);
     public record GetConfigurationRequest(List<string>? Keys);
     public record ChangeConfigurationRequest(string Key, string Value);
+    public record RemoteStopRequest(int TransactionId);
 
     public static IEndpointRouteBuilder MapOcppRoutes(this IEndpointRouteBuilder app)
     {
@@ -198,6 +199,14 @@ public static class OcppRoutes
             .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
             .WithName("OCPP ChangeAvailability")
             .WithSummary("Admin: take a plug (or the whole unit, connectorId 0) out of service / back in service. Inoperative plugs show Unavailable in the apps; Scheduled = after the running session.")
+            .WithOpenApi();
+
+        app.MapPost("/charge-points/{id:int}/commands/remote-stop", async (IMediator mediator, [FromRoute] int id, RemoteStopRequest body, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new RemoteStopOcppTransactionCommand(id, body.TransactionId), ct)))
+            .Produces<OcppCommandResultDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("OCPP RemoteStopTransaction")
+            .WithSummary("Admin: stop a running session (transactionId = the open OcppTransaction id). The unit answers Accepted / Rejected and then sends StopTransaction (reason Remote), which closes the session and confirms the command.")
             .WithOpenApi();
 
         app.MapPost("/charge-points/{id:int}/commands/get-configuration", async (IMediator mediator, [FromRoute] int id, GetConfigurationRequest? body, CancellationToken ct) =>

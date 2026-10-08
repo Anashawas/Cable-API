@@ -23,7 +23,7 @@ Both repos are committed and pushed (`Anashawas/Cable-API`, `Anashawas/Cable-Adm
 ### OCPP server (`Cable.Ocpp`)
 - All nine charger-initiated messages handled and persisted; raw frame log; restart counter; liveness (Online / Reconnecting / Offline by freshness).
 - Charger identity: id + optional Basic password, 10 failures → 15-min lock. Subscription gate (`OcppConnect` type).
-- **Phase 2 control**: TriggerMessage, Reset, UnlockConnector, ChangeAvailability, GetConfiguration, ChangeConfiguration — sent from the API through the internal `/commands` endpoint, reply matched by uniqueId, audited in `OcppCommand`, **confirmed** when the charger's follow-up message proves the effect (`CompletedAt`).
+- **Phase 2 control**: TriggerMessage, Reset, UnlockConnector, ChangeAvailability, GetConfiguration, ChangeConfiguration, **RemoteStopTransaction** (Oct 8) — sent from the API through the internal `/commands` endpoint, reply matched by uniqueId, audited in `OcppCommand`, **confirmed** when the charger's follow-up message proves the effect (`CompletedAt`).
 - **Safety (your P1-6)**: protected configuration keys refused in code (server address / identity / auth key / security profile / APN…), UnlockConnector refused while a plug is Charging — both in the API and again inside the OCPP server.
 - **SendLocalList (your 3.7, "build first")**: the station's cards are pushed into every charger after each card change and when a Pending unit boots; ClearCache follows; status per charger (Synced / Pending / Failed / NotSupported).
 - AWS Lightsail production host prepared: Always Running pool, Let's Encrypt, verified 25-min silent socket and 28/28 heartbeats with 0 restarts.
@@ -57,7 +57,6 @@ Both repos are committed and pushed (`Anashawas/Cable-API`, `Anashawas/Cable-Adm
 | # | Item | Est. | Source |
 |---|---|---|---|
 | 1 | Reports page: energy & sessions per station per day / week / month, plug utilization, faults per month, Excel export | 2–3 d | feature map 4.11 |
-| 2 | RemoteStopTransaction from the admin (and later partner app) | 0.5 d | P1-5 |
 | 3 | Share-live-data switch for the partner + admin veto, default ON with the subscription (`ChargingPoint.ShareLiveStatus`, `LiveStatusBlocked`) | 1 d + partner app switch | N-2 |
 | 4 | Review quality items: search debounce, per-row pending flags, `expiresAt` UTC consistency, two decimals on kWh, leftover `config.staging.js` | 0.5 d | P2 |
 | 5 | Reliability score, partner-only first; "reliable" badge ≥ 95 % later | 1 d | N-6 |

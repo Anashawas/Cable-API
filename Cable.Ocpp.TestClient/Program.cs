@@ -19,6 +19,7 @@
 // (keep it alive with --run N): TriggerMessage, Reset (closes, reconnects, boots again),
 // UnlockConnector, ChangeAvailability, GetConfiguration, ChangeConfiguration.
 // SendLocalList / GetLocalListVersion / ClearCache keep an in-memory card list and print it.
+// RemoteStopTransaction ends the running --plug session (reason Remote); any other id is Rejected.
 // Anything else gets CALLERROR NotImplemented, like a real unit without that profile.
 
 using System.Net.WebSockets;
@@ -35,7 +36,9 @@ var runMinutes = int.Parse(Arg("--run") ?? "5");
 var plug = args.Contains("--plug");
 var replay = args.Contains("--replay");
 var fault = args.Contains("--fault");
-var chargeSeconds = int.Parse(Arg("--charge-seconds") ?? "0");   // keep the plug in Charging this long before StopTransaction (UI tests)
+var chargeSeconds = int.Parse(Arg("--charge-seconds") ?? "0");
+var currentTransactionId = 0;        // the open session, for RemoteStopTransaction
+var remoteStopRequested = false;     // set by the handler; the charge hold loop ends and Stop goes out with reason Remote   // keep the plug in Charging this long before StopTransaction (UI tests)
 
 var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
 var full = url.TrimEnd('/') + "/" + id;
@@ -67,6 +70,7 @@ if (plug || replay)
     await Call("Authorize", new { idTag = tag });
     var startReply = await CallAndWait("StartTransaction", new { connectorId = 1, idTag = tag, meterStart, timestamp = t0 });
     var transactionId = startReply.TryGetProperty("transactionId", out var tx) ? tx.GetInt32() : 0;
+    currentTransactionId = transactionId;
     Console.WriteLine($"[{Now()}] server assigned transactionId = {transactionId}");
     await Call("StatusNotification", new { connectorId = 1, status = "Charging", errorCode = "NoError", timestamp = t0.AddSeconds(2) });
 
@@ -101,8 +105,10 @@ if (plug || replay)
     {
         Console.WriteLine("[" + Now() + "] holding connector 1 in Charging for " + chargeSeconds + " s (--charge-seconds)");
         var holdUntil = DateTime.UtcNow.AddSeconds(chargeSeconds);
-        while (DateTime.UtcNow < holdUntil && ws.State == WebSocketState.Open)
-            await Task.Delay(TimeSpan.FromSeconds(15));
+        while (DateTime.UtcNow < holdUntil && ws.State == WebSocketState.Open && !remoteStopRequested)
+            await Task.Delay(TimeSpan.FromSeconds(2));
+        if (remoteStopRequested)
+            Console.WriteLine("[" + Now() + "] remote stop requested by the server — ending the session");
     }
 
     if (replay)
@@ -124,13 +130,14 @@ if (plug || replay)
     }
 
     var last = replay ? 5 : 3;
+    await Call("StatusNotification", new { connectorId = 1, status = "Finishing", errorCode = "NoError", timestamp = DateTime.UtcNow });
     await Call("StopTransaction", new
     {
         transactionId,
         idTag = tag,
         meterStop = meterStart + last * 500,
         timestamp = t0.AddSeconds(15 * last + 5),
-        reason = "Local",
+        reason = remoteStopRequested ? "Remote" : "Local",
         transactionData = new[]
         {
             new
@@ -142,6 +149,8 @@ if (plug || replay)
     });
     await Call("StatusNotification", new { connectorId = 1, status = "Available", errorCode = "NoError", timestamp = t0.AddSeconds(15 * last + 6) });
     Console.WriteLine($"[{Now()}] expected EnergyKwh = {(last * 500) / 1000m:0.000}, meter rows = {last}{(replay ? " (+1 Transaction.End)" : " (+1 Transaction.End)")}");
+    currentTransactionId = 0;
+    remoteStopRequested = false;
 }
 
 if (idleMinutes > 0)
@@ -329,6 +338,15 @@ async Task OnServerCall(string uid, string action, JsonElement payload)
             else if (entry.ReadOnly) status = "Rejected";
             else { configuration[key] = entry with { Value = value }; status = "Accepted"; }
             await Reply(uid, new { status });
+            break;
+        }
+        case "RemoteStopTransaction":
+        {
+            var requested = payload.GetProperty("transactionId").GetInt32();
+            var ok = currentTransactionId != 0 && requested == currentTransactionId;
+            await Reply(uid, new { status = ok ? "Accepted" : "Rejected" });
+            if (ok) remoteStopRequested = true;
+            else Console.WriteLine($"[{Now()}] RemoteStop for {requested} rejected — open session is {currentTransactionId}");
             break;
         }
         case "SendLocalList":

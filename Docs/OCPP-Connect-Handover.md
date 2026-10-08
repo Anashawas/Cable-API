@@ -274,6 +274,7 @@ and waits ≤ 30 s for the CALLRESULT (matched by uniqueId, R4) → one row in `
 | `POST reset` `{type: Soft | Hard}` | Reset | Accepted — the unit closes, reconnects and boots again (~1 min) |
 | `POST unlock-connector` `{connectorId}` | UnlockConnector | Unlocked / UnlockFailed / NotSupported |
 | `POST change-availability` `{connectorId, type: Operative | Inoperative}` | ChangeAvailability | Accepted / Scheduled (after the session) / Rejected; connector 0 = whole unit |
+| `POST remote-stop` `{transactionId}` | RemoteStopTransaction | Accepted / Rejected; the unit then sends StopTransaction (reason Remote) which closes the session and confirms the command |
 | `POST get-configuration` `{keys?}` | GetConfiguration | `configurationKey[] {key, readonly, value}` + `unknownKey[]` |
 | `POST change-configuration` `{key, value}` | ChangeConfiguration | Accepted / Rejected / RebootRequired / NotSupported |
 | `GET` (list) | — | the audit rows, newest first |
