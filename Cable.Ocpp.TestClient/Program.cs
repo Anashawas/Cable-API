@@ -166,8 +166,18 @@ if (remoteWaitSeconds > 0)
     var waitUntil = DateTime.UtcNow.AddSeconds(remoteWaitSeconds);
     var demoPlugs = (Arg("--demo-plugs") ?? "1,2").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(int.Parse).ToArray();
     Console.WriteLine($"[{Now()}] demo mode on plugs {string.Join(",", demoPlugs)} until {waitUntil:HH:mm:ss} UTC");
-    await Task.WhenAll(demoPlugs.Select(k => RunDemoPlug(k, waitUntil)));
+    // Heartbeats keep running while the plugs wait, otherwise the server marks the unit Offline after a minute of silence.
+    await Task.WhenAll(demoPlugs.Select(k => RunDemoPlug(k, waitUntil)).Append(DemoHeartbeat(waitUntil)));
     Console.WriteLine($"[{Now()}] demo window over");
+}
+
+async Task DemoHeartbeat(DateTime until)
+{
+    while (DateTime.UtcNow < until && ws.State == WebSocketState.Open)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(55));
+        if (ws.State == WebSocketState.Open) await Call("Heartbeat", new { });
+    }
 }
 
 async Task RunDemoPlug(int k, DateTime waitUntil)
