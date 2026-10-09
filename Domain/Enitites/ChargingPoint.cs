@@ -88,6 +88,12 @@ public partial class ChargingPoint : BaseAuditableEntity
     public int? LiveStatusBlockedByUserId { get; set; }
     public string? LiveStatusBlockReason { get; set; }
 
+    // Cable Connect — alert thresholds in minutes for this station; null = OcppLimits default.
+    public int? OcppOfflineAlertMin { get; set; }
+    public int? OcppFaultedAlertMin { get; set; }
+    public int? OcppLongSessionAlertMin { get; set; }
+    public int? OcppParkedAlertMin { get; set; }
+
     public virtual ICollection<ChargingPointAttachment> ChargingPointAttachments { get; set; } =
         new List<ChargingPointAttachment>();
 

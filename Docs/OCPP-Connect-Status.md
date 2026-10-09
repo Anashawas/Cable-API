@@ -67,7 +67,7 @@ Both repos are committed and pushed (`Anashawas/Cable-API`, `Anashawas/Cable-Adm
 |---|---|---|---|
 | 1 | Reports page: energy & sessions per station per day / week / month, plug utilization, faults per month, Excel export | 2–3 d | feature map 4.11 |
 | 6 | Admin screen to link a card to a user (`OcppUserIdTag` exists, no UI yet) — only needed if automatic points go the card route | 0.5 d | P1-6 item 4 |
-| 7 | Alert thresholds configurable per station (constants today: 15 min / 15 min / 6 h / 20 min) | 0.5 d | N-5 |
+| ~~7~~ | ~~Alert thresholds configurable per station~~ **done Oct 9**: four minute values on the station's Cable Connect tab (blank = default), `GET/PUT /api/admin/ocpp/stations/{id}/alert-thresholds`, `Scripts/OcppConnect_AlertThresholds.sql` (dev) | — | N-5 |
 
 ## 4. Pending — mobile apps
 

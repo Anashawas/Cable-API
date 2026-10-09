@@ -425,6 +425,15 @@ per spec §5.2, prices filled from the tariff at send time. Dry run for any Jord
 `GET /api/admin/pricing/price-alerts/preview?at=2026-10-09T16:30`. Jordan has no DST (UTC+3
 since 2022). Script: `Scripts/PriceAlerts_Phase1.sql`.
 
+## 9e2. Alert thresholds per station (Oct 9, 2026)
+
+`ChargingPoint.OcppOfflineAlertMin / OcppFaultedAlertMin / OcppLongSessionAlertMin / OcppParkedAlertMin`
+(minutes, null = `OcppLimits` default: 15 / 15 / 360 / 20). Admin: station page → Cable Connect →
+"Alert thresholds"; API `GET/PUT /api/admin/ocpp/stations/{id}/alert-thresholds` (ranges: offline
+and faulted 5–1440, session 30–2880, parked 5–720). `CheckOcppAlertsAsync` queries candidates with
+the shortest allowed value and applies the station's own minutes in memory (`AlertTarget.Due`); the
+parked → station escalation delay stays global (20 min). Script `Scripts/OcppConnect_AlertThresholds.sql`.
+
 ## 9f. Phase 3 — start without a card + session price (built Oct 9, 2026)
 
 **Start.** `RemoteStartTransaction` is sent with a *virtual* idTag: `CBL-U{userId}` when the driver

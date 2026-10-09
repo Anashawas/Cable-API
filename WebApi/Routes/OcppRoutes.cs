@@ -4,6 +4,7 @@ using Application.Ocpp;
 using Application.Ocpp.Commands.ControlOcppChargePoint;
 using Application.Ocpp.Commands.DriverSessions;
 using Application.Ocpp.Commands.ManageLiveVisibility;
+using Application.Ocpp.Commands.ManageAlertThresholds;
 using Application.Ocpp.Commands.OwnerChargerCommands;
 using Application.Ocpp.Commands.ManageOcppAuthorizedTags;
 using Application.Ocpp.Commands.ManageOcppChargePoint;
@@ -46,6 +47,7 @@ public static class OcppRoutes
     public record RemoteStartRequest(int ConnectorId);
     public record StartMySessionRequest(int ChargingPointId, int ChargerId, int ConnectorId);
     public record ShareLiveStatusRequest(bool Share);
+    public record AlertThresholdsRequest(int? OfflineMinutes, int? FaultedMinutes, int? LongSessionMinutes, int? ParkedMinutes);
     public record LiveStatusBlockRequest(bool Blocked, string? Reason);
     public record ChargerDisplayNameRequest(string? DisplayName);
 
@@ -236,6 +238,22 @@ public static class OcppRoutes
             .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
             .WithName("Set OCPP live visibility block")
             .WithSummary("Admin veto: hide this station's live data from drivers (reason required, shown to the owner). It cannot turn sharing on — only the owner can.")
+            .WithOpenApi();
+
+        app.MapGet("/stations/{chargingPointId:int}/alert-thresholds", async (IMediator mediator, [FromRoute] int chargingPointId, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetOcppAlertThresholdsRequest(chargingPointId), ct)))
+            .Produces<OcppAlertThresholdsDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesInternalServerError()
+            .WithName("Get station alert thresholds")
+            .WithSummary("Admin: the station's alert thresholds in minutes (offline, plug faulted, session too long, car parked after charging) with the platform defaults and allowed ranges. minutes = null means the default applies.")
+            .WithOpenApi();
+
+        app.MapPut("/stations/{chargingPointId:int}/alert-thresholds", async (IMediator mediator, [FromRoute] int chargingPointId, AlertThresholdsRequest body, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new SetOcppAlertThresholdsCommand(chargingPointId, body.OfflineMinutes, body.FaultedMinutes, body.LongSessionMinutes, body.ParkedMinutes), ct)))
+            .Produces<OcppAlertThresholdsDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("Set station alert thresholds")
+            .WithSummary("Admin: set the station's thresholds in minutes; null restores the default for that alert. The alert job picks them up on its next run (≤ 5 min).")
             .WithOpenApi();
 
         app.MapPut("/stations/{chargingPointId:int}/live-visibility/share", async (IMediator mediator, [FromRoute] int chargingPointId, ShareLiveStatusRequest body, CancellationToken ct) =>

@@ -790,14 +790,17 @@ public class BackgroundJobService(
             .ToListAsync(cancellationToken);
 
         // ---- 1. Charger offline too long: socket gone, or open but silent (no message) for the threshold.
-        var offlineCutoff = now - OcppLimits.OfflineAlertAfter;
-        var offline = await applicationDbContext.OcppChargePoints.AsNoTracking()
+        // Per-station thresholds (ChargingPoint.Ocpp*AlertMin, null = default): SQL filters with the
+        // shortest allowed value, the station's own minutes decide in memory (AlertTarget.Due).
+        var offlineCutoff = now - TimeSpan.FromMinutes(Application.Ocpp.Commands.ManageAlertThresholds.OcppAlertThresholds.OfflineMin);
+        var offline = (await applicationDbContext.OcppChargePoints.AsNoTracking()
             .Where(c => !c.IsDeleted && c.IsEnabled && c.LastBootAt != null
                         && ((!c.IsConnected && c.DisconnectedAt != null && c.DisconnectedAt < offlineCutoff)
                             || (c.IsConnected && c.LastMessageAt != null && c.LastMessageAt < offlineCutoff)))
             .Select(c => new AlertTarget(c.Id, c.ChargePointId, c.DisplayName, c.ChargingPointId, c.ChargingPoint.Name, c.ChargingPoint.OwnerId,
-                null, null, (c.IsConnected ? c.LastMessageAt : c.DisconnectedAt)!.Value, null))
-            .ToListAsync(cancellationToken);
+                null, null, (c.IsConnected ? c.LastMessageAt : c.DisconnectedAt)!.Value, null, c.ChargingPoint.OcppOfflineAlertMin))
+            .ToListAsync(cancellationToken))
+            .Where(t => t.Due(now, OcppLimits.OfflineAlertAfter)).ToList();
 
         foreach (var t in offline)
         {
@@ -822,14 +825,15 @@ public class BackgroundJobService(
         }
 
         // ---- 2. Plug Faulted too long (the immediate fault push already went out; this is the escalation).
-        var faultCutoff = now - OcppLimits.FaultedAlertAfter;
-        var faulted = await applicationDbContext.OcppConnectors.AsNoTracking()
+        var faultCutoff = now - TimeSpan.FromMinutes(Application.Ocpp.Commands.ManageAlertThresholds.OcppAlertThresholds.FaultedMin);
+        var faulted = (await applicationDbContext.OcppConnectors.AsNoTracking()
             .Where(k => k.Status == OcppConnectorStatus.Faulted && !k.ChargePoint.IsDeleted && k.ChargePoint.IsEnabled
                         && (k.StatusUpdatedAt ?? k.StatusReceivedAt) < faultCutoff)
             .Select(k => new AlertTarget(k.ChargePoint.Id, k.ChargePoint.ChargePointId, k.ChargePoint.DisplayName, k.ChargePoint.ChargingPointId,
                 k.ChargePoint.ChargingPoint.Name, k.ChargePoint.ChargingPoint.OwnerId,
-                k.ConnectorId, null, k.StatusUpdatedAt ?? k.StatusReceivedAt, k.ErrorCode))
-            .ToListAsync(cancellationToken);
+                k.ConnectorId, null, k.StatusUpdatedAt ?? k.StatusReceivedAt, k.ErrorCode, k.ChargePoint.ChargingPoint.OcppFaultedAlertMin))
+            .ToListAsync(cancellationToken))
+            .Where(t => t.Due(now, OcppLimits.FaultedAlertAfter)).ToList();
 
         foreach (var t in faulted)
         {
@@ -853,13 +857,14 @@ public class BackgroundJobService(
         }
 
         // ---- 3. Session open too long (a car forgotten on the plug, or a charger that never sent Stop).
-        var sessionCutoff = now - OcppLimits.LongSessionAlertAfter;
-        var longSessions = await applicationDbContext.OcppTransactions.AsNoTracking()
+        var sessionCutoff = now - TimeSpan.FromMinutes(Application.Ocpp.Commands.ManageAlertThresholds.OcppAlertThresholds.LongSessionMin);
+        var longSessions = (await applicationDbContext.OcppTransactions.AsNoTracking()
             .Where(x => x.IsOpen && !x.IsStale && !x.WasRejected && x.StartedAt < sessionCutoff && !x.ChargePoint.IsDeleted)
             .Select(x => new AlertTarget(x.ChargePoint.Id, x.ChargePoint.ChargePointId, x.ChargePoint.DisplayName, x.ChargePoint.ChargingPointId,
                 x.ChargePoint.ChargingPoint.Name, x.ChargePoint.ChargingPoint.OwnerId,
-                x.ConnectorId, x.Id, x.StartedAt, x.IdTag))
-            .ToListAsync(cancellationToken);
+                x.ConnectorId, x.Id, x.StartedAt, x.IdTag, x.ChargePoint.ChargingPoint.OcppLongSessionAlertMin))
+            .ToListAsync(cancellationToken))
+            .Where(t => t.Due(now, OcppLimits.LongSessionAlertAfter)).ToList();
 
         foreach (var t in longSessions)
         {
@@ -879,15 +884,16 @@ public class BackgroundJobService(
         // ---- 4. Charging finished but the car is still plugged in (Finishing / SuspendedEV): the plug is
         //         blocked for the next driver. Stage 1 → the driver, if the card is linked to a user;
         //         stage 2 (or stage 1 when no driver is known) → the station owner / managers.
-        var parkedCutoff = now - OcppLimits.ParkedAlertAfter;
-        var parked = await applicationDbContext.OcppConnectors.AsNoTracking()
+        var parkedCutoff = now - TimeSpan.FromMinutes(Application.Ocpp.Commands.ManageAlertThresholds.OcppAlertThresholds.ParkedMin);
+        var parked = (await applicationDbContext.OcppConnectors.AsNoTracking()
             .Where(k => k.ConnectorId > 0 && !k.ChargePoint.IsDeleted && k.ChargePoint.IsEnabled
                         && (k.Status == OcppConnectorStatus.Finishing || k.Status == OcppConnectorStatus.SuspendedEV)
                         && (k.StatusUpdatedAt ?? k.StatusReceivedAt) < parkedCutoff)
             .Select(k => new AlertTarget(k.ChargePoint.Id, k.ChargePoint.ChargePointId, k.ChargePoint.DisplayName, k.ChargePoint.ChargingPointId,
                 k.ChargePoint.ChargingPoint.Name, k.ChargePoint.ChargingPoint.OwnerId,
-                k.ConnectorId, null, k.StatusUpdatedAt ?? k.StatusReceivedAt, k.Status))
-            .ToListAsync(cancellationToken);
+                k.ConnectorId, null, k.StatusUpdatedAt ?? k.StatusReceivedAt, k.Status, k.ChargePoint.ChargingPoint.OcppParkedAlertMin))
+            .ToListAsync(cancellationToken))
+            .Where(t => t.Due(now, OcppLimits.ParkedAlertAfter)).ToList();
 
         foreach (var t in parked)
         {
@@ -1169,8 +1175,11 @@ public class BackgroundJobService(
 
     /// <summary>Who, what, since when — one shape for all three alert rules.</summary>
     private sealed record AlertTarget(int ChargePointRowId, string ChargePointId, string? DisplayName, int ChargingPointId, string? StationName, int? OwnerId,
-        int? ConnectorId, int? TransactionId, DateTime Since, string? Detail)
+        int? ConnectorId, int? TransactionId, DateTime Since, string? Detail, int? ThresholdMinutes = null)
     {
+        /// <summary>The station's own threshold for this alert, or the default; the job filters candidates with it in memory.</summary>
+        public bool Due(DateTime now, TimeSpan fallback) => Since < now - (ThresholdMinutes is int m ? TimeSpan.FromMinutes(m) : fallback);
+
         public string Name => DisplayName ?? ChargePointId;
         public string Where => ConnectorId is int c and > 0 ? $" – المقبس {c}" : "";
         public string StationLabel
@@ -1187,7 +1196,7 @@ public class BackgroundJobService(
         await applicationDbContext.OcppChargePoints.AsNoTracking()
             .Where(c => c.Id == ocppChargePointId)
             .Select(c => new AlertTarget(c.Id, c.ChargePointId, c.DisplayName, c.ChargingPointId, c.ChargingPoint.Name, c.ChargingPoint.OwnerId,
-                connectorId, null, DateTime.UtcNow, null))
+                connectorId, null, DateTime.UtcNow, null, null))
             .FirstOrDefaultAsync(ct);
 
     /// <summary>Push + inbox to the station owner, its active managers and every active admin. Returns how many people.</summary>

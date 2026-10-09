@@ -32,7 +32,7 @@ shown as text (`Other` → "Stopped at the charger").
 
 - [x] Phase 0–2 + Phase 3 (start without a card, session price) built and tested with the simulator.
 - [x] `Scripts/OcppConnect_Phase3.sql` applied to **dev**.
-- [ ] **Production DB**: apply `OcppConnect_Phase0.sql`, `Phase1.sql`, `Phase2.sql`, `Phase3.sql`, `PriceAlerts_Phase1.sql` (all idempotent, in that order).
+- [ ] **Production DB**: apply `OcppConnect_Phase0.sql`, `Phase1.sql`, `Phase2.sql`, `Phase3.sql`, `OcppConnect_AlertThresholds.sql`, `PriceAlerts_Phase1.sql` (all idempotent, in that order).
 - [ ] **Production API config**: `OcppServer: { Url: "https://ocpp.cable-app.com", ApiKey: <the AWS StatusApiKey>, HttpTimeoutSeconds: 35 }` in `appsettings.Production.json` (git-ignored).
 - [ ] **Cable.Ocpp on AWS**: `appsettings.Production.json` with the production connection string + `ASPNETCORE_ENVIRONMENT=Production` in IIS; today it runs the Staging settings against the dev DB.
 - [ ] Publish API (dev first, then prod) — new Hangfire jobs `price-ocpp-sessions` (10 min) and the Phase 3 columns need the new build on **every** instance that shares the Hangfire DB (handover §9d).
@@ -92,4 +92,4 @@ Endpoints are live on dev. Everything below is screens only.
 - Automatic loyalty points per session (N-1): now that every session carries a price and (for app / linked-card sessions) a user, the amount and the commission rule are the only open points.
 - Payment: wallet / card in the app, or settle with the station — not started.
 - Reservation (RH4 supports `Reservation`): not started.
-- Per-station alert thresholds, raw-log retention 30 → 7 days.
+- Raw-log retention 30 → 7 days. (Per-station alert thresholds: done Oct 9, on the station's Cable Connect tab.)
