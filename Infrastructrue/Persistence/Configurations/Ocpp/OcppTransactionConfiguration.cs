@@ -22,6 +22,9 @@ public class OcppTransactionConfiguration : IEntityTypeConfiguration<OcppTransac
         builder.Property(e => e.IsStale).IsRequired().HasDefaultValue(false);
         builder.Property(e => e.IsOrphan).IsRequired().HasDefaultValue(false);
         builder.Property(e => e.WasRejected).IsRequired().HasDefaultValue(false);
+        builder.Property(e => e.StartSource).IsRequired().HasMaxLength(10).HasDefaultValue("Card");
+        builder.Property(e => e.CostBreakdownJson);
+        builder.Property(e => e.PricedAt).HasColumnType("datetime2(0)");
 
         builder.HasOne(e => e.ChargePoint)
             .WithMany(c => c.Transactions)
@@ -33,6 +36,11 @@ public class OcppTransactionConfiguration : IEntityTypeConfiguration<OcppTransac
         builder.HasIndex(e => new { e.OcppChargePointId, e.StartedAt })
             .HasDatabaseName("IX_OcppTransaction_ChargePoint_StartedAt")
             .IsDescending(false, true);
+
+        // Driver history / "my current session".
+        builder.HasIndex(e => new { e.StartedByUserId, e.StartedAt })
+            .HasDatabaseName("IX_OcppTransaction_StartedBy_StartedAt")
+            .HasFilter("[StartedByUserId] IS NOT NULL");
 
         // The stale-session job and "current session" lookups.
         builder.HasIndex(e => e.IsOpen)

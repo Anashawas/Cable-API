@@ -38,12 +38,23 @@ public record OcppTransactionDto(
     bool IsOpen,
     bool IsStale,
     bool IsOrphan,
-    bool WasRejected)
+    bool WasRejected,
+    /// <summary>Card | App | Operator.</summary>
+    string StartSource = "Card",
+    int? StartedByUserId = null,
+    /// <summary>Human wording for StopReason (vendor quirks folded in).</summary>
+    string? StopReasonText = null,
+    /// <summary>Price under the time-of-use tariff (fils / JOD); null while open or when the energy is unknown.</summary>
+    int? CostFils = null,
+    decimal? CostJod = null,
+    int? TariffVersion = null)
 {
     public static OcppTransactionDto From(OcppTransaction t, DateTime nowUtc) => new(
         t.Id, t.ConnectorId, t.IdTag, t.StartedAt, t.StoppedAt,
         (int)((t.StoppedAt ?? nowUtc) - t.StartedAt).TotalSeconds,
-        t.MeterStartWh, t.MeterStopWh, t.EnergyKwh, t.StopReason, t.IsOpen, t.IsStale, t.IsOrphan, t.WasRejected);
+        t.MeterStartWh, t.MeterStopWh, t.EnergyKwh, t.StopReason, t.IsOpen, t.IsStale, t.IsOrphan, t.WasRejected,
+        t.StartSource, t.StartedByUserId, OcppStopReason.Describe(t.StopReason),
+        t.CostFils, t.CostFils is int f ? f / 1000m : null, t.TariffVersion);
 }
 
 /// <summary>One row of the admin charger list.</summary>

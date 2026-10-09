@@ -35,6 +35,9 @@ public interface IBackgroundJobService
     /// <summary>Flags open sessions with no StopTransaction for 24 h (R6 keeps them open; this just marks them for reconciliation).</summary>
     Task<int> MarkStaleOcppTransactionsAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Every 10 min: prices closed sessions that have no CostFils yet from the active time-of-use tariff (the stop handler prices immediately; this is the catch-up). Returns sessions priced.</summary>
+    Task<int> PriceOcppSessionsAsync(CancellationToken cancellationToken = default);
+
     /// <summary>Trims OcppRawMessage to OcppLimits.RawMessageRetentionDays, in batches.</summary>
     Task<int> PurgeOcppRawMessagesAsync(CancellationToken cancellationToken = default);
 

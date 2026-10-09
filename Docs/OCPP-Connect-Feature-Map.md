@@ -62,7 +62,7 @@ handler + one route + one button.
 | 3.7 | **SendLocalList / GetLocalListVersion** | push the allowed cards into the charger so it still authorizes when our server is unreachable | ✅ Oct 7 | automatic (Hangfire job) after every card change and when a Pending unit boots; chip + "Sync cards now" in Admin |
 | 3.8 | **ClearCache** | wipe cached authorizations after removing a card | ✅ Oct 7 | sent right after every accepted SendLocalList |
 | 3.9a | **RemoteStopTransaction** | stop a running session from the admin / partner app — a safety and operations tool (stuck session, car left charging), no payment involved. Confirmed by the unit's own StopTransaction (reason Remote) | ✅ Oct 8 (Admin: "Stop session" on the plug with an open session) | Admin, Partner ⏳ |
-| 3.9b | **RemoteStartTransaction** | start charging from an app with a card id we supply (RH4 has `AuthorizeRemoteTxRequests` ON → it asks us to authorize, we answer); needs a user ↔ idTag mapping, tariffs and payment | ⏳ Phase 3 | Cable app, Partner, Admin |
+| 3.9b | **RemoteStartTransaction** | start charging with a virtual tag we supply — `CBL-U{userId}` (driver app) or `CBL-S{stationId}` (partner / admin); the unit authorizes it against our own request (10-min window), the session is recorded with its source and the user; confirmed by StartTransaction | ✅ Oct 9 | Cable app, Partner, Admin |
 | 3.10 | **ReserveNow / CancelReservation** | hold a plug for a card until a time | ⏳ Phase 3 (RH4 confirmed `Reservation` in its feature list at the site visit) | Cable app |
 | 3.11 | **SetChargingProfile / ClearChargingProfile / GetCompositeSchedule** | cap power per plug / per unit by schedule (load management, cheaper tariff hours) | ⏳ later (RH4 confirmed `SmartCharging` at the site visit) | Admin, Partner |
 | 3.12 | **UpdateFirmware / GetDiagnostics** | push a firmware file, pull the unit's log file | 💡 | Admin — needs a file server we host |
@@ -86,9 +86,9 @@ network; and anything while the unit still points at another server (one charger
 | 4.9 | Charger settings panel: read the unit's config keys, supported profiles as chips, inline edit of the writable ones | ✅ Oct 7 | — |
 | 4.10 | "Cards on the unit" chip per charger (Synced vN · when · count / Pending / Failed / Not supported) + "Sync cards now" | ✅ Oct 7 | — |
 | 4.11 | Reports: energy & sessions per station per day, plug utilization %, faults per month, Excel export | 💡 | data already stored |
-| 4.12 | Tariffs per station: per kWh, per minute, idle fee, free list (owner's cards) | 💡 Phase 3 | commercial agreement |
+| 4.12 | Tariffs per station: per kWh, per minute, idle fee, free list (owner's cards) | 💡 later — today every session is priced from the **time-of-use tariff** (`CostFils`, breakdown per window) | commercial agreement |
 | 4.13 | Alert rules: charger offline > 15 min, plug Faulted > 15 min, session open > 6 h → push + inbox to admins, the station owner and managers; "back online / fault cleared" push when it resolves; **parked after charging** (Finishing / SuspendedEV > 20 min → the driver via `OcppUserIdTag`, then the station 20 min later; station directly when the card is not linked); Alerts panel + KPI tile on the Cable Connect screen | ✅ Oct 7 | job `check-ocpp-alerts` every 5 min |
-| 4.14 | Remote start / stop from admin (support use) | 💡 Phase 3 | 3.9 |
+| 4.14 | Remote start / stop from admin (support use) | ✅ Oct 8 (stop) / Oct 9 (start) — buttons per plug on the charger page | 3.9 |
 | 4.15 | Firmware & diagnostics page | 💡 | 3.12 |
 
 ## 5. Partner app (station owner / managers)
@@ -105,7 +105,7 @@ mostly reuse plus ownership checks (`/api/provider/charging-points/{id}/chargers
 | 5.5 | More pushes: charger offline > 15 min, plug faulted > 15 min, session > 6 h, back online / fault cleared | ✅ Oct 7 (push + inbox already reach the owner; the partner app only needs to open them) | — |
 | 5.6 | Maintenance buttons with confirmation: refresh, reset, unlock, out-of-service, **stop session** | ✅ API Oct 8 (`POST /api/provider/charging-points/{id}/chargers/{ocppId}/commands/…`, owner-or-manager guard, same audit / confirmation / rate limit) · ⏳ app screen | — |
 | 5.7 | Monthly statement: energy sold, sessions, revenue (once tariffs exist), export | 💡 | 4.12 |
-| 5.8 | Remote start / stop for a customer on site | 💡 Phase 3 | 3.9 |
+| 5.8 | Remote start / stop for a customer on site | ✅ API Oct 9 (`…/commands/remote-start`, `…/remote-stop`); app screen ⏳ | 3.9 |
 | 5.9 | Power cap per plug / schedule (load management) | 💡 | 3.11 + unit support |
 | 5.11 | **Reliability score (N-6)**: % of the last 30 days each charger was reachable and fault-free (our own restarts excluded), daily job + "Recompute" in Admin; owner sees the number (`reliabilityPct` on `GET /api/provider/charging-points/{id}/live`), drivers get only `reliable: true` at ≥ 95 % on the station live endpoint, never a bad number | ✅ API Oct 8 · ⏳ app screens | — |
 | 5.10 | Name each cabinet for drivers (N-3) | ✅ API Oct 8 (`PUT /api/provider/charging-points/{id}/chargers/{ocppId}/display-name`) · ⏳ app screen | — |
@@ -119,8 +119,8 @@ Nothing is built yet. Everything here is gated by the station's OcppConnect subs
 | 6.1 | **"N of M plugs free"** live badge on the station card and page, **per plug type** with max power | ✅ API Oct 8 (`GET /api/charging-points/{id}/live`, `GET /api/charging-points/live-summary?ids=`) · ⏳ app screens | gated by N-2 + freshness |
 | 6.2 | "Notify me when a plug is free" | 💡 | 6.1 + small job |
 | 6.3 | Charger-level detail on the station page: each cabinet (owner-named, N-3) with its plugs Free / Busy / **OutOfOrder (N-4)** / Unknown, all cabinets in one answer (N-7) | ✅ API Oct 8 · ⏳ app screens | same endpoint as 6.1 |
-| 6.4 | **Start charging from the app** on a chosen plug (a virtual card id per app user, no physical card), stop from the app | 💡 Phase 3 | 3.9 + `OcppUserIdTag` (table exists since Oct 7; admin screen to link a card to a user still ⏳) |
-| 6.5 | Live session screen: kWh so far, charging power, battery % if the car reports it, elapsed time, cost so far | 💡 Phase 3 | 6.4 + tariffs |
+| 6.4 | **Start charging from the app** on a chosen plug (a virtual card id per app user, no physical card), stop from the app | ✅ API Oct 9 (`POST /api/users/me/ocpp-sessions/start`, `…/{id}/stop`); app screen ⏳ | 3.9 + `OcppUserIdTag` (the app tag is created on first use; admin screen to link a physical card to a user still ⏳) |
+| 6.5 | Live session screen: kWh so far, charging power, battery % if the car reports it, elapsed time, cost so far | ✅ API Oct 9 (`GET …/current`; cost comes at stop, history has the price and breakdown); app screen ⏳ | 6.4 + tariffs |
 | 6.6 | Pushes: charging started, car stopped drawing, charging complete, cable still plugged | 💡 Phase 3 | 6.4 |
 | 6.7 | Unlock my cable | 💡 Phase 3 | 3.5, own session only |
 | 6.8 | Reserve a plug for 15 min before arriving | 💡 | 3.10 + unit support |

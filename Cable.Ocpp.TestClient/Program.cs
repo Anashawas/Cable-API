@@ -38,6 +38,8 @@ var replay = args.Contains("--replay");
 var fault = args.Contains("--fault");
 var chargeSeconds = int.Parse(Arg("--charge-seconds") ?? "0");
 var currentTransactionId = 0;        // the open session, for RemoteStopTransaction
+(string Tag, int Connector)? remoteStartTag = null;   // set by RemoteStartTransaction; --remote waits for it and runs the session
+var remoteWaitSeconds = int.Parse(Arg("--remote") ?? "0");   // wait this long for a RemoteStartTransaction, then run the session with its tag
 var remoteStopRequested = false;     // set by the handler; the charge hold loop ends and Stop goes out with reason Remote   // keep the plug in Charging this long before StopTransaction (UI tests)
 
 var json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
@@ -151,6 +153,49 @@ if (plug || replay)
     Console.WriteLine($"[{Now()}] expected EnergyKwh = {(last * 500) / 1000m:0.000}, meter rows = {last}{(replay ? " (+1 Transaction.End)" : " (+1 Transaction.End)")}");
     currentTransactionId = 0;
     remoteStopRequested = false;
+}
+
+if (remoteWaitSeconds > 0)
+{
+    Console.WriteLine($"[{Now()}] waiting up to {remoteWaitSeconds} s for a RemoteStartTransaction (--remote)");
+    var waitUntil = DateTime.UtcNow.AddSeconds(remoteWaitSeconds);
+    while (DateTime.UtcNow < waitUntil && remoteStartTag is null && ws.State == WebSocketState.Open)
+        await Task.Delay(500);
+    if (remoteStartTag is { } rs)
+    {
+        var t0 = DateTime.UtcNow;
+        const long meterStart = 2_000_000;
+        await Call("StatusNotification", new { connectorId = rs.Connector, status = "Preparing", errorCode = "NoError", timestamp = t0 });
+        await Call("Authorize", new { idTag = rs.Tag });
+        var startReply = await CallAndWait("StartTransaction", new { connectorId = rs.Connector, idTag = rs.Tag, meterStart, timestamp = t0 });
+        currentTransactionId = startReply.TryGetProperty("transactionId", out var tx) ? tx.GetInt32() : 0;
+        var accepted = startReply.TryGetProperty("idTagInfo", out var info) && info.TryGetProperty("status", out var st) && st.GetString() == "Accepted";
+        Console.WriteLine($"[{Now()}] remote session transactionId = {currentTransactionId}, idTag {(accepted ? "Accepted" : "REJECTED")}");
+        await Call("StatusNotification", new { connectorId = rs.Connector, status = "Charging", errorCode = "NoError", timestamp = t0.AddSeconds(1) });
+        var i = 0;
+        var holdUntil = DateTime.UtcNow.AddSeconds(chargeSeconds > 0 ? chargeSeconds : 30);
+        while (DateTime.UtcNow < holdUntil && ws.State == WebSocketState.Open && !remoteStopRequested)
+        {
+            i++;
+            await Call("MeterValues", new
+            {
+                connectorId = rs.Connector, transactionId = currentTransactionId,
+                meterValue = new[] { new { timestamp = DateTime.UtcNow, sampledValue = new object[]
+                {
+                    new { value = (meterStart + i * 500).ToString(), context = "Sample.Periodic", measurand = "Energy.Active.Import.Register", unit = "Wh" },
+                    new { value = "30000", measurand = "Power.Active.Import", unit = "W" },
+                    new { value = (40 + i).ToString(), measurand = "SoC", unit = "Percent" },
+                } } },
+            });
+            await Task.Delay(TimeSpan.FromSeconds(5));
+        }
+        await Call("StatusNotification", new { connectorId = rs.Connector, status = "Finishing", errorCode = "NoError", timestamp = DateTime.UtcNow });
+        await Call("StopTransaction", new { transactionId = currentTransactionId, idTag = rs.Tag, meterStop = meterStart + i * 500, timestamp = DateTime.UtcNow, reason = remoteStopRequested ? "Remote" : "Local" });
+        await Call("StatusNotification", new { connectorId = rs.Connector, status = "Available", errorCode = "NoError", timestamp = DateTime.UtcNow });
+        Console.WriteLine($"[{Now()}] remote session ended, energy {(i * 500) / 1000m:0.000} kWh");
+        currentTransactionId = 0; remoteStopRequested = false; remoteStartTag = null;
+    }
+    else Console.WriteLine($"[{Now()}] no RemoteStartTransaction arrived");
 }
 
 if (idleMinutes > 0)
@@ -338,6 +383,18 @@ async Task OnServerCall(string uid, string action, JsonElement payload)
             else if (entry.ReadOnly) status = "Rejected";
             else { configuration[key] = entry with { Value = value }; status = "Accepted"; }
             await Reply(uid, new { status });
+            break;
+        }
+        case "RemoteStartTransaction":
+        {
+            // A real unit authorizes the given idTag, then starts on that plug. Here: Accepted when no
+            // session is open; the main loop (--remote) runs the session with that tag.
+            var ok = currentTransactionId == 0 && !remoteStartTag.HasValue;
+            var startTag = payload.GetProperty("idTag").GetString() ?? "";
+            var startConnector = payload.TryGetProperty("connectorId", out var rc) ? rc.GetInt32() : 1;
+            await Reply(uid, new { status = ok ? "Accepted" : "Rejected" });
+            if (ok) { remoteStartTag = (startTag, startConnector); Console.WriteLine($"[{Now()}] remote start accepted: tag {startTag} on connector {startConnector}"); }
+            else Console.WriteLine($"[{Now()}] remote start rejected — a session is already open");
             break;
         }
         case "RemoteStopTransaction":

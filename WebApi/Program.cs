@@ -179,6 +179,12 @@ RecurringJob.AddOrUpdate<IBackgroundJobService>(
     service => service.ComputeOcppReliabilityAsync(CancellationToken.None),
     "30 3 * * *");
 
+// Cable Connect: price closed sessions that the stop handler could not price (catch-up).
+RecurringJob.AddOrUpdate<IBackgroundJobService>(
+    "price-ocpp-sessions",
+    service => service.PriceOcppSessionsAsync(CancellationToken.None),
+    "*/10 * * * *");
+
 RecurringJob.AddOrUpdate<IBackgroundJobService>(
     "check-ocpp-alerts",
     service => service.CheckOcppAlertsAsync(CancellationToken.None),

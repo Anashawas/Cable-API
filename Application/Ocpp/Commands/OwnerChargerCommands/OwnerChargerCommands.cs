@@ -21,7 +21,8 @@ namespace Application.Ocpp.Commands.OwnerChargerCommands;
 /// <summary>
 /// One maintenance command from the owner. Action: Reset (Type Soft|Hard) · UnlockConnector
 /// (ConnectorId) · ChangeAvailability (ConnectorId, Type Operative|Inoperative) ·
-/// RemoteStopTransaction (TransactionId) · TriggerMessage (RequestedMessage, ConnectorId?).
+/// RemoteStopTransaction (TransactionId) · TriggerMessage (RequestedMessage, ConnectorId?) ·
+/// RemoteStartTransaction (ConnectorId) — start a session for a walk-in customer without a card.
 /// </summary>
 public record OwnerChargerCommand(
     int ChargingPointId,
@@ -34,7 +35,7 @@ public record OwnerChargerCommand(
 
 public class OwnerChargerCommandValidator : AbstractValidator<OwnerChargerCommand>
 {
-    public static readonly string[] Actions = ["Reset", "UnlockConnector", "ChangeAvailability", "RemoteStopTransaction", "TriggerMessage"];
+    public static readonly string[] Actions = ["Reset", "UnlockConnector", "ChangeAvailability", "RemoteStopTransaction", "TriggerMessage", "RemoteStartTransaction"];
 
     public OwnerChargerCommandValidator()
     {
@@ -47,6 +48,7 @@ public class OwnerChargerCommandValidator : AbstractValidator<OwnerChargerComman
             RuleFor(x => x.Type).Must(t => t is "Operative" or "Inoperative").WithMessage("Type must be Operative or Inoperative");
         });
         When(x => x.Action == "RemoteStopTransaction", () => RuleFor(x => x.TransactionId).NotNull().GreaterThan(0));
+        When(x => x.Action == "RemoteStartTransaction", () => RuleFor(x => x.ConnectorId).NotNull().GreaterThanOrEqualTo(1));
         When(x => x.Action == "TriggerMessage", () => RuleFor(x => x.RequestedMessage)
             .Must(m => TriggerOcppMessageCommandValidator.Messages.Contains(m)).WithMessage("RequestedMessage must be one of: " + string.Join(", ", TriggerOcppMessageCommandValidator.Messages)));
     }
@@ -91,6 +93,13 @@ public class OwnerChargerCommandHandler(IApplicationDbContext db, ICurrentUserSe
                 payload["requestedMessage"] = request.RequestedMessage!;
                 if (request.ConnectorId is int c) payload["connectorId"] = c;
                 break;
+            case "RemoteStartTransaction":
+            {
+                // The station's virtual tag: the unit accepts it only against this very request (TagAuthorizer).
+                await Application.Ocpp.Commands.DriverSessions.OcppRemoteStart.EnsureCanStartAsync(db, request.OcppChargePointId, request.ConnectorId!.Value, cancellationToken);
+                payload = Application.Ocpp.Commands.DriverSessions.OcppRemoteStart.Payload(request.ConnectorId!.Value, OcppVirtualTag.ForStation(request.ChargingPointId));
+                break;
+            }
         }
 
         return await OcppCommandRunner.RunAsync(db, currentUser, client, request.OcppChargePointId, request.Action, payload, cancellationToken,
@@ -113,7 +122,11 @@ public record OwnerSessionDto(
     int? DurationSec,
     decimal? EnergyKwh,
     string? StopReason,
-    bool IsOpen);
+    bool IsOpen,
+    string StartSource = "Card",
+    string? StopReasonText = null,
+    int? CostFils = null,
+    decimal? CostJod = null);
 
 /// <summary>Owner / manager: sessions at their station, newest first; optional charger and date filters (UTC).</summary>
 public record GetMyStationSessionsRequest(int ChargingPointId, int? OcppChargePointId = null, DateTime? From = null, DateTime? To = null, int? Page = null, int? PageSize = null)
@@ -136,11 +149,15 @@ public class GetMyStationSessionsRequestHandler(IApplicationDbContext db, ICurre
         var page = await q.OrderByDescending(t => t.StartedAt)
             .Select(t => new OwnerSessionDto(
                 t.Id, t.OcppChargePointId, t.ChargePoint.DisplayName, t.ConnectorId, t.IdTag, t.StartedAt, t.StoppedAt,
-                null, t.EnergyKwh, t.StopReason, t.IsOpen))
+                null, t.EnergyKwh, t.StopReason, t.IsOpen, t.StartSource, null, t.CostFils, t.CostFils == null ? null : t.CostFils / 1000m))
             .ToPaginatedAsync(request.Page, request.PageSize, 20, 200, cancellationToken);
 
         // Duration computed in memory: the SQL date-diff helper lives in the SqlServer provider, which Application does not reference.
-        return page.As(page.Items.Select(d => d with { DurationSec = (int)((d.StoppedAt ?? now) - d.StartedAt).TotalSeconds }).ToList());
+        return page.As(page.Items.Select(d => d with
+        {
+            DurationSec = (int)((d.StoppedAt ?? now) - d.StartedAt).TotalSeconds,
+            StopReasonText = OcppStopReason.Describe(d.StopReason),
+        }).ToList());
     }
 }
 

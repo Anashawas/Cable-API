@@ -28,12 +28,22 @@ internal static class OcppCommandRunner
     /// When set, the caller is a station owner / manager acting on that station (partner app):
     /// the owner guard applies instead of the admin guard, and the charger must belong to the station.
     /// </param>
+    /// <param name="skipAccessGuard">
+    /// The caller already decided who may send this (the driver's own session: start / stop). Only
+    /// RemoteStart / RemoteStop go through here that way; everything else keeps the admin / owner guard.
+    /// </param>
     public static async Task<OcppCommandResultDto> RunAsync(
         IApplicationDbContext db, ICurrentUserService currentUser, IOcppCommandClient client,
         int ocppChargePointId, string action, IDictionary<string, object> payload,
-        CancellationToken cancellationToken, int? timeoutSeconds = null, int? ownerStationId = null)
+        CancellationToken cancellationToken, int? timeoutSeconds = null, int? ownerStationId = null, bool skipAccessGuard = false)
     {
-        if (ownerStationId is int stationId)
+        if (skipAccessGuard)
+        {
+            if (currentUser.UserId is null) throw new NotAuthorizedAccessException("User not authenticated");
+            if (action is not ("RemoteStartTransaction" or "RemoteStopTransaction"))
+                throw new ForbiddenAccessException("Only session start / stop may bypass the admin guard.");
+        }
+        else if (ownerStationId is int stationId)
             await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, stationId, cancellationToken);
         else
             await AdminRoleGuard.EnsureAdminAsync(db, currentUser, cancellationToken);
@@ -261,6 +271,36 @@ public class RemoteStopOcppTransactionCommandHandler(IApplicationDbContext db, I
 
         return await OcppCommandRunner.RunAsync(db, currentUser, client, request.Id, "RemoteStopTransaction",
             new Dictionary<string, object> { ["transactionId"] = request.TransactionId }, cancellationToken);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RemoteStartTransaction — start a session for a walk-in customer (no card)
+// ---------------------------------------------------------------------------
+
+/// <summary>
+/// Phase 3: the admin starts a session on a plug with the station's virtual tag (CBL-S{stationId}).
+/// The unit authorizes that tag only against this request, then opens the session, which is
+/// recorded with StartSource Operator and the admin as StartedByUserId. Confirmed by StartTransaction.
+/// </summary>
+public record RemoteStartOcppTransactionCommand(int Id, int ConnectorId) : IRequest<OcppCommandResultDto>;
+
+public class RemoteStartOcppTransactionCommandValidator : AbstractValidator<RemoteStartOcppTransactionCommand>
+{
+    public RemoteStartOcppTransactionCommandValidator()
+    {
+        RuleFor(x => x.ConnectorId).GreaterThanOrEqualTo(1);
+    }
+}
+
+public class RemoteStartOcppTransactionCommandHandler(IApplicationDbContext db, ICurrentUserService currentUser, IOcppCommandClient client)
+    : IRequestHandler<RemoteStartOcppTransactionCommand, OcppCommandResultDto>
+{
+    public async Task<OcppCommandResultDto> Handle(RemoteStartOcppTransactionCommand request, CancellationToken cancellationToken)
+    {
+        var target = await DriverSessions.OcppRemoteStart.EnsureCanStartAsync(db, request.Id, request.ConnectorId, cancellationToken);
+        return await OcppCommandRunner.RunAsync(db, currentUser, client, request.Id, "RemoteStartTransaction",
+            DriverSessions.OcppRemoteStart.Payload(request.ConnectorId, Cable.Core.Constants.OcppVirtualTag.ForStation(target.ChargePoint.ChargingPointId)), cancellationToken);
     }
 }
 

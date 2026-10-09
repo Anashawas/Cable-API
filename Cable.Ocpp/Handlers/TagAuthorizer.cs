@@ -32,6 +32,19 @@ public sealed class TagAuthorizer(IApplicationDbContext db, IOptions<OcppOptions
             .Select(t => new { t.IsEnabled, t.ExpiresAt })
             .FirstOrDefaultAsync(cancellationToken);
 
+        // A virtual tag (driver app / operator start) is accepted only against the RemoteStartTransaction
+        // we sent with it a moment ago — never from the station's card list, never without that request.
+        if (entry is null && (OcppVirtualTag.UserIdOf(tag) is not null || OcppVirtualTag.IsStationTag(tag)))
+        {
+            var since = DateTime.UtcNow - OcppVirtualTag.RemoteStartAuthorizeWindow;
+            var needle = "\"idTag\":\"" + tag + "\"";
+            var requested = await db.OcppCommands.AsNoTracking()
+                .AnyAsync(c => c.OcppChargePointId == session.OcppChargePointId && c.Action == "RemoteStartTransaction"
+                               && !c.IsDeleted && c.CreatedAt >= since && c.ResultStatus == "Accepted"
+                               && c.RequestPayload.Contains(needle), cancellationToken);
+            if (requested) return OcppAuthorizationStatus.Accepted;
+        }
+
         var status = entry switch
         {
             null => OcppAuthorizationStatus.Invalid,

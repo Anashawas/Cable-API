@@ -107,6 +107,12 @@ public static class OcppLimits
     /// <summary>OCPP 1.6 SendLocalList: a Full update bigger than the unit's SendLocalListMaxLength is refused; 100 is a safe floor for the pilot hardware.</summary>
     public const int LocalListMaxEntries = 100;
 
+    /// <summary>Above this many cards the sync job asks the unit for its SendLocalListMaxLength first (the pilot hjl unit holds 20) and trims to it.</summary>
+    public const int LocalListProbeAbove = 20;
+
+    /// <summary>A driver may hold at most this many open app-started sessions at once.</summary>
+    public const int OpenSessionsPerDriver = 1;
+
     /// <summary>Alert job thresholds. A charger offline / a plug Faulted longer than this, a session open longer than this → push + inbox.</summary>
     public static readonly TimeSpan OfflineAlertAfter = TimeSpan.FromMinutes(15);
     public static readonly TimeSpan FaultedAlertAfter = TimeSpan.FromMinutes(15);
@@ -125,7 +131,7 @@ public static class OcppLimits
     public static readonly TimeSpan DuplicateCommandWindow = TimeSpan.FromSeconds(90);
 
     /// <summary>Commands whose effect the unit proves with a later message — the ones duplicate protection applies to.</summary>
-    public static readonly string[] ConfirmableCommands = ["Reset", "ChangeAvailability", "UnlockConnector", "RemoteStopTransaction"];
+    public static readonly string[] ConfirmableCommands = ["Reset", "ChangeAvailability", "UnlockConnector", "RemoteStopTransaction", "RemoteStartTransaction"];
 
     /// <summary>N-6: reliability is computed over this many days (bounded by the raw-log retention).</summary>
     public const int ReliabilityWindowDays = 30;
@@ -135,4 +141,73 @@ public static class OcppLimits
 
     /// <summary>Same connector + same error code within this window = one notification.</summary>
     public static readonly TimeSpan FaultNotificationDedupe = TimeSpan.FromMinutes(30);
+}
+
+/// <summary>How a session was started (OcppTransaction.StartSource).</summary>
+public static class OcppStartSource
+{
+    /// <summary>A physical RFID card from the station's list.</summary>
+    public const string Card = "Card";
+    /// <summary>The driver app: RemoteStartTransaction with the user's virtual tag.</summary>
+    public const string App = "App";
+    /// <summary>The partner app or the admin started it for a walk-in customer (no card at the station).</summary>
+    public const string Operator = "Operator";
+}
+
+/// <summary>
+/// Virtual idTags Cable sends in RemoteStartTransaction. OCPP 1.6 caps an idTag at 20 characters.
+/// A charger only sees these tags after we asked it to start with them; TagAuthorizer accepts
+/// them solely against that recent request, so nothing printed on a card can impersonate them.
+/// </summary>
+public static class OcppVirtualTag
+{
+    public const string UserPrefix = "CBL-U";
+    public const string StationPrefix = "CBL-S";
+
+    /// <summary>Window in which a RemoteStartTransaction we sent authorises its own tag (Authorize / StartTransaction).</summary>
+    public static readonly TimeSpan RemoteStartAuthorizeWindow = TimeSpan.FromMinutes(10);
+
+    public static string ForUser(int userId) => UserPrefix + userId;
+    public static string ForStation(int chargingPointId) => StationPrefix + chargingPointId;
+
+    public static int? UserIdOf(string? idTag) =>
+        idTag is not null && idTag.StartsWith(UserPrefix, StringComparison.OrdinalIgnoreCase) && int.TryParse(idTag.AsSpan(UserPrefix.Length), out var id) ? id : null;
+
+    public static bool IsStationTag(string? idTag) =>
+        idTag is not null && idTag.StartsWith(StationPrefix, StringComparison.OrdinalIgnoreCase);
+
+    public static string SourceOf(string? idTag) =>
+        UserIdOf(idTag) is not null ? OcppStartSource.App : IsStationTag(idTag) ? OcppStartSource.Operator : OcppStartSource.Card;
+}
+
+/// <summary>OCPP 1.6 StopTransaction reasons, with the wording the apps show. Vendors differ: the pilot unit (hjl) reports a card stop as "Other".</summary>
+public static class OcppStopReason
+{
+    public static string? Describe(string? reason) => reason switch
+    {
+        null or "" => null,
+        "Local" or "Other" => "Stopped at the charger",
+        "Remote" => "Stopped from the app",
+        "EVDisconnected" => "Cable unplugged",
+        "DeAuthorized" => "Card no longer accepted",
+        "EmergencyStop" => "Emergency stop",
+        "PowerLoss" => "Power loss",
+        "Reboot" or "HardReset" or "SoftReset" => "Charger restarted",
+        "UnlockCommand" => "Connector unlocked",
+        _ => reason,
+    };
+
+    public static string? DescribeAr(string? reason) => reason switch
+    {
+        null or "" => null,
+        "Local" or "Other" => "أُوقف من الشاحن",
+        "Remote" => "أُوقف من التطبيق",
+        "EVDisconnected" => "فُصل الكيبل",
+        "DeAuthorized" => "البطاقة لم تعد مقبولة",
+        "EmergencyStop" => "إيقاف طارئ",
+        "PowerLoss" => "انقطاع الكهرباء",
+        "Reboot" or "HardReset" or "SoftReset" => "أُعيد تشغيل الشاحن",
+        "UnlockCommand" => "فُتح قفل المنفذ",
+        _ => reason,
+    };
 }

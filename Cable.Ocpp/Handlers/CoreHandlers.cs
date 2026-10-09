@@ -1,3 +1,5 @@
+using Application.Ocpp;
+using Application.Pricing;
 using System.Text.Json;
 using Application.Common.Interfaces;
 using Cable.Core.Constants;
@@ -134,13 +136,34 @@ public sealed class AuthorizeHandler(TagAuthorizer authorizer) : IOcppHandler
 }
 
 /// <summary>Opens the session; the row's identity is the transactionId the charger will quote from now on.</summary>
-public sealed class StartTransactionHandler(IApplicationDbContext db, TagAuthorizer authorizer) : IOcppHandler
+public sealed class StartTransactionHandler(IApplicationDbContext db, TagAuthorizer authorizer, CommandConfirmer confirmer) : IOcppHandler
 {
     public async Task<object> HandleAsync(OcppSession session, JsonElement payload, CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow;
         var idTag = OcppPayload.Str(payload, "idTag") ?? "";
         var status = await authorizer.AuthorizeAsync(session, idTag, cancellationToken);
+        var tag = OcppCredentials.NormalizeIdTag(idTag);
+
+        // Who started it: the app (virtual user tag), an operator (virtual station tag → the admin / owner
+        // who sent the RemoteStart), or a card — linked to a driver when OcppUserIdTag says so.
+        var source = OcppVirtualTag.SourceOf(tag);
+        int? startedBy = OcppVirtualTag.UserIdOf(tag);
+        if (startedBy is null && source == OcppStartSource.Operator)
+        {
+            var since = now - OcppVirtualTag.RemoteStartAuthorizeWindow;
+            var needle = "\"idTag\":\"" + tag + "\"";
+            startedBy = await db.OcppCommands.AsNoTracking()
+                .Where(c => c.OcppChargePointId == session.OcppChargePointId && c.Action == "RemoteStartTransaction" && !c.IsDeleted
+                            && c.CreatedAt >= since && c.RequestPayload.Contains(needle))
+                .OrderByDescending(c => c.Id).Select(c => c.CreatedBy).FirstOrDefaultAsync(cancellationToken);
+        }
+        else if (startedBy is null)
+        {
+            startedBy = await db.OcppUserIdTags.AsNoTracking()
+                .Where(u => u.IdTag == tag && u.IsEnabled && !u.IsDeleted)
+                .Select(u => (int?)u.UserId).FirstOrDefaultAsync(cancellationToken);
+        }
 
         // A rejected start still gets a row: the spec requires a transactionId in the reply,
         // and the charger's StopTransaction a moment later must find something to close.
@@ -154,9 +177,17 @@ public sealed class StartTransactionHandler(IApplicationDbContext db, TagAuthori
             ReceivedStartAt = now,
             IsOpen = true,
             WasRejected = status != OcppAuthorizationStatus.Accepted,
+            StartSource = source,
+            StartedByUserId = startedBy,
         };
         db.OcppTransactions.Add(tx);
         await db.SaveChanges(cancellationToken);
+
+        // A RemoteStartTransaction we sent is confirmed by the session actually opening.
+        if (!tx.WasRejected && source != OcppStartSource.Card)
+            await confirmer.ConfirmAsync(session.OcppChargePointId, "RemoteStartTransaction", r =>
+                string.Equals(CommandConfirmer.Str(r, "idTag"), tag, StringComparison.OrdinalIgnoreCase)
+                && (CommandConfirmer.Int(r, "connectorId") is null || CommandConfirmer.Int(r, "connectorId") == tx.ConnectorId), cancellationToken);
 
         return new { transactionId = tx.Id, idTagInfo = new { status } };
     }
@@ -227,6 +258,17 @@ public sealed class StopTransactionHandler(IApplicationDbContext db, CommandConf
         // A RemoteStopTransaction we sent is confirmed by this very message.
         if (!tx.IsOrphan)
             await confirmer.ConfirmAsync(session.OcppChargePointId, "RemoteStopTransaction", r => CommandConfirmer.Int(r, "transactionId") == tx.Id, cancellationToken);
+
+        // Price it from the time-of-use tariff. Never fails the reply: the job PriceOcppSessions catches up.
+        try
+        {
+            if (await SessionPricingService.PriceAsync(db, tx, null, cancellationToken))
+                await db.SaveChanges(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "{ChargePointId}: could not price session {TransactionId} now — left for the pricing job", session.ChargePointId, tx.Id);
+        }
 
         // transactionData carries the final samples (context Transaction.End).
         var samples = OcppPayload.Array(payload, "transactionData");

@@ -425,6 +425,47 @@ per spec §5.2, prices filled from the tariff at send time. Dry run for any Jord
 `GET /api/admin/pricing/price-alerts/preview?at=2026-10-09T16:30`. Jordan has no DST (UTC+3
 since 2022). Script: `Scripts/PriceAlerts_Phase1.sql`.
 
+## 9f. Phase 3 — start without a card + session price (built Oct 9, 2026)
+
+**Start.** `RemoteStartTransaction` is sent with a *virtual* idTag: `CBL-U{userId}` when the driver
+app asks (`POST /api/users/me/ocpp-sessions/start`), `CBL-S{stationId}` when the partner app or the
+admin asks (`…/commands/remote-start`). The unit (RH4 has `AuthorizeRemoteTxRequests = true`) sends
+`Authorize` and then `StartTransaction` with that tag; `TagAuthorizer` accepts it **only** if an
+Accepted `RemoteStartTransaction` with the same tag exists for that charger in the last 10 minutes
+(`OcppVirtualTag.RemoteStartAuthorizeWindow`) — a card carrying that text is refused.
+`StartTransactionHandler` sets `OcppTransaction.StartSource` (Card / App / Operator) and
+`StartedByUserId` (the app user; the admin / owner who pressed the button; or, for a card, the user
+it is linked to in `OcppUserIdTag`) and stamps the RemoteStart command `CompletedAt`.
+Pre-flight (`OcppRemoteStart.EnsureCanStartAsync`): charger enabled + connected, plug Available /
+Preparing with NoError, no open session on the plug; drivers additionally need the station open to
+drivers (N-2) and may hold one running session (`OcppLimits.OpenSessionsPerDriver`).
+The driver's `OcppUserIdTag` row (`CBL-U…`, label "Cable app") is created on first use.
+
+**Stop.** Drivers: `POST /api/users/me/ocpp-sessions/{id}/stop` — only sessions whose
+`StartedByUserId` is the caller. Owners / admins: the existing remote-stop. Both bypass the admin
+guard through `OcppCommandRunner.RunAsync(skipAccessGuard: true)`, which only permits
+RemoteStart / RemoteStop.
+
+**Price.** `SessionPricer` (Application/Pricing/SessionPricing.cs) walks the meter readings from
+`MeterStartWh` to `MeterStopWh`, splits every stretch at the tariff-window boundaries (Jordan
+wall-clock, windows may cross midnight) in proportion to time, and prices each window at its
+fils/kWh. Whole fils; stored as `CostFils`, `TariffVersion`, `CostBreakdownJson` (`[{key, kwh,
+priceFils, fils}]`), `PricedAt`. Done in `StopTransactionHandler` (never fails the reply) and by the
+job `price-ocpp-sessions` every 10 min for anything left unpriced. Exposed as `costFils / costJod`
+(+ `price[]` for drivers) on admin, owner and driver session DTOs. **Nothing is charged** — there is
+no payment step yet.
+
+**Test with the simulator**: `--remote 150 --charge-seconds 40` makes the client wait for a
+RemoteStart, run the session with the tag it was given and stop after 40 s (or on RemoteStop).
+Script used Oct 9: login a driver, `POST …/start {chargingPointId:223, chargerId:1, connectorId:1}`
+→ `accepted`, `/current` shows 30 kW / SoC / kWh, `…/stop` → history shows `costFils 458` for
+2.5 kWh off-peak at 183 fils.
+
+**Visit findings fixed the same day**: `OcppWebSocketHandler` labels a peer drop `connection lost`
+(only our own shutdown is `server shutting down`, which reliability excludes); `SyncOcppLocalListAsync`
+asks the unit for `SendLocalListMaxLength` above `OcppLimits.LocalListProbeAbove` (20) and trims;
+`OcppStopReason.Describe/DescribeAr` turns vendor reasons into text (`Other` = card stop on hjl).
+
 ## 10. What is NOT built yet
 
 - Phase C — the real charger (above).
@@ -433,4 +474,4 @@ since 2022). Script: `Scripts/PriceAlerts_Phase1.sql`.
 - Phase E — "N of M plugs free" in the driver app.
 - Phase 2 (contract change) — control: `Reset`, `UnlockConnector`, `ChangeAvailability`,
   `TriggerMessage`, `GetConfiguration`/`ChangeConfiguration` (set the offline keys ourselves).
-- Phase 3 — remote start/stop, pricing, payments (what CHARGER asked for as "full solution").
+- Phase 3 — **payments and reservation** (remote start / stop and the session price are built, §9f).

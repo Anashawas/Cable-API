@@ -490,6 +490,47 @@ public class BackgroundJobService(
     // Cable Connect (OCPP)
     // ==========================================
 
+    /// <summary>GetConfiguration.conf → the integer value of one key, or null.</summary>
+    private static int? ReadConfigurationInt(string? payload, string key)
+    {
+        if (string.IsNullOrWhiteSpace(payload)) return null;
+        try
+        {
+            using var doc = JsonDocument.Parse(payload);
+            if (!doc.RootElement.TryGetProperty("configurationKey", out var keys) || keys.ValueKind != JsonValueKind.Array) return null;
+            foreach (var k in keys.EnumerateArray())
+                if (k.TryGetProperty("key", out var name) && name.GetString() == key
+                    && k.TryGetProperty("value", out var v) && int.TryParse(v.GetString(), out var n))
+                    return n;
+        }
+        catch (JsonException) { }
+        return null;
+    }
+
+    public async Task<int> PriceOcppSessionsAsync(CancellationToken cancellationToken = default)
+    {
+        // Sessions closed but not priced: the stop handler failed, or the tariff / columns arrived later.
+        var tariff = await TouTariffLoader.LoadAsync(applicationDbContext, cancellationToken);
+        if (tariff is null) return 0;
+
+        var pending = await applicationDbContext.OcppTransactions
+            .Where(t => !t.IsOpen && !t.IsOrphan && t.PricedAt == null && t.EnergyKwh != null && t.StoppedAt != null)
+            .OrderBy(t => t.Id)
+            .Take(500)
+            .ToListAsync(cancellationToken);
+
+        var priced = 0;
+        foreach (var tx in pending)
+            if (await SessionPricingService.PriceAsync(applicationDbContext, tx, tariff, cancellationToken)) priced++;
+
+        if (priced > 0)
+        {
+            await applicationDbContext.SaveChanges(cancellationToken);
+            logger.LogInformation("PriceOcppSessions: priced {Count} session(s) with tariff v{Version}", priced, tariff.Version);
+        }
+        return priced;
+    }
+
     public async Task<int> MarkStaleOcppTransactionsAsync(CancellationToken cancellationToken = default)
     {
         var cutoff = DateTime.UtcNow - OcppLimits.StaleTransactionAfter;
@@ -633,29 +674,50 @@ public class BackgroundJobService(
             .ToListAsync(cancellationToken);
         if (chargers.Count == 0) return 0;
 
+        // Units differ in how many entries a Full list may carry (the pilot hjl unit: 20). Above the probe
+        // threshold, ask each unit for its SendLocalListMaxLength and trim to it rather than be refused.
+        var allCards = cards;
+        async Task<List<(string IdTag, DateTime? ExpiresAt)>> CardsFor(string chargePointId)
+        {
+            var list = allCards.Select(c => (c.IdTag, c.ExpiresAt)).ToList();
+            if (list.Count <= OcppLimits.LocalListProbeAbove) return list;
+            var probe = await ocppCommands.SendAsync(chargePointId, "GetConfiguration",
+                new Dictionary<string, object> { ["key"] = new[] { "SendLocalListMaxLength" } }, cancellationToken);
+            var max = ReadConfigurationInt(probe.Payload, "SendLocalListMaxLength");
+            if (max is int m && m > 0 && list.Count > m)
+            {
+                logger.LogWarning("SyncOcppLocalList: {ChargePointId} accepts {Max} entries, station has {Count} cards — sending the first {Max}",
+                    chargePointId, m, list.Count, m);
+                list = list.Take(m).ToList();
+            }
+            return list;
+        }
+
         // Version = Unix seconds of this push: always increasing, no bookkeeping, and a Full
         // update every time so a missed push can never leave the unit with a stale diff.
         var version = (int)Math.Min(new DateTimeOffset(now).ToUnixTimeSeconds(), int.MaxValue);
-        var list = cards.Select(c => new Dictionary<string, object>
-        {
-            ["idTag"] = c.IdTag,
-            ["idTagInfo"] = c.ExpiresAt is DateTime exp
-                ? new Dictionary<string, object> { ["status"] = "Accepted", ["expiryDate"] = exp }
-                : new Dictionary<string, object> { ["status"] = "Accepted" },
-        }).ToList();
-        var payload = new Dictionary<string, object>
-        {
-            ["listVersion"] = version,
-            ["localAuthorizationList"] = list,
-            ["updateType"] = "Full",
-        };
 
         var confirmed = 0;
         foreach (var cp in chargers)
         {
+            var unitCards = await CardsFor(cp.ChargePointId);
+            var list = unitCards.Select(c => new Dictionary<string, object>
+            {
+                ["idTag"] = c.IdTag,
+                ["idTagInfo"] = c.ExpiresAt is DateTime exp
+                    ? new Dictionary<string, object> { ["status"] = "Accepted", ["expiryDate"] = exp }
+                    : new Dictionary<string, object> { ["status"] = "Accepted" },
+            }).ToList();
+            var payload = new Dictionary<string, object>
+            {
+                ["listVersion"] = version,
+                ["localAuthorizationList"] = list,
+                ["updateType"] = "Full",
+            };
+
             var outcome = await ocppCommands.SendAsync(cp.ChargePointId, "SendLocalList", payload, cancellationToken);
             var verdict = outcome.Answered ? ReadStatus(outcome.Payload) : null;
-            Audit(cp.Id, "SendLocalList", $"{{\"listVersion\":{version},\"updateType\":\"Full\",\"cards\":{cards.Count}}}", outcome, verdict);
+            Audit(cp.Id, "SendLocalList", $"{{\"listVersion\":{version},\"updateType\":\"Full\",\"cards\":{unitCards.Count}}}", outcome, verdict);
 
             if (outcome.Answered && verdict == "Accepted")
             {

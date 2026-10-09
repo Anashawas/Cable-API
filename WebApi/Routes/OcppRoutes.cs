@@ -2,6 +2,7 @@ using Application.Common.Models;
 using Application.Ocpp.Commands.AddOcppAuthorizedTag;
 using Application.Ocpp;
 using Application.Ocpp.Commands.ControlOcppChargePoint;
+using Application.Ocpp.Commands.DriverSessions;
 using Application.Ocpp.Commands.ManageLiveVisibility;
 using Application.Ocpp.Commands.OwnerChargerCommands;
 using Application.Ocpp.Commands.ManageOcppAuthorizedTags;
@@ -42,6 +43,8 @@ public static class OcppRoutes
     public record GetConfigurationRequest(List<string>? Keys);
     public record ChangeConfigurationRequest(string Key, string Value);
     public record RemoteStopRequest(int TransactionId);
+    public record RemoteStartRequest(int ConnectorId);
+    public record StartMySessionRequest(int ChargingPointId, int ChargerId, int ConnectorId);
     public record ShareLiveStatusRequest(bool Share);
     public record LiveStatusBlockRequest(bool Blocked, string? Reason);
     public record ChargerDisplayNameRequest(string? DisplayName);
@@ -66,6 +69,49 @@ public static class OcppRoutes
         app.MapGroup("/api/charging-points")
             .WithTags("Charging Points")
             .MapDriverLiveRoutes();
+
+        // Drivers (Cable app): start / stop without a card, the running session, history with price.
+        app.MapGroup("/api/users/me/ocpp-sessions")
+            .WithTags("Charging Points")
+            .MapDriverSessionRoutes();
+
+        return app;
+    }
+
+    /// <summary>Phase 3: the driver's own sessions.</summary>
+    private static RouteGroupBuilder MapDriverSessionRoutes(this RouteGroupBuilder app)
+    {
+        app.MapPost("/start", async (IMediator mediator, StartMySessionRequest body, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new StartMyOcppSessionCommand(body.ChargingPointId, body.ChargerId, body.ConnectorId), ct)))
+            .Produces<OcppSessionStartDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("Start my charging session")
+            .WithSummary("Driver: start charging on a plug (chargerId = ChargerLiveDto.Id, connectorId = PlugLiveDto.ConnectorId from GET /api/charging-points/{id}/live) without a card. accepted=true means the charger took the request; poll /current until the session appears (a few seconds). 400 with a message when the station does not offer app charging, the plug is busy / out of order, the charger is offline, or you already have a running session.")
+            .WithOpenApi();
+
+        app.MapPost("/{id:int}/stop", async (IMediator mediator, [FromRoute] int id, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new StopMyOcppSessionCommand(id), ct)))
+            .Produces<OcppCommandResultDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("Stop my charging session")
+            .WithSummary("Driver: stop their own running session (id from /current). The charger confirms with its StopTransaction a few seconds later; /current then returns null and the session shows in the history with its price.")
+            .WithOpenApi();
+
+        app.MapGet("/current", async (IMediator mediator, CancellationToken ct) =>
+                Results.Json(await mediator.Send(new GetMyCurrentOcppSessionRequest(), ct)))   // Json: a null session is the literal null, not an empty body
+            .Produces<MySessionDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesInternalServerError()
+            .WithName("Get my current charging session")
+            .WithSummary("Driver: the session running now (null when none) with power, battery level, energy so far and the latest sample time. Poll every 10 s while charging.")
+            .WithOpenApi();
+
+        app.MapGet("/", async (IMediator mediator, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetMyOcppSessionsRequest(page, pageSize), ct)))
+            .Produces<PagedResult<MySessionDto>>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesInternalServerError()
+            .WithName("Get my charging sessions")
+            .WithSummary("Driver: past sessions newest first (card and app alike) with energy, duration, why it stopped and the price under the tariff in force (costFils / costJod + per-window breakdown).")
+            .WithOpenApi();
 
         return app;
     }
@@ -120,6 +166,11 @@ public static class OcppRoutes
                 Results.Ok(await Send(mediator, new OwnerChargerCommand(chargingPointId, ocppChargePointId, "RemoteStopTransaction", TransactionId: body.TransactionId), ct)))
             .Produces<OcppCommandResultDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
             .WithName("Provider: stop session").WithSummary("Owner / manager: end a running session on their charger (the unit's StopTransaction confirms it).").WithOpenApi();
+
+        app.MapPost("/{chargingPointId:int}/chargers/{ocppChargePointId:int}/commands/remote-start", async (IMediator mediator, [FromRoute] int chargingPointId, [FromRoute] int ocppChargePointId, RemoteStartRequest body, CancellationToken ct) =>
+                Results.Ok(await Send(mediator, new OwnerChargerCommand(chargingPointId, ocppChargePointId, "RemoteStartTransaction", ConnectorId: body.ConnectorId), ct)))
+            .Produces<OcppCommandResultDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("Provider: start session").WithSummary("Owner / manager: start a session on a free plug for a customer who has no card. The charger confirms with its StartTransaction; the session is recorded as started by the operator.").WithOpenApi();
 
         app.MapPost("/{chargingPointId:int}/chargers/{ocppChargePointId:int}/commands/trigger-message", async (IMediator mediator, [FromRoute] int chargingPointId, [FromRoute] int ocppChargePointId, TriggerMessageRequest body, CancellationToken ct) =>
                 Results.Ok(await Send(mediator, new OwnerChargerCommand(chargingPointId, ocppChargePointId, "TriggerMessage", ConnectorId: body.ConnectorId, RequestedMessage: body.RequestedMessage), ct)))
@@ -373,6 +424,14 @@ public static class OcppRoutes
             .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
             .WithName("OCPP RemoteStopTransaction")
             .WithSummary("Admin: stop a running session (transactionId = the open OcppTransaction id). The unit answers Accepted / Rejected and then sends StopTransaction (reason Remote), which closes the session and confirms the command.")
+            .WithOpenApi();
+
+        app.MapPost("/charge-points/{id:int}/commands/remote-start", async (IMediator mediator, [FromRoute] int id, RemoteStartRequest body, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new RemoteStartOcppTransactionCommand(id, body.ConnectorId), ct)))
+            .Produces<OcppCommandResultDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("OCPP RemoteStartTransaction")
+            .WithSummary("Admin: start a session on a free plug without a card (stations that issue no cards). The unit answers Accepted / Rejected, then sends StartTransaction with the station's virtual tag, which opens the session (StartSource Operator) and confirms the command.")
             .WithOpenApi();
 
         app.MapPost("/charge-points/{id:int}/commands/get-configuration", async (IMediator mediator, [FromRoute] int id, GetConfigurationRequest? body, CancellationToken ct) =>

@@ -45,6 +45,23 @@ public class OcppTransaction : BaseEntity
     /// <summary>Authorize/Start answered Invalid for this idTag; the charger will normally stop right away.</summary>
     public bool WasRejected { get; set; }
 
+    /// <summary>Card | App | Operator (OcppStartSource). Derived from the idTag at StartTransaction.</summary>
+    public string StartSource { get; set; } = "Card";
+
+    /// <summary>The driver (App, or a card linked through OcppUserIdTag) or the operator who started it. Null for an unlinked card.</summary>
+    public int? StartedByUserId { get; set; }
+
+    /// <summary>Price from the time-of-use tariff in force, in fils. Null while open, or when the energy is unknown.</summary>
+    public int? CostFils { get; set; }
+
+    /// <summary>TouTariff.Version used for CostFils.</summary>
+    public int? TariffVersion { get; set; }
+
+    /// <summary>Per-window breakdown (JSON: key, kWh, fils/kWh, fils).</summary>
+    public string? CostBreakdownJson { get; set; }
+
+    public DateTime? PricedAt { get; set; }
+
     public virtual OcppChargePoint ChargePoint { get; set; } = null!;
     public virtual ICollection<OcppMeterValue> MeterValues { get; set; } = new List<OcppMeterValue>();
 }

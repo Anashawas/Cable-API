@@ -13,6 +13,7 @@ public sealed class OcppWebSocketHandler(
     RawMessageStore store,
     IServiceScopeFactory scopes,
     IOptions<OcppOptions> options,
+    IHostApplicationLifetime lifetime,
     ILogger<OcppWebSocketHandler> log)
 {
     private const string Subprotocol = "ocpp1.6";
@@ -84,7 +85,9 @@ public sealed class OcppWebSocketHandler(
         }
         catch (OperationCanceledException)
         {
-            closeReason = "server shutting down";
+            // Kestrel aborts the request both when we stop and when the peer drops the TCP connection
+            // (a charger rebooting, a cut cable). Only the first is our fault and excluded from reliability.
+            closeReason = lifetime.ApplicationStopping.IsCancellationRequested ? "server shutting down" : "connection lost";
         }
         catch (WebSocketException ex)
         {
