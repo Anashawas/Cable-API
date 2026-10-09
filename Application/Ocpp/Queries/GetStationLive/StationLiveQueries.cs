@@ -47,7 +47,10 @@ public static class LiveUnavailableReason
     public const string Offline = "Offline";
 }
 
-public record PlugLiveDto(int ConnectorId, string State, int? PlugTypeId, string? PlugTypeName, string? PlugTypeFamily, decimal? PowerKw);
+/// <param name="OcppStatus">The raw OCPP status (Available, Preparing, Charging, Finishing…) — Preparing means a car is connected and waiting, which is when a session may be started.</param>
+/// <param name="OpenSessionId">Owner / admin only: the running session on this plug (for Stop); null for drivers.</param>
+public record PlugLiveDto(int ConnectorId, string State, int? PlugTypeId, string? PlugTypeName, string? PlugTypeFamily, decimal? PowerKw,
+    string? OcppStatus = null, int? OpenSessionId = null);
 
 /// <summary>One cabinet. DisplayName is what the owner named it; null = the app shows its own default ("Charger {Ordinal}"). The OCPP id is never exposed to drivers.</summary>
 public record ChargerLiveDto(int Id, int Ordinal, string? DisplayName, bool Online, DateTime? UpdatedAt, List<PlugLiveDto> Plugs);
@@ -99,7 +102,12 @@ internal static class StationLiveBuilder
             {
                 c.Id, c.DisplayName, c.IsConnected, c.LastMessageAt, c.DisconnectedAt, c.HeartbeatInterval, c.ReliabilityPct,
                 Plugs = c.Connectors.Where(k => k.ConnectorId > 0).OrderBy(k => k.ConnectorId)
-                    .Select(k => new { k.ConnectorId, k.Status, k.PlugTypeId, PlugTypeName = k.PlugType != null ? k.PlugType.Name : null, PlugTypeFamily = k.PlugType != null ? k.PlugType.PlugTypeFamily : null, k.PowerKw })
+                    .Select(k => new
+                    {
+                        k.ConnectorId, k.Status, k.PlugTypeId, PlugTypeName = k.PlugType != null ? k.PlugType.Name : null, PlugTypeFamily = k.PlugType != null ? k.PlugType.PlugTypeFamily : null, k.PowerKw,
+                        OpenSessionId = db.OcppTransactions.Where(t => t.OcppChargePointId == c.Id && t.ConnectorId == k.ConnectorId && t.IsOpen && !t.WasRejected && !t.IsStale)
+                            .OrderByDescending(t => t.Id).Select(t => (int?)t.Id).FirstOrDefault(),
+                    })
                     .ToList(),
             })
             .ToListAsync(ct);
@@ -113,7 +121,8 @@ internal static class StationLiveBuilder
         {
             ordinal++;
             var online = OcppLiveness.StateOf(c.IsConnected, c.LastMessageAt, c.DisconnectedAt, c.HeartbeatInterval, now) == OcppLiveness.Online;
-            var plugs = c.Plugs.Select(p => new PlugLiveDto(p.ConnectorId, PlugLiveState.Of(p.Status, online), p.PlugTypeId, p.PlugTypeName, p.PlugTypeFamily, p.PowerKw)).ToList();
+            var plugs = c.Plugs.Select(p => new PlugLiveDto(p.ConnectorId, PlugLiveState.Of(p.Status, online), p.PlugTypeId, p.PlugTypeName, p.PlugTypeFamily, p.PowerKw,
+                online ? p.Status : null, enforceGates ? null : p.OpenSessionId)).ToList();
             chargerDtos.Add(new ChargerLiveDto(c.Id, ordinal, string.IsNullOrWhiteSpace(c.DisplayName) ? null : c.DisplayName, online, c.LastMessageAt, plugs));
         }
 
