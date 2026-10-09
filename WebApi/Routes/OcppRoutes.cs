@@ -98,7 +98,11 @@ public static class OcppRoutes
             .WithOpenApi();
 
         app.MapGet("/current", async (IMediator mediator, CancellationToken ct) =>
-                Results.Json(await mediator.Send(new GetMyCurrentOcppSessionRequest(), ct)))   // Json: a null session is the literal null, not an empty body
+            {
+                var session = await mediator.Send(new GetMyCurrentOcppSessionRequest(), ct);
+                // No session = the literal JSON null (Results.Ok(null) sends an empty body, which mobile JSON parsers reject).
+                return session is null ? Results.Content("null", "application/json") : Results.Ok(session);
+            })
             .Produces<MySessionDto>()
             .RequireAuthorization().ProducesUnAuthorized().ProducesInternalServerError()
             .WithName("Get my current charging session")
