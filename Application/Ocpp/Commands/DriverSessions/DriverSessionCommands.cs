@@ -26,7 +26,7 @@ public static class OcppRemoteStart
 {
     public sealed record Target(OcppChargePoint ChargePoint, OcppConnector Connector);
 
-    /// <summary>The charger must be enabled and online, the plug free (Available / Preparing, no error) and without an open session.</summary>
+    /// <summary>The charger must be enabled and online, the plug must have a car connected (Preparing, no error) and no open session. A RemoteStart into an empty plug is refused: the unit would wait 60 s and cancel.</summary>
     public static async Task<Target> EnsureCanStartAsync(IApplicationDbContext db, int ocppChargePointId, int connectorId, CancellationToken ct)
     {
         var cp = await db.OcppChargePoints.AsNoTracking().FirstOrDefaultAsync(c => c.Id == ocppChargePointId && !c.IsDeleted, ct)
@@ -39,7 +39,9 @@ public static class OcppRemoteStart
         if (connectorId < 1) throw new DataValidationException("ConnectorId", "Pick a plug (connectorId 1 or more).");
         if (k.ErrorCode != "NoError" || k.Status is OcppConnectorStatus.Faulted or OcppConnectorStatus.Unavailable)
             throw new DataValidationException("ConnectorId", "This plug is out of order.");
-        if (k.Status is not (OcppConnectorStatus.Available or OcppConnectorStatus.Preparing))
+        if (k.Status == OcppConnectorStatus.Available)
+            throw new DataValidationException("ConnectorId", "Plug the cable into the car first. The plug shows 'Preparing' once the car is connected.");
+        if (k.Status != OcppConnectorStatus.Preparing)
             throw new DataValidationException("ConnectorId", "This plug is busy (" + k.Status + ").");
 
         var open = await db.OcppTransactions.AsNoTracking()

@@ -57,7 +57,7 @@ Endpoints are live on dev. Everything below is screens only.
 |---|---|---|
 | Station page: plugs free / busy per type, reliability badge | `GET /api/charging-points/{id}/live` | `unavailableReason` tells why nothing is shown |
 | Map / list badges | `GET /api/charging-points/live-summary?ids=1,2,3` | max 50 ids |
-| **Start charging** on a plug | `POST /api/users/me/ocpp-sessions/start` `{chargingPointId, chargerId, connectorId}` | `chargerId` = `chargers[].id`, `connectorId` = `plugs[].connectorId` from the live endpoint. `accepted=true` → poll `/current` every 3 s until it appears (≈ 5 s). 400 + message when the station does not offer app charging, the plug is busy, the charger is offline, or a session is already running. The cable must be plugged in before or right after. |
+| **Start charging** on a plug | `POST /api/users/me/ocpp-sessions/start` `{chargingPointId, chargerId, connectorId}` | `chargerId` = `chargers[].id`, `connectorId` = `plugs[].connectorId` from the live endpoint. **The cable must be plugged into the car first** (plug state `Busy` with OCPP status Preparing); an empty plug is refused with "Plug the cable into the car first". `accepted=true` → poll `/current` every 3 s until it appears (≈ 5 s). 400 + message when the station does not offer app charging, the plug is busy with another car, the charger is offline, or a session is already running. |
 | **Live session** | `GET /api/users/me/ocpp-sessions/current` | `null` when none. `powerW`, `socPercent`, `energyKwh` so far, `durationSec`, `lastSampleAt`. Poll every 10 s. |
 | **Stop** | `POST /api/users/me/ocpp-sessions/{id}/stop` | only the caller's own session; the charger confirms a few seconds later |
 | **History + receipt** | `GET /api/users/me/ocpp-sessions?page=1&pageSize=20` | `costFils` / `costJod`, `price[]` per tariff window, `stopReasonText` / `stopReasonTextAr`, `startSource` (Card / App / Operator). Card sessions appear here too when the card is linked to the user. |
@@ -80,7 +80,8 @@ Endpoints are live on dev. Everything below is screens only.
 
 ## 6. Rules in force (change here first if the business wants otherwise)
 
-- **Who may start**: a card from the station list; the driver app (virtual tag `CBL-U{userId}`) only at stations whose live status is open to drivers; the partner app / admin (virtual tag `CBL-S{stationId}`) on any free plug of their own / any charger.
+- **Who may start**: a card from the station list; the driver app (virtual tag `CBL-U{userId}`) only at stations whose live status is open to drivers; the partner app / admin (virtual tag `CBL-S{stationId}`) on their own / any charger.
+- **A car must be connected first** (plug Preparing) for every app / operator start. The admin shows "Plug in first" on an empty plug instead of the button.
 - **Who may stop**: the card that started it; the driver only their own app or linked-card sessions; owner / manager any session on their chargers; admin any.
 - **One running app session per driver.**
 - **Price** = energy split over the time-of-use tariff windows the session ran through (Asia/Amman), whole fils, stored on the session with the tariff version. Nothing is charged to anyone yet — there is no payment step.

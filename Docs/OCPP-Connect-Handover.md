@@ -436,8 +436,9 @@ Accepted `RemoteStartTransaction` with the same tag exists for that charger in t
 `StartTransactionHandler` sets `OcppTransaction.StartSource` (Card / App / Operator) and
 `StartedByUserId` (the app user; the admin / owner who pressed the button; or, for a card, the user
 it is linked to in `OcppUserIdTag`) and stamps the RemoteStart command `CompletedAt`.
-Pre-flight (`OcppRemoteStart.EnsureCanStartAsync`): charger enabled + connected, plug Available /
-Preparing with NoError, no open session on the plug; drivers additionally need the station open to
+Pre-flight (`OcppRemoteStart.EnsureCanStartAsync`): charger enabled + connected, plug **Preparing**
+(a car is connected — an Available plug is refused with "Plug the cable into the car first", because
+the unit would wait `ConnectionTimeOut` = 60 s and cancel) with NoError, no open session on the plug; drivers additionally need the station open to
 drivers (N-2) and may hold one running session (`OcppLimits.OpenSessionsPerDriver`).
 The driver's `OcppUserIdTag` row (`CBL-U…`, label "Cable app") is created on first use.
 
