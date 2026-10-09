@@ -49,6 +49,24 @@ shown as text (`Other` → "Stopped at the charger").
 - [ ] Name the cabinet (display name) so the driver app does not show "Charger 1".
 - [ ] Decide whether to switch `LocalAuthListEnabled` to true on RH4 (cards keep working offline) — one click in Charger settings.
 
+## 3b. Partner web portal — done (Oct 9)
+
+- [x] "Cable Connect" menu: tiles (online, free, charging, reliability, today's sessions / kWh / revenue), one card per charger with name, plugs, Start for a walk-in customer (car connected only), Stop, Unlock, out of service, Refresh, Restart, command history, **live session panel** (power, energy, battery, elapsed, cost so far, curve), "Session finished" card, sharing switch with a "what drivers see" preview, sessions with price (row → detail with curve), accepted cards.
+- [ ] Build the standalone partner web for its host (`Scripts/build-partner.ps1`) and publish it with the API.
+- [ ] A real owner account (role Provider) per pilot station, or the owner's staff as workers, so they can log in. Note: one web session per account — a second login logs the first one out.
+
+## 3c. Team test on dev before go-live (the gate)
+
+Order: publish → the team tests on dev with the simulator and with RH4 on its next visit → fix list → publish to production.
+
+- [ ] Publish API + admin to dev, Cable.Ocpp to AWS; attach the simulator to `ocpp-dev` in demo mode (two cars, `--remote`).
+- [ ] Admin: register / sheet / commissioning, control buttons, settings, cards sync, sessions with price, alerts, thresholds, reliability, price alerts page.
+- [ ] Partner web: everything in 3b with an owner account; two sessions at once; the finished card; sharing off → driver endpoint returns `NotShared`.
+- [ ] Driver endpoints with the mobile build (or curl): start on a `Preparing` plug, `/current`, stop, history with price, start on an empty plug refused.
+- [ ] Review `Cable-Connect-Functionality-Review.md`: keep / remove / change per row, decide the open questions.
+- [ ] Apply the fix list; re-test what changed.
+- [ ] Production switch (§2) and the RH4 settings (§3).
+
 ## 4. Driver app (Cable) — teammate
 
 Endpoints are live on dev. Everything below is screens only.
