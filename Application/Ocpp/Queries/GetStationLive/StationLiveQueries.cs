@@ -1,3 +1,4 @@
+using Cable.Core.Utilities;
 using Application.Common.Interfaces;
 using Application.Common.Security;
 using Cable.Core.Constants;
@@ -58,6 +59,9 @@ public record ChargerLiveDto(int Id, int Ordinal, string? DisplayName, bool Onli
 /// <summary>Per plug type across the whole station — the number the badge shows.</summary>
 public record PlugTypeLiveDto(int? PlugTypeId, string Name, string? Family, int Total, int Free, int Busy, int OutOfOrder, int Unknown, decimal? MaxPowerKw);
 
+/// <summary>Owner / admin: the station's day so far (Jordan calendar day).</summary>
+public record StationTodayDto(int Sessions, decimal EnergyKwh, int CostFils, decimal CostJod, int Running);
+
 public record StationLiveDto(
     int ChargingPointId,
     bool Available,
@@ -68,7 +72,9 @@ public record StationLiveDto(
     /// <summary>N-6: true when the station's worst charger scores ≥ the threshold. Drivers get true or null — never a bad number.</summary>
     bool? Reliable = null,
     /// <summary>N-6: the station score (lowest charger), owner / admin only; null for drivers.</summary>
-    decimal? ReliabilityPct = null);
+    decimal? ReliabilityPct = null,
+    /// <summary>Owner / admin only: sessions, energy and revenue today; null for drivers.</summary>
+    StationTodayDto? Today = null);
 
 /// <summary>Lightweight form for the map / list badge.</summary>
 public record PlugTypeFreeDto(int? PlugTypeId, string Name, int Free, int Total);
@@ -149,8 +155,22 @@ internal static class StationLiveBuilder
         decimal? stationPct = scores.Count == 0 ? null : scores.Min();
         bool? reliable = stationPct is null ? null : stationPct >= OcppLimits.ReliableThresholdPct ? true : (enforceGates ? null : false);
 
+        StationTodayDto? today = null;
+        if (!enforceGates)
+        {
+            var todayStartUtc = JordanTime.ToUtc(JordanTime.FromUtc(now).Date);
+            var rows = await db.OcppTransactions.AsNoTracking()
+                .Where(t => t.ChargePoint.ChargingPointId == chargingPointId && !t.ChargePoint.IsDeleted && !t.WasRejected && !t.IsOrphan
+                            && (t.StartedAt >= todayStartUtc || t.IsOpen))
+                .Select(t => new { t.IsOpen, t.EnergyKwh, t.CostFils, t.StartedAt })
+                .ToListAsync(ct);
+            var todays = rows.Where(r => r.StartedAt >= todayStartUtc).ToList();
+            today = new StationTodayDto(todays.Count, todays.Sum(r => r.EnergyKwh ?? 0m), todays.Sum(r => r.CostFils ?? 0),
+                todays.Sum(r => r.CostFils ?? 0) / 1000m, rows.Count(r => r.IsOpen));
+        }
+
         return new StationLiveDto(chargingPointId, anyOnline, anyOnline ? null : LiveUnavailableReason.Offline, updatedAt, plugTypes, chargerDtos,
-            reliable, enforceGates ? null : stationPct);
+            reliable, enforceGates ? null : stationPct, today);
     }
 
     public static StationLiveSummaryDto Summarize(StationLiveDto live) => new(

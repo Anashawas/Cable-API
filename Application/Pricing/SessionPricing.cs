@@ -61,6 +61,9 @@ public static class SessionPricer
         return new SessionPriceDto(lines.Sum(l => l.Fils), tariff.Version, lines);
     }
 
+    /// <summary>The tariff window in force at a UTC instant (Jordan wall-clock), for "rate now" displays.</summary>
+    public static TouWindowDto? WindowNow(TouTariffDto tariff, DateTime utc) => WindowAt(tariff, JordanTime.FromUtc(utc)).Window;
+
     /// <summary>Share of the span [t0, t1] (UTC) that falls in each tariff window, by Jordan wall-clock time.</summary>
     private static IEnumerable<(string Key, decimal Share)> SplitByWindow(TouTariffDto tariff, DateTime t0, DateTime t1)
     {

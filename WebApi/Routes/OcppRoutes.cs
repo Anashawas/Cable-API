@@ -18,6 +18,7 @@ using Application.Ocpp.Queries.GetOcppCommands;
 using Application.Ocpp.Queries.GetOcppFleetHealth;
 using Application.Ocpp.Queries.GetOcppRawMessages;
 using Application.Ocpp.Queries.GetStationLive;
+using Application.Ocpp.Queries.GetSessionLive;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -187,6 +188,11 @@ public static class OcppRoutes
                 Results.Ok(await mediator.Send(new GetMyChargerCommandsRequest(chargingPointId, ocppChargePointId, take), ct)))
             .Produces<List<OcppCommandDto>>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesInternalServerError()
             .WithName("Provider: charger command history").WithSummary("Owner / manager: commands sent to this charger, newest first, with who sent them and whether the unit confirmed.").WithOpenApi();
+
+        app.MapGet("/{chargingPointId:int}/sessions/{transactionId:int}/live", async (IMediator mediator, [FromRoute] int chargingPointId, [FromRoute] int transactionId, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetMySessionLiveRequest(chargingPointId, transactionId), ct)))
+            .Produces<SessionLiveDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesInternalServerError()
+            .WithName("Provider: session live").WithSummary("Owner / manager: one session in detail — while it runs: power now, energy so far, battery, cost so far at the current tariff rate, seconds since the last reading; once closed: the final figures and price. Includes the sampled curve (≤ 120 points) for a chart. Poll every 5 s while open.").WithOpenApi();
 
         app.MapGet("/{chargingPointId:int}/sessions", async (IMediator mediator, [FromRoute] int chargingPointId, [FromQuery] int? chargerId, [FromQuery] DateTime? from, [FromQuery] DateTime? to, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken ct) =>
                 Results.Ok(await mediator.Send(new GetMyStationSessionsRequest(chargingPointId, chargerId, from, to, page, pageSize), ct)))
@@ -487,6 +493,11 @@ public static class OcppRoutes
             .WithName("Recompute OCPP reliability")
             .WithSummary("Admin: recompute the 30-day reliability score of every charger now (the daily job runs at 03:30 UTC)")
             .WithOpenApi();
+
+        app.MapGet("/sessions/{transactionId:int}/live", async (IMediator mediator, [FromRoute] int transactionId, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetOcppSessionLiveRequest(transactionId), ct)))
+            .Produces<SessionLiveDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesInternalServerError()
+            .WithName("OCPP session live").WithSummary("Admin: one session in detail with the sampled curve; live figures and cost so far while it runs.").WithOpenApi();
 
         app.MapGet("/charge-points/{id:int}/commands", async (IMediator mediator, [FromRoute] int id, [FromQuery] int? take, CancellationToken ct) =>
                 Results.Ok(await mediator.Send(new GetOcppCommandsRequest(id, take), ct)))
