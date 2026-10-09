@@ -201,3 +201,6 @@ appsettings.Staging.json
 Screenshot*.png
 WhatsApp*.jpeg
 WhatsApp*.jpg
+
+# Local notes with dev test accounts (never committed)
+Docs/*.local.md
