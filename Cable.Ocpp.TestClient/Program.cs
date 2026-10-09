@@ -157,16 +157,19 @@ if (plug || replay)
 
 if (remoteWaitSeconds > 0)
 {
-    // A car is plugged in on connector 1 while we wait (Preparing): the apps only offer "Start" on such a plug.
-    await Call("StatusNotification", new { connectorId = 1, status = "Preparing", errorCode = "NoError", info = "Connector 1 is in use", timestamp = DateTime.UtcNow });
-    Console.WriteLine($"[{Now()}] connector 1 is Preparing (car connected); waiting up to {remoteWaitSeconds} s for a RemoteStartTransaction (--remote)");
+    // Demo mode: a car is plugged in on connector 1 (Preparing) and the apps may start it; after each
+    // session the next car "arrives" and the wait continues until --remote seconds have passed.
     var waitUntil = DateTime.UtcNow.AddSeconds(remoteWaitSeconds);
+    long meterStart = 2_000_000;
+    while (DateTime.UtcNow < waitUntil && ws.State == WebSocketState.Open)
+    {
+    await Call("StatusNotification", new { connectorId = 1, status = "Preparing", errorCode = "NoError", info = "Connector 1 is in use", timestamp = DateTime.UtcNow });
+    Console.WriteLine($"[{Now()}] connector 1 is Preparing (car connected); waiting for a RemoteStartTransaction (--remote, until {waitUntil:HH:mm:ss} UTC)");
     while (DateTime.UtcNow < waitUntil && remoteStartTag is null && ws.State == WebSocketState.Open)
         await Task.Delay(500);
     if (remoteStartTag is { } rs)
     {
         var t0 = DateTime.UtcNow;
-        const long meterStart = 2_000_000;
         await Call("StatusNotification", new { connectorId = rs.Connector, status = "Preparing", errorCode = "NoError", timestamp = t0 });
         await Call("Authorize", new { idTag = rs.Tag });
         var startReply = await CallAndWait("StartTransaction", new { connectorId = rs.Connector, idTag = rs.Tag, meterStart, timestamp = t0 });
@@ -174,34 +177,39 @@ if (remoteWaitSeconds > 0)
         var accepted = startReply.TryGetProperty("idTagInfo", out var info) && info.TryGetProperty("status", out var st) && st.GetString() == "Accepted";
         Console.WriteLine($"[{Now()}] remote session transactionId = {currentTransactionId}, idTag {(accepted ? "Accepted" : "REJECTED")}");
         await Call("StatusNotification", new { connectorId = rs.Connector, status = "Charging", errorCode = "NoError", timestamp = t0.AddSeconds(1) });
+        // Realistic DC curve: ~40 kW, 55 Wh per 5-second sample, battery climbing about 1 % every 90 s from 40 %.
         var i = 0;
         var holdUntil = DateTime.UtcNow.AddSeconds(chargeSeconds > 0 ? chargeSeconds : 30);
         while (DateTime.UtcNow < holdUntil && ws.State == WebSocketState.Open && !remoteStopRequested)
         {
             i++;
+            var kw = 39.6 + Math.Sin(i / 7.0) * 1.2;
             await Call("MeterValues", new
             {
                 connectorId = rs.Connector, transactionId = currentTransactionId,
                 meterValue = new[] { new { timestamp = DateTime.UtcNow, sampledValue = new object[]
                 {
-                    new { value = (meterStart + i * 500).ToString(), context = "Sample.Periodic", measurand = "Energy.Active.Import.Register", unit = "Wh" },
-                    new { value = "30000", measurand = "Power.Active.Import", unit = "W" },
-                    new { value = (40 + i).ToString(), measurand = "SoC", unit = "Percent" },
+                    new { value = (meterStart + i * 55).ToString(), context = "Sample.Periodic", measurand = "Energy.Active.Import.Register", unit = "Wh" },
+                    new { value = ((int)(kw * 1000)).ToString(), measurand = "Power.Active.Import", unit = "W" },
+                    new { value = Math.Min(100, 40 + i / 18).ToString(), measurand = "SoC", unit = "Percent" },
+                    new { value = "398.5", measurand = "Voltage", unit = "V" },
+                    new { value = (kw * 1000 / 398.5).ToString("0.0"), measurand = "Current.Import", unit = "A" },
                 } } },
             });
             await Task.Delay(TimeSpan.FromSeconds(5));
         }
+        var meterStop = meterStart + i * 55;
         await Call("StatusNotification", new { connectorId = rs.Connector, status = "Finishing", errorCode = "NoError", timestamp = DateTime.UtcNow });
-        await Call("StopTransaction", new { transactionId = currentTransactionId, idTag = rs.Tag, meterStop = meterStart + i * 500, timestamp = DateTime.UtcNow, reason = remoteStopRequested ? "Remote" : "Local" });
+        await Call("StopTransaction", new { transactionId = currentTransactionId, idTag = rs.Tag, meterStop, timestamp = DateTime.UtcNow, reason = remoteStopRequested ? "Remote" : "Local" });
         await Call("StatusNotification", new { connectorId = rs.Connector, status = "Available", errorCode = "NoError", timestamp = DateTime.UtcNow });
-        Console.WriteLine($"[{Now()}] remote session ended, energy {(i * 500) / 1000m:0.000} kWh");
+        Console.WriteLine($"[{Now()}] remote session ended, energy {(i * 55) / 1000m:0.000} kWh — next car arrives in 10 s");
         currentTransactionId = 0; remoteStopRequested = false; remoteStartTag = null;
+        meterStart = meterStop;
+        await Task.Delay(TimeSpan.FromSeconds(10));
     }
-    else
-    {
-        Console.WriteLine($"[{Now()}] no RemoteStartTransaction arrived — unplugging");
-        await Call("StatusNotification", new { connectorId = 1, status = "Available", errorCode = "NoError", timestamp = DateTime.UtcNow });
     }
+    Console.WriteLine($"[{Now()}] demo window over — unplugging");
+    await Call("StatusNotification", new { connectorId = 1, status = "Available", errorCode = "NoError", timestamp = DateTime.UtcNow });
 }
 
 if (idleMinutes > 0)

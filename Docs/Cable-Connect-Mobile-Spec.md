@@ -87,7 +87,7 @@ Precondition in the UI: the user is logged in, the station is `available`, and t
 
 The driver's virtual tag (`CBL-U{userId}`) is created automatically on first use. Nothing to store on the device.
 
-### 1.4 Live session screen
+### 1.4 Live session screen (make it feel alive: big animated kW figure, battery bar, elapsed clock ticking on the device, "updated N s ago" — the partner web live panel is the reference look)
 
 `GET /api/users/me/ocpp-sessions/current` (auth) — poll every **10 s** while open. Returns the literal `null` when nothing is running.
 
@@ -176,6 +176,19 @@ Three gates: subscription (Cable team), Cable approval (`!adminBlocked`, reason 
   "startSource": "Operator", "stopReasonText": "Stopped from the app", "costFils": 639, "costJod": 0.639 }
 ```
 Columns on the web: started (+ "running" chip), charger, plug, duration, energy, price (JOD, 3 decimals), started by (`Card` / `Driver app` / `You / staff`), ended (`stopReasonText`). Show `idTag` only in a detail view; it is a card number or a virtual tag.
+
+### 2.4b Live session detail (the "wow" screen)
+
+`GET /api/provider/charging-points/{id}/sessions/{transactionId}/live` — poll every **5 s** while `isOpen`, once when closed.
+```json
+{ "id": 33, "chargerName": "Test 1", "connectorId": 1, "startedAt": "…", "isOpen": true, "durationSec": 184, "startSource": "Operator",
+  "energyKwh": 2.03, "powerW": 39600, "socPercent": 46, "voltageV": 398.5, "currentA": 99.4, "lastSampleAt": "…", "secondsSinceSample": 3,
+  "maxPowerW": 40800, "avgPowerW": 39500,
+  "costFils": 392, "costJod": 0.392, "currentRateFils": 193, "currentWindowNameEn": "Partial peak", "currentWindowNameAr": "ذروة جزئية",
+  "price": [{ "key": "night", "nameEn": "Partial peak", "nameAr": "…", "kwh": 2.03, "priceFils": 193, "fils": 392 }],
+  "series": [{ "at": "…", "powerW": 39600, "socPercent": 46, "energyKwh": 2.03 }] }
+```
+The partner web shows it under a busy plug: power now (big, animated), energy so far, battery % bar, elapsed clock ticking every second, **cost so far** at the current rate, "updated N s ago", and a power / battery curve from `series` (≤ 120 points). The same endpoint renders a closed session (final figures + curve) when a row of the sessions list is tapped. The station live endpoint also carries `today` for owners: `{ sessions, energyKwh, costFils, costJod, running }` for three "today" tiles.
 
 ### 2.5 Accepted cards
 

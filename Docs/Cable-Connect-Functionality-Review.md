@@ -44,6 +44,8 @@
 | P9 | Live data for drivers: the three gates (subscription, Cable approval, owner switch) and the owner's switch | Owner, manager | ✅ | |
 | P10 | Sessions table: started, charger, plug, duration, energy, **price (JOD)**, started by (card / driver app / you-staff), ended (reason in words) | Owner, manager | ✅ | |
 | P11 | Accepted cards: list, add (number + label), switch a card off / on; chargers updated within seconds | Owner, manager | ✅ | |
+| P11b | **Live session panel** under a busy plug: power now (animated), energy so far, battery bar, elapsed clock, **cost so far** at the current rate, power / battery curve; refresh every 5 s while active | Owner, manager | ✅ | |
+| P11c | Today tiles: sessions, kWh, revenue; a session row opens its detail with the curve and price breakdown | Owner, manager | ✅ | |
 | P12 | Register a charger from the portal (today admin only) | Owner | 💡 | |
 | P13 | Hard reset, read / change charger settings, raw log (kept admin-only on purpose) | — | ✗ not offered | |
 | P14 | Export sessions to Excel / CSV | Owner | 💡 | |
