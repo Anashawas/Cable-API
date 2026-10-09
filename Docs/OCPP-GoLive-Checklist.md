@@ -32,7 +32,7 @@ shown as text (`Other` → "Stopped at the charger").
 
 - [x] Phase 0–2 + Phase 3 (start without a card, session price) built and tested with the simulator.
 - [x] `Scripts/OcppConnect_Phase3.sql` applied to **dev**.
-- [ ] **Production DB**: apply `OcppConnect_Phase0.sql`, `Phase1.sql`, `Phase2.sql`, `Phase3.sql`, `OcppConnect_AlertThresholds.sql`, `PriceAlerts_Phase1.sql` (all idempotent, in that order).
+- [ ] **Production DB**: apply `OcppConnect_Phase0.sql`, `Phase1.sql`, `Phase2.sql`, `Phase3.sql`, `OcppConnect_AlertThresholds.sql`, `PriceAlerts_Phase1.sql`, `Worker_Privileges.sql` (all idempotent, in that order).
 - [ ] **Production API config**: `OcppServer: { Url: "https://ocpp.cable-app.com", ApiKey: <the AWS StatusApiKey>, HttpTimeoutSeconds: 35 }` in `appsettings.Production.json` (git-ignored).
 - [ ] **Cable.Ocpp on AWS**: `appsettings.Production.json` with the production connection string + `ASPNETCORE_ENVIRONMENT=Production` in IIS; today it runs the Staging settings against the dev DB.
 - [ ] Publish API (dev first, then prod) — new Hangfire jobs `price-ocpp-sessions` (10 min) and the Phase 3 columns need the new build on **every** instance that shares the Hangfire DB (handover §9d).
@@ -54,6 +54,7 @@ shown as text (`Other` → "Stopped at the charger").
 - [x] "Cable Connect" menu: tiles (online, free, charging, reliability, today's sessions / kWh / revenue), one card per charger with name, plugs, Start for a walk-in customer (car connected only), Stop, Unlock, out of service, Refresh, Restart, command history, **live session panel** (power, energy, battery, elapsed, cost so far, curve), "Session finished" card, sharing switch with a "what drivers see" preview, sessions with price (row → detail with curve), accepted cards.
 - [ ] Build the standalone partner web for its host (`Scripts/build-partner.ps1`) and publish it with the API.
 - [ ] A real owner account (role Provider) per pilot station, or the owner's staff as workers, so they can log in. Note: one web session per account — a second login logs the first one out.
+- [x] Worker permissions (Oct 10): the owner ticks what each worker sees / does; `Scripts/Worker_Privileges.sql` applied to dev.
 
 ## 3c. Team test on dev before go-live (the gate)
 

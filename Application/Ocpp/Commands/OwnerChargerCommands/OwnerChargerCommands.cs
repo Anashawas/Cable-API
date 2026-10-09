@@ -137,7 +137,7 @@ public class GetMyStationSessionsRequestHandler(IApplicationDbContext db, ICurre
 {
     public async Task<PagedResult<OwnerSessionDto>> Handle(GetMyStationSessionsRequest request, CancellationToken cancellationToken)
     {
-        await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken);
+        await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken, requiredPrivilege: Cable.Core.Constants.WorkerPrivileges.ConnectView);
         var now = DateTime.UtcNow;
 
         var q = db.OcppTransactions.AsNoTracking()
@@ -169,7 +169,7 @@ public class GetMyChargerCommandsRequestHandler(IApplicationDbContext db, ICurre
 {
     public async Task<List<OcppCommandDto>> Handle(GetMyChargerCommandsRequest request, CancellationToken cancellationToken)
     {
-        await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken);
+        await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken, requiredPrivilege: Cable.Core.Constants.WorkerPrivileges.ConnectView);
         var belongs = await db.OcppChargePoints.AsNoTracking()
             .AnyAsync(c => c.Id == request.OcppChargePointId && c.ChargingPointId == request.ChargingPointId && !c.IsDeleted, cancellationToken);
         if (!belongs) throw new NotFoundException("cannot find charger " + request.OcppChargePointId + " at this station");

@@ -13,7 +13,7 @@ public class GetOcppAuthorizedTagsRequestHandler(IApplicationDbContext db, ICurr
     public async Task<List<OcppAuthorizedTagDto>> Handle(GetOcppAuthorizedTagsRequest request, CancellationToken cancellationToken)
     {
         await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser,
-            ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken);
+            ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken, requiredPrivilege: Cable.Core.Constants.WorkerPrivileges.ConnectView);
 
         var query = db.OcppAuthorizedTags.AsNoTracking()
             .Where(t => t.ChargingPointId == request.ChargingPointId && !t.IsDeleted);

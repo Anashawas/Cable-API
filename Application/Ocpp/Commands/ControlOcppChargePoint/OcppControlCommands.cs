@@ -44,7 +44,7 @@ internal static class OcppCommandRunner
                 throw new ForbiddenAccessException("Only session start / stop may bypass the admin guard.");
         }
         else if (ownerStationId is int stationId)
-            await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, stationId, cancellationToken);
+            await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, stationId, cancellationToken, requiredPrivilege: Cable.Core.Constants.WorkerPrivileges.ConnectControl);
         else
             await AdminRoleGuard.EnsureAdminAsync(db, currentUser, cancellationToken);
 

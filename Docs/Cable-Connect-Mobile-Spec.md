@@ -201,6 +201,17 @@ The partner web shows it under a busy plug: power now (big, animated), energy so
 
 `PUT /api/notification-token` with `appType: 2` (partner) after login and on every token refresh. Without it the owner gets inbox entries only and no push for: charger offline > 15 min, plug faulted (immediately and after 15 min), session open > 6 h, car parked after charging (20 min after the driver was told, or immediately when no driver is known), and "back online / fault cleared". The minutes are per station (admin-configurable).
 
+### 2.6b Worker permissions (owner decides what a worker sees)
+
+`GET /api/provider/my-assets` now returns `access[]`, one entry per asset for the caller:
+```json
+"access": [{ "providerType": "ChargingPoint", "providerId": 210, "isOwner": false,
+             "privileges": ["ConnectView", "PointOfSale", "ViewFeedback"] }]
+```
+Owners get every key. Use it to hide screens and buttons for a worker. Keys: `ConnectView` (Cable Connect read), `ConnectControl` (start / stop / unlock / service / restart, cards, sharing switch, names), `PointOfSale` (QR / transactions), `ManageOffers`, `SendAnnouncements`, `ViewWallet`, `ViewFeedback`, `ViewStatistics`, `ManageStation` (edit requests). Station details and the workers screen rule stay as they are: details always visible, workers owner-only. The API itself refuses `ConnectView` / `ConnectControl` / `PointOfSale` calls from a worker without the key (403 with a message), so the UI gate is never the only one.
+
+Owner side: `GET /api/workers?providerType=&providerId=` now includes `privileges[]` and `usesAllPrivileges`; `PUT /api/workers/{providerManagerId}/privileges` `{ "privileges": ["ConnectView", …] }` (empty list = station details only; all keys = everything, including keys added later). `GET /api/workers/privileges` lists the keys. The partner web shows this as a checkbox list on the worker card.
+
 ### 2.7 Not in the partner app (admin only)
 
 Registering a charger, the connection sheet, reading / changing charger settings, the raw message log, alert thresholds, blocking a station's live data.

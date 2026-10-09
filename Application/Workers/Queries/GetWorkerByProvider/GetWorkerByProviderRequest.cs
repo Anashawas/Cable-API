@@ -11,9 +11,15 @@ public record WorkerDto(
     string?   Phone,
     string?   Email,
     bool      IsActive,
-    DateTime? AssignedAt
+    DateTime? AssignedAt,
+    /// <summary>Stored value (null = everything). Not for the UI — see Privileges / UsesAllPrivileges.</summary>
+    string?   StoredPrivileges = null
 )
 {
+    /// <summary>What the worker may do, resolved (null stored = all).</summary>
+    public IReadOnlyList<string> Privileges => StoredPrivileges is null ? Cable.Core.Constants.WorkerPrivileges.All : Cable.Core.Constants.WorkerPrivileges.Parse(StoredPrivileges);
+    public bool UsesAllPrivileges => StoredPrivileges is null;
+
     // Returned in dial-ready E.164 (+962...) so tel: links work on the clients.
     // Storage is unchanged (962... in the DB).
     public string? Phone { get; init; } = PhoneNumberUtility.ToE164OrOriginal(Phone);
@@ -43,7 +49,8 @@ public class GetWorkerByProviderQueryHandler(
                 pm.User.Phone,
                 pm.User.Email,
                 pm.IsActive,
-                pm.CreatedAt))
+                pm.CreatedAt,
+                pm.Privileges))
             .FirstOrDefaultAsync(cancellationToken);
     }
 }

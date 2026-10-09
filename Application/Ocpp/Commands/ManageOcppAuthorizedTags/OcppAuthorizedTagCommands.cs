@@ -58,7 +58,7 @@ internal static class OcppAuthorizedTagLookup
                   ?? throw new NotFoundException($"cannot find OCPP authorized tag with id: {id}");
 
         await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser,
-            ProviderAccessGuard.ChargingPoint, tag.ChargingPointId, ct);
+            ProviderAccessGuard.ChargingPoint, tag.ChargingPointId, ct, requiredPrivilege: Cable.Core.Constants.WorkerPrivileges.ConnectControl);
         return tag;
     }
 }

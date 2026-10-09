@@ -134,7 +134,7 @@ public class GetMySessionLiveRequestHandler(IApplicationDbContext db, ICurrentUs
 {
     public async Task<SessionLiveDto> Handle(GetMySessionLiveRequest request, CancellationToken cancellationToken)
     {
-        await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken);
+        await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken, requiredPrivilege: Cable.Core.Constants.WorkerPrivileges.ConnectView);
         return await SessionLiveBuilder.BuildAsync(db, request.TransactionId, request.ChargingPointId, cancellationToken);
     }
 }

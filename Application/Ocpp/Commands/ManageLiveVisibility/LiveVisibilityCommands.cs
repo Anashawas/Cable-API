@@ -22,7 +22,7 @@ public class SetShareLiveStatusCommandHandler(IApplicationDbContext db, ICurrent
 {
     public async Task<OcppLiveVisibilityDto> Handle(SetShareLiveStatusCommand request, CancellationToken cancellationToken)
     {
-        await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken);
+        await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken, requiredPrivilege: Cable.Core.Constants.WorkerPrivileges.ConnectControl);
 
         var cp = await db.ChargingPoints.FirstOrDefaultAsync(c => c.Id == request.ChargingPointId && !c.IsDeleted, cancellationToken)
                  ?? throw new NotFoundException("cannot find charging point with id: " + request.ChargingPointId);
@@ -76,7 +76,7 @@ public class GetLiveVisibilityRequestHandler(IApplicationDbContext db, ICurrentU
 {
     public async Task<OcppLiveVisibilityDto> Handle(GetLiveVisibilityRequest request, CancellationToken cancellationToken)
     {
-        await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken);
+        await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken, requiredPrivilege: Cable.Core.Constants.WorkerPrivileges.ConnectView);
         var exists = await db.ChargingPoints.AsNoTracking().AnyAsync(c => c.Id == request.ChargingPointId && !c.IsDeleted, cancellationToken);
         if (!exists) throw new NotFoundException("cannot find charging point with id: " + request.ChargingPointId);
         return await OcppLiveVisibility.GetAsync(db, request.ChargingPointId, cancellationToken);

@@ -46,7 +46,7 @@ public class InitiatePartnerTransactionCommandHandler(
         // the caller must be checked against it rather than merely signed in.
         await ProviderAccessGuard.EnsureCanActForProviderAsync(
             applicationDbContext, currentUserService, agreement.ProviderType, agreement.ProviderId,
-            cancellationToken);
+            cancellationToken, requiredPrivilege: Cable.Core.Constants.WorkerPrivileges.PointOfSale);
 
         // Check minimum transaction amount
         if (agreement.MinimumTransactionAmount.HasValue && request.TransactionAmount < agreement.MinimumTransactionAmount.Value)

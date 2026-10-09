@@ -25,6 +25,8 @@ public class ProviderManagerConfiguration : IEntityTypeConfiguration<ProviderMan
             .IsRequired()
             .HasDefaultValue(true);
 
+        builder.Property(e => e.Privileges).HasMaxLength(500);
+
         builder.Property(e => e.IsDeleted)
             .IsRequired()
             .HasDefaultValue(false);

@@ -46,6 +46,7 @@
 | P11 | Accepted cards: list, add (number + label), switch a card off / on; chargers updated within seconds | Owner, manager | ✅ | |
 | P11b | **Live session panel** under a busy plug: power now (animated), energy so far, battery bar, elapsed clock, **cost so far** at the current rate, power / battery curve; refresh every 5 s while active | Owner, manager | ✅ | |
 | P11c | Today tiles: sessions, kWh, revenue; a session row opens its detail with the curve and price breakdown | Owner, manager | ✅ | |
+| P11d | **Worker permissions**: on the worker card the owner ticks what the worker may see / do (Cable Connect view, Cable Connect control, QR / point of sale, offers, messages, wallet, reviews, statistics, station edits). Hidden in the portal and refused by the API for Cable Connect and point of sale | Owner | ✅ Oct 10 | |
 | P12 | Register a charger from the portal (today admin only) | Owner | 💡 | |
 | P13 | Hard reset, read / change charger settings, raw log (kept admin-only on purpose) | — | ✗ not offered | |
 | P14 | Export sessions to Excel / CSV | Owner | 💡 | |
@@ -63,6 +64,7 @@
 | M6 | Accepted cards (P11) | 📱 | |
 | M7 | Charger name (P2) | 📱 | |
 | M8 | **Register the push token with the partner app type** — required for every alert push | 📱 required | |
+| M10 | Respect the worker permissions from `my-assets.access[]`; owner: permissions editor on the worker screen | 📱 | |
 | M9 | Pushes received: charger offline / back online, plug faulted / cleared, session too long, car parked after charging | ✅ backend | |
 
 Endpoints and payloads: `Docs/Cable-Connect-Mobile-Spec.md` §2.

@@ -27,12 +27,17 @@ public static class ProviderAccessGuard
     public const string ServiceProvider = "ServiceProvider";
     public const string ChargingPoint = "ChargingPoint";
 
+    /// <param name="requiredPrivilege">
+    /// A WorkerPrivileges key. Owners and admins always pass; a worker passes only when the owner
+    /// granted that privilege (null stored = everything). Null here = any active worker.
+    /// </param>
     public static async Task EnsureCanActForProviderAsync(
         IApplicationDbContext db,
         ICurrentUserService currentUser,
         string providerType,
         int providerId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? requiredPrivilege = null)
     {
         var callerUserId = currentUser.UserId
                            ?? throw new NotAuthorizedAccessException("User not authenticated");
@@ -56,17 +61,22 @@ public static class ProviderAccessGuard
         if (ownerId == callerUserId)
             return;
 
-        var isWorker = await db.ProviderManagers
+        var worker = await db.ProviderManagers
             .AsNoTracking()
-            .AnyAsync(x => x.ProviderType == providerType
-                           && x.ProviderId == providerId
-                           && x.UserId == callerUserId
-                           && x.IsActive
-                           && !x.IsDeleted,
-                cancellationToken);
+            .Where(x => x.ProviderType == providerType
+                        && x.ProviderId == providerId
+                        && x.UserId == callerUserId
+                        && x.IsActive
+                        && !x.IsDeleted)
+            .Select(x => new { x.Privileges })
+            .FirstOrDefaultAsync(cancellationToken);
 
-        if (isWorker)
-            return;
+        if (worker is not null)
+        {
+            if (requiredPrivilege is null || Cable.Core.Constants.WorkerPrivileges.Has(worker.Privileges, requiredPrivilege))
+                return;
+            throw new ForbiddenAccessException("Your account does not have this permission. Ask the station owner.");
+        }
 
         if (await AdminRoleGuard.IsAdminAsync(db, currentUser, cancellationToken))
             return;

@@ -27,5 +27,8 @@ public class ProviderManager : BaseAuditableEntity
     /// <summary>Owner can pause/resume the worker without removing the record.</summary>
     public bool   IsActive     { get; set; } = true;
 
+    /// <summary>Comma-separated WorkerPrivileges keys the owner granted; null = everything, "" = station details only.</summary>
+    public string? Privileges  { get; set; }
+
     public virtual UserAccount User { get; set; } = null!;
 }

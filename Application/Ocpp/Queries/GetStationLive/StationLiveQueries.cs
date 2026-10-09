@@ -234,7 +234,7 @@ public class GetMyStationLiveRequestHandler(IApplicationDbContext db, ICurrentUs
 {
     public async Task<StationLiveDto> Handle(GetMyStationLiveRequest request, CancellationToken cancellationToken)
     {
-        await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken);
+        await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken, requiredPrivilege: Cable.Core.Constants.WorkerPrivileges.ConnectView);
         return await StationLiveBuilder.BuildAsync(db, request.ChargingPointId, enforceGates: false, cancellationToken);
     }
 }
@@ -254,7 +254,7 @@ public class SetChargerDisplayNameCommandHandler(IApplicationDbContext db, ICurr
 {
     public async Task Handle(SetChargerDisplayNameCommand request, CancellationToken cancellationToken)
     {
-        await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken);
+        await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken, requiredPrivilege: Cable.Core.Constants.WorkerPrivileges.ConnectControl);
         var cp = await db.OcppChargePoints.FirstOrDefaultAsync(c => c.Id == request.OcppChargePointId && c.ChargingPointId == request.ChargingPointId && !c.IsDeleted, cancellationToken)
                  ?? throw new NotFoundException("cannot find charger " + request.OcppChargePointId + " at this station");
         cp.DisplayName = string.IsNullOrWhiteSpace(request.DisplayName) ? null : request.DisplayName.Trim();

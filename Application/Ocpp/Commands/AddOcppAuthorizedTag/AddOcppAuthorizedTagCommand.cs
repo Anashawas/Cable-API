@@ -38,7 +38,7 @@ public class AddOcppAuthorizedTagCommandHandler(IApplicationDbContext db, ICurre
     public async Task<int> Handle(AddOcppAuthorizedTagCommand request, CancellationToken cancellationToken)
     {
         await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser,
-            ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken);
+            ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken, requiredPrivilege: Cable.Core.Constants.WorkerPrivileges.ConnectControl);
 
         var tag = OcppCredentials.NormalizeIdTag(request.IdTag);
         var expiresAt = JordanTime.ToUtc(request.ExpiresAt);

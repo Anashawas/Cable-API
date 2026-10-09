@@ -86,6 +86,6 @@ public class GetProviderAssetsByUserIdRequestHandler(
             partnerSet.Contains(x.Id)
         )).ToList();
 
-        return new ProviderAssetsDto(chargingPoints, serviceProviderDtos);
+        return new ProviderAssetsDto(chargingPoints, serviceProviderDtos, []);   // admin view: no caller access list
     }
 }

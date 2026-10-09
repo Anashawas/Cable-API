@@ -42,7 +42,7 @@ public class InitiateOfferTransactionCommandHandler(
         // it — otherwise any signed-in account could mint a code for anyone.
         await ProviderAccessGuard.EnsureCanActForProviderAsync(
             applicationDbContext, currentUserService, offer.ProviderType, offer.ProviderId,
-            cancellationToken);
+            cancellationToken, requiredPrivilege: Cable.Core.Constants.WorkerPrivileges.PointOfSale);
 
         // Check if provider is blocked from loyalty
         if (offer.ProviderType == "ChargingPoint")

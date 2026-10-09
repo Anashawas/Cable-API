@@ -8,9 +8,13 @@ namespace Application.Providers.Queries.GetMyProviderAssets;
 
 public record GetMyProviderAssetsRequest() : IRequest<ProviderAssetsDto>;
 
+/// <summary>How the caller may act on one asset: owner (everything) or worker with the owner's privilege list.</summary>
+public record ProviderAccessDto(string ProviderType, int ProviderId, bool IsOwner, IReadOnlyList<string> Privileges);
+
 public record ProviderAssetsDto(
     List<GetAllChargingPointsDto> ChargingPoints,
-    List<ServiceProviderDto> ServiceProviders
+    List<ServiceProviderDto> ServiceProviders,
+    List<ProviderAccessDto> Access
 );
 
 public class GetMyProviderAssetsRequestHandler(
@@ -107,6 +111,27 @@ public class GetMyProviderAssetsRequestHandler(
             spFavCounts.GetValueOrDefault(x.Id, 0)
         )).ToList();
 
-        return new ProviderAssetsDto(chargingPoints, serviceProviderDtos);
+        // What the caller may do on each asset: owners everything, workers what the owner granted.
+        var workerRows = await applicationDbContext.ProviderManagers.AsNoTracking()
+            .Where(pm => pm.UserId == userId && pm.IsActive && !pm.IsDeleted)
+            .Select(pm => new { pm.ProviderType, pm.ProviderId, pm.Privileges })
+            .ToListAsync(cancellationToken);
+        var ownedCps = await applicationDbContext.ChargingPoints.AsNoTracking()
+            .Where(c => c.OwnerId == userId && !c.IsDeleted).Select(c => c.Id).ToListAsync(cancellationToken);
+        var access = new List<ProviderAccessDto>();
+        foreach (var cp in chargingPoints)
+        {
+            var w = workerRows.FirstOrDefault(r => r.ProviderType == "ChargingPoint" && r.ProviderId == cp.Id);
+            var owner = ownedCps.Contains(cp.Id);
+            access.Add(new ProviderAccessDto("ChargingPoint", cp.Id, owner, owner || w is null ? Cable.Core.Constants.WorkerPrivileges.All : Cable.Core.Constants.WorkerPrivileges.Parse(w.Privileges)));
+        }
+        foreach (var sp in serviceProviders)
+        {
+            var w = workerRows.FirstOrDefault(r => r.ProviderType == "ServiceProvider" && r.ProviderId == sp.Id);
+            var owner = sp.OwnerId == userId;
+            access.Add(new ProviderAccessDto("ServiceProvider", sp.Id, owner, owner || w is null ? Cable.Core.Constants.WorkerPrivileges.All : Cable.Core.Constants.WorkerPrivileges.Parse(w.Privileges)));
+        }
+
+        return new ProviderAssetsDto(chargingPoints, serviceProviderDtos, access);
     }
 }

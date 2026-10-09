@@ -1,6 +1,8 @@
 using Application.Workers.Commands.CreateWorker;
 using Application.Workers.Commands.DeleteWorker;
 using Application.Workers.Commands.SetWorkerActive;
+using Application.Workers.Commands.SetWorkerPrivileges;
+using Cable.Core.Constants;
 using Application.Workers.Queries.GetWorkerByProvider;
 using Cable.WebApi.OpenAPI;
 using MediatR;
@@ -10,6 +12,8 @@ namespace Cable.Routes;
 
 public static class WorkerRoutes
 {
+    public record WorkerPrivilegesRequest(List<string> Privileges);
+
     public static IEndpointRouteBuilder MapWorkerRoutes(this IEndpointRouteBuilder app)
     {
         app.MapGroup("/api/workers")
@@ -89,6 +93,30 @@ public static class WorkerRoutes
                 op.Parameters[1].Description = "true = activate, false = deactivate";
                 return op;
             });
+
+        // Owner chooses what the worker may see / do.
+        app.MapPut("/{providerManagerId:int}/privileges", async (
+                IMediator mediator,
+                [FromRoute] int providerManagerId,
+                WorkerPrivilegesRequest body,
+                CancellationToken cancellationToken) =>
+                Results.Ok(await mediator.Send(new SetWorkerPrivilegesCommand(providerManagerId, body.Privileges ?? []), cancellationToken)))
+            .Produces<WorkerDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Set Worker Privileges")
+            .WithSummary("Owner: what the worker may see and do in the partner app. Keys: " + string.Join(", ", WorkerPrivileges.All) + ". Empty list = station details only; all keys = everything (including privileges added later).")
+            .WithOpenApi();
+
+        app.MapGet("/privileges", () => Results.Ok(WorkerPrivileges.All))
+            .Produces<string[]>()
+            .WithName("List Worker Privileges")
+            .WithSummary("The privilege keys an owner can grant a worker.")
+            .WithOpenApi();
 
         // Owner deletes the worker (frees the provider for a new one).
         app.MapDelete("/{providerManagerId:int}", async (
