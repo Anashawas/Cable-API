@@ -157,7 +157,9 @@ if (plug || replay)
 
 if (remoteWaitSeconds > 0)
 {
-    Console.WriteLine($"[{Now()}] waiting up to {remoteWaitSeconds} s for a RemoteStartTransaction (--remote)");
+    // A car is plugged in on connector 1 while we wait (Preparing): the apps only offer "Start" on such a plug.
+    await Call("StatusNotification", new { connectorId = 1, status = "Preparing", errorCode = "NoError", info = "Connector 1 is in use", timestamp = DateTime.UtcNow });
+    Console.WriteLine($"[{Now()}] connector 1 is Preparing (car connected); waiting up to {remoteWaitSeconds} s for a RemoteStartTransaction (--remote)");
     var waitUntil = DateTime.UtcNow.AddSeconds(remoteWaitSeconds);
     while (DateTime.UtcNow < waitUntil && remoteStartTag is null && ws.State == WebSocketState.Open)
         await Task.Delay(500);
@@ -195,7 +197,11 @@ if (remoteWaitSeconds > 0)
         Console.WriteLine($"[{Now()}] remote session ended, energy {(i * 500) / 1000m:0.000} kWh");
         currentTransactionId = 0; remoteStopRequested = false; remoteStartTag = null;
     }
-    else Console.WriteLine($"[{Now()}] no RemoteStartTransaction arrived");
+    else
+    {
+        Console.WriteLine($"[{Now()}] no RemoteStartTransaction arrived — unplugging");
+        await Call("StatusNotification", new { connectorId = 1, status = "Available", errorCode = "NoError", timestamp = DateTime.UtcNow });
+    }
 }
 
 if (idleMinutes > 0)
