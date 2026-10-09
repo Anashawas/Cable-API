@@ -310,7 +310,7 @@ because RH4 has a separate port field that still says 4435 (SafeerSoft); the tec
 to 443 or the unit silently never connects. Charge Point ID is limited to 20 characters (OCPP
 CiString20) and "require password" is off by default (Security Profile 0 units cannot send one).
 
-**Owner maintenance (Oct 9).** Partner-app endpoints under `/api/provider/charging-points/{id}`:
+**Owner maintenance (Oct 8).** Partner-app endpoints under `/api/provider/charging-points/{id}`:
 `chargers/{ocppId}/commands/{reset | unlock-connector | change-availability | remote-stop |
 trigger-message}` (same bodies as the admin ones), `chargers/{ocppId}/commands` (history),
 `sessions?chargerId=&from=&to=&page=` (newest first, rejected / orphan rows excluded). The guard is
@@ -319,7 +319,7 @@ owner-or-active-manager of that station and the charger must belong to it; every
 shared `OcppCommandRunner`. Reliability windows now start at the charger's first CONNECT when
 that is later than 30 days ago, so a new unit is not scored for weeks it was not with us.
 
-**Reliability score, N-6 (Oct 9).** `ComputeOcppReliabilityAsync` (daily 03:30 UTC, or `POST
+**Reliability score, N-6 (Oct 8).** `ComputeOcppReliabilityAsync` (daily 03:30 UTC, or `POST
 /api/admin/ocpp/reliability/recompute`) walks the last 30 days of the raw log per charger in
 one-minute buckets: online from CONNECT / DISCONNECT rows (state before the window from the last
 row before it), faulted from StatusNotification frames (Faulted until the next status of that
@@ -409,7 +409,7 @@ All of them pull from the same queues and all run the recurring-job scheduler. C
 - Production has only the production API, so this does not apply there — as long as nobody
   points a local run at the production database.
 
-## 9e. Price alerts (not OCPP — PRICE_ALERTS_BE_SPEC, Oct 9)
+## 9e. Price alerts (not OCPP — PRICE_ALERTS_BE_SPEC, Oct 8)
 
 Tariff source of truth: `TouTariff` (one active row, `Version` bumps on edit) + `TouTariffWindow`
 (stable `Key`, minutes from midnight Asia/Amman, `EndMin` > 1440 crosses midnight, `PriceFils`,

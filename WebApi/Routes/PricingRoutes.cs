@@ -10,6 +10,7 @@ public static class PricingRoutes
 {
     public record PriceAlertPrefsRequest(bool Enabled, int LeadMinutes, List<string> Windows);
     public record UpdateTouTariffRequest(List<TouWindowDto> Windows, DateTime? EffectiveFrom, string? Note);
+    public record QuietHoursRequest(string QuietFrom, string QuietTo);
 
     public static IEndpointRouteBuilder MapPricingRoutes(this IEndpointRouteBuilder app)
     {
@@ -45,6 +46,20 @@ public static class PricingRoutes
             .Produces<TouTariffDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesValidationProblem().ProducesInternalServerError()
             .WithName("Update time-of-use tariff")
             .WithSummary("Admin: replace the tariff windows (must cover exactly 24 h, unique keys, prices in fils). Creates a new version; the previous one is kept inactive. Keep the keys stable — user preferences point at them.")
+            .WithOpenApi();
+
+        admin.MapGet("/price-alerts/overview", async (IMediator mediator, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetPriceAlertAdminOverviewRequest(), ct)))
+            .Produces<PriceAlertAdminOverviewDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesInternalServerError()
+            .WithName("Price alerts admin overview")
+            .WithSummary("Admin page data: active tariff + version history, quiet hours, enabled users, subscribers per window and lead, sends of the last 14 days.")
+            .WithOpenApi();
+
+        admin.MapPut("/price-alerts/quiet-hours", async (IMediator mediator, QuietHoursRequest body, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new SetPriceAlertQuietHoursCommand(body.QuietFrom, body.QuietTo), ct)))
+            .Produces<PriceAlertAdminOverviewDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("Set price alert quiet hours")
+            .WithSummary("Admin: the span (HH:mm, Asia/Amman, may cross midnight) in which an alert is cancelled rather than sent.")
             .WithOpenApi();
 
         admin.MapGet("/price-alerts/preview", async (IMediator mediator, [FromQuery] DateTime? at, [FromQuery] int? lookBackMinutes, CancellationToken ct) =>

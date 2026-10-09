@@ -287,3 +287,78 @@ public class PreviewPriceAlertsRequestHandler(IApplicationDbContext db, ICurrent
         return result;
     }
 }
+
+// ---------------------------------------------------------------------------
+// Admin page: overview (tariff, quiet hours, subscribers, recent sends) + quiet hours edit
+// ---------------------------------------------------------------------------
+
+public record PriceAlertSubscriberCountDto(string WindowKey, int LeadMinutes, int Users);
+public record PriceAlertSentDto(string WindowKey, DateOnly AlertDate, int LeadMinutes, int Users, DateTime SentAt);
+public record TouTariffVersionDto(int Version, DateTime EffectiveFrom, bool IsActive, string? Note, DateTime CreatedAt);
+public record PriceAlertAdminOverviewDto(
+    TouTariffDto? Tariff,
+    List<TouTariffVersionDto> Versions,
+    string QuietFrom,
+    string QuietTo,
+    int EnabledUsers,
+    List<PriceAlertSubscriberCountDto> Subscribers,
+    List<PriceAlertSentDto> RecentSends);
+
+public record GetPriceAlertAdminOverviewRequest : IRequest<PriceAlertAdminOverviewDto>;
+
+public class GetPriceAlertAdminOverviewRequestHandler(IApplicationDbContext db, ICurrentUserService currentUser) : IRequestHandler<GetPriceAlertAdminOverviewRequest, PriceAlertAdminOverviewDto>
+{
+    public async Task<PriceAlertAdminOverviewDto> Handle(GetPriceAlertAdminOverviewRequest request, CancellationToken cancellationToken)
+    {
+        await AdminRoleGuard.EnsureAdminAsync(db, currentUser, cancellationToken);
+        var tariff = await TouTariffLoader.LoadAsync(db, cancellationToken);
+        var versions = await db.TouTariffs.AsNoTracking().Where(t => !t.IsDeleted).OrderByDescending(t => t.Version)
+            .Select(t => new TouTariffVersionDto(t.Version, t.EffectiveFrom, t.IsActive, t.Note, t.CreatedAt)).Take(20).ToListAsync(cancellationToken);
+        var quiet = await PriceAlertQuietHours.GetAsync(db, cancellationToken);
+
+        var prefs = await db.UserPriceAlerts.AsNoTracking().Where(p => p.IsEnabled).Select(p => new { p.LeadMinutes, p.Windows }).ToListAsync(cancellationToken);
+        var subscribers = prefs
+            .SelectMany(p => PriceAlertWindows.Parse(p.Windows).Select(k => (k, p.LeadMinutes)))
+            .GroupBy(x => x)
+            .Select(g => new PriceAlertSubscriberCountDto(g.Key.k, g.Key.LeadMinutes, g.Count()))
+            .OrderBy(x => x.WindowKey).ThenBy(x => x.LeadMinutes).ToList();
+
+        var since = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-14);
+        // Grouped in memory: the log is small (one row per user per alert) and EF cannot translate a DateOnly group key into a record.
+        var logRows = await db.PriceAlertLogs.AsNoTracking().Where(l => l.AlertDate >= since)
+            .Select(l => new { l.WindowKey, l.AlertDate, l.LeadMinutes, l.SentAt }).ToListAsync(cancellationToken);
+        var sends = logRows
+            .GroupBy(l => (l.WindowKey, l.AlertDate, l.LeadMinutes))
+            .Select(g => new PriceAlertSentDto(g.Key.WindowKey, g.Key.AlertDate, g.Key.LeadMinutes, g.Count(), g.Max(l => l.SentAt)))
+            .OrderByDescending(x => x.AlertDate).ThenByDescending(x => x.SentAt).Take(50).ToList();
+
+        return new PriceAlertAdminOverviewDto(tariff, versions, quiet.From.ToString("HH:mm"), quiet.To.ToString("HH:mm"), prefs.Count, subscribers, sends);
+    }
+}
+
+public record SetPriceAlertQuietHoursCommand(string QuietFrom, string QuietTo) : IRequest<PriceAlertAdminOverviewDto>;
+
+public class SetPriceAlertQuietHoursCommandValidator : AbstractValidator<SetPriceAlertQuietHoursCommand>
+{
+    public SetPriceAlertQuietHoursCommandValidator()
+    {
+        RuleFor(x => x.QuietFrom).Must(v => TimeOnly.TryParseExact(v, "HH:mm", out _)).WithMessage("QuietFrom must be HH:mm");
+        RuleFor(x => x.QuietTo).Must(v => TimeOnly.TryParseExact(v, "HH:mm", out _)).WithMessage("QuietTo must be HH:mm");
+    }
+}
+
+public class SetPriceAlertQuietHoursCommandHandler(IApplicationDbContext db, ICurrentUserService currentUser) : IRequestHandler<SetPriceAlertQuietHoursCommand, PriceAlertAdminOverviewDto>
+{
+    public async Task<PriceAlertAdminOverviewDto> Handle(SetPriceAlertQuietHoursCommand request, CancellationToken cancellationToken)
+    {
+        await AdminRoleGuard.EnsureAdminAsync(db, currentUser, cancellationToken);
+        foreach (var (key, value) in new[] { (PriceAlertQuietHours.FromKey, request.QuietFrom), (PriceAlertQuietHours.ToKey, request.QuietTo) })
+        {
+            var row = await db.AppSettings.FirstOrDefaultAsync(s => s.Key == key && !s.IsDeleted, cancellationToken);
+            if (row is null) db.AppSettings.Add(new AppSetting { Key = key, Value = value });
+            else row.Value = value;
+        }
+        await db.SaveChanges(cancellationToken);
+        return await new GetPriceAlertAdminOverviewRequestHandler(db, currentUser).Handle(new GetPriceAlertAdminOverviewRequest(), cancellationToken);
+    }
+}
