@@ -59,6 +59,10 @@ public class OwnerChargerCommandHandler(IApplicationDbContext db, ICurrentUserSe
 {
     public async Task<OcppCommandResultDto> Handle(OwnerChargerCommand request, CancellationToken cancellationToken)
     {
+        // Access first, so a worker without the control privilege gets a clear 403 before any pre-flight detail.
+        await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken,
+            requiredPrivilege: WorkerPrivileges.ConnectControl);
+
         var payload = new Dictionary<string, object>();
         switch (request.Action)
         {
