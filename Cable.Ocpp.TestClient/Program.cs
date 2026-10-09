@@ -38,7 +38,11 @@ var replay = args.Contains("--replay");
 var fault = args.Contains("--fault");
 var chargeSeconds = int.Parse(Arg("--charge-seconds") ?? "0");
 var currentTransactionId = 0;        // the open session, for RemoteStopTransaction
-(string Tag, int Connector)? remoteStartTag = null;   // set by RemoteStartTransaction; --remote waits for it and runs the session
+(string Tag, int Connector)? remoteStartTag = null;
+var demoStart = new System.Collections.Concurrent.ConcurrentDictionary<int, string>();   // demo mode: plug → tag of the accepted RemoteStart
+var demoTx = new System.Collections.Concurrent.ConcurrentDictionary<int, int>();         // demo mode: plug → open transactionId
+var demoStop = new System.Collections.Concurrent.ConcurrentDictionary<int, bool>();      // demo mode: plug → RemoteStop received
+var sendLock = new SemaphoreSlim(1, 1);   // set by RemoteStartTransaction; --remote waits for it and runs the session
 var remoteWaitSeconds = int.Parse(Arg("--remote") ?? "0");   // wait this long for a RemoteStartTransaction, then run the session with its tag
 var remoteStopRequested = false;     // set by the handler; the charge hold loop ends and Stop goes out with reason Remote   // keep the plug in Charging this long before StopTransaction (UI tests)
 
@@ -157,36 +161,47 @@ if (plug || replay)
 
 if (remoteWaitSeconds > 0)
 {
-    // Demo mode: a car is plugged in on connector 1 (Preparing) and the apps may start it; after each
-    // session the next car "arrives" and the wait continues until --remote seconds have passed.
+    // Demo mode: a car is plugged in on every demo plug (Preparing) and the apps may start each one;
+    // sessions run independently per plug, and after each one the next car "arrives" 10 s later.
     var waitUntil = DateTime.UtcNow.AddSeconds(remoteWaitSeconds);
-    long meterStart = 2_000_000;
+    var demoPlugs = (Arg("--demo-plugs") ?? "1,2").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(int.Parse).ToArray();
+    Console.WriteLine($"[{Now()}] demo mode on plugs {string.Join(",", demoPlugs)} until {waitUntil:HH:mm:ss} UTC");
+    await Task.WhenAll(demoPlugs.Select(k => RunDemoPlug(k, waitUntil)));
+    Console.WriteLine($"[{Now()}] demo window over");
+}
+
+async Task RunDemoPlug(int k, DateTime waitUntil)
+{
+    long meterStart = 1_000_000L * (k + 1);
     while (DateTime.UtcNow < waitUntil && ws.State == WebSocketState.Open)
     {
-    await Call("StatusNotification", new { connectorId = 1, status = "Preparing", errorCode = "NoError", info = "Connector 1 is in use", timestamp = DateTime.UtcNow });
-    Console.WriteLine($"[{Now()}] connector 1 is Preparing (car connected); waiting for a RemoteStartTransaction (--remote, until {waitUntil:HH:mm:ss} UTC)");
-    while (DateTime.UtcNow < waitUntil && remoteStartTag is null && ws.State == WebSocketState.Open)
-        await Task.Delay(500);
-    if (remoteStartTag is { } rs)
-    {
+        await Call("StatusNotification", new { connectorId = k, status = "Preparing", errorCode = "NoError", info = $"Connector {k} is in use", timestamp = DateTime.UtcNow });
+        Console.WriteLine($"[{Now()}] plug {k}: car connected (Preparing), waiting for a RemoteStartTransaction");
+        string? tag = null;
+        while (DateTime.UtcNow < waitUntil && ws.State == WebSocketState.Open && !demoStart.TryRemove(k, out tag))
+            await Task.Delay(500);
+        if (tag is null) break;
+
         var t0 = DateTime.UtcNow;
-        await Call("StatusNotification", new { connectorId = rs.Connector, status = "Preparing", errorCode = "NoError", timestamp = t0 });
-        await Call("Authorize", new { idTag = rs.Tag });
-        var startReply = await CallAndWait("StartTransaction", new { connectorId = rs.Connector, idTag = rs.Tag, meterStart, timestamp = t0 });
-        currentTransactionId = startReply.TryGetProperty("transactionId", out var tx) ? tx.GetInt32() : 0;
+        await Call("Authorize", new { idTag = tag });
+        var startReply = await CallAndWait("StartTransaction", new { connectorId = k, idTag = tag, meterStart, timestamp = t0 });
+        var txId = startReply.TryGetProperty("transactionId", out var tx) ? tx.GetInt32() : 0;
         var accepted = startReply.TryGetProperty("idTagInfo", out var info) && info.TryGetProperty("status", out var st) && st.GetString() == "Accepted";
-        Console.WriteLine($"[{Now()}] remote session transactionId = {currentTransactionId}, idTag {(accepted ? "Accepted" : "REJECTED")}");
-        await Call("StatusNotification", new { connectorId = rs.Connector, status = "Charging", errorCode = "NoError", timestamp = t0.AddSeconds(1) });
-        // Realistic DC curve: ~40 kW, 55 Wh per 5-second sample, battery climbing about 1 % every 90 s from 40 %.
+        demoTx[k] = txId;
+        Console.WriteLine($"[{Now()}] plug {k}: session {txId} started, idTag {(accepted ? "Accepted" : "REJECTED")}");
+        await Call("StatusNotification", new { connectorId = k, status = "Charging", errorCode = "NoError", timestamp = t0.AddSeconds(1) });
+
+        // Realistic DC curve: ~40 kW (plug 2 a little faster), 55 Wh per 5-second sample, battery from 40 % capped at 100.
         var i = 0;
+        var baseKw = k == 2 ? 48.0 : 39.6;
         var holdUntil = DateTime.UtcNow.AddSeconds(chargeSeconds > 0 ? chargeSeconds : 30);
-        while (DateTime.UtcNow < holdUntil && ws.State == WebSocketState.Open && !remoteStopRequested)
+        while (DateTime.UtcNow < holdUntil && ws.State == WebSocketState.Open && !demoStop.ContainsKey(k))
         {
             i++;
-            var kw = 39.6 + Math.Sin(i / 7.0) * 1.2;
+            var kw = baseKw + Math.Sin(i / 7.0) * 1.2;
             await Call("MeterValues", new
             {
-                connectorId = rs.Connector, transactionId = currentTransactionId,
+                connectorId = k, transactionId = txId,
                 meterValue = new[] { new { timestamp = DateTime.UtcNow, sampledValue = new object[]
                 {
                     new { value = (meterStart + i * 55).ToString(), context = "Sample.Periodic", measurand = "Energy.Active.Import.Register", unit = "Wh" },
@@ -198,18 +213,17 @@ if (remoteWaitSeconds > 0)
             });
             await Task.Delay(TimeSpan.FromSeconds(5));
         }
+        var remote = demoStop.TryRemove(k, out _);
         var meterStop = meterStart + i * 55;
-        await Call("StatusNotification", new { connectorId = rs.Connector, status = "Finishing", errorCode = "NoError", timestamp = DateTime.UtcNow });
-        await Call("StopTransaction", new { transactionId = currentTransactionId, idTag = rs.Tag, meterStop, timestamp = DateTime.UtcNow, reason = remoteStopRequested ? "Remote" : "Local" });
-        await Call("StatusNotification", new { connectorId = rs.Connector, status = "Available", errorCode = "NoError", timestamp = DateTime.UtcNow });
-        Console.WriteLine($"[{Now()}] remote session ended, energy {(i * 55) / 1000m:0.000} kWh — next car arrives in 10 s");
-        currentTransactionId = 0; remoteStopRequested = false; remoteStartTag = null;
+        await Call("StatusNotification", new { connectorId = k, status = "Finishing", errorCode = "NoError", timestamp = DateTime.UtcNow });
+        await Call("StopTransaction", new { transactionId = txId, idTag = tag, meterStop, timestamp = DateTime.UtcNow, reason = remote ? "Remote" : "Local" });
+        await Call("StatusNotification", new { connectorId = k, status = "Available", errorCode = "NoError", timestamp = DateTime.UtcNow });
+        demoTx.TryRemove(k, out _);
+        Console.WriteLine($"[{Now()}] plug {k}: session {txId} ended ({(remote ? "Remote" : "Local")}), {(i * 55) / 1000m:0.000} kWh — next car in 10 s");
         meterStart = meterStop;
         await Task.Delay(TimeSpan.FromSeconds(10));
     }
-    }
-    Console.WriteLine($"[{Now()}] demo window over — unplugging");
-    await Call("StatusNotification", new { connectorId = 1, status = "Available", errorCode = "NoError", timestamp = DateTime.UtcNow });
+    await Call("StatusNotification", new { connectorId = k, status = "Available", errorCode = "NoError", timestamp = DateTime.UtcNow });
 }
 
 if (idleMinutes > 0)
@@ -271,8 +285,19 @@ async Task Call(string action, object payload)
     }
     var frame = JsonSerializer.Serialize(new object[] { 2, Guid.NewGuid().ToString("N")[..12], action, payload }, json);
     RememberStatus(action, frame);
-    await ws.SendAsync(Encoding.UTF8.GetBytes(frame), WebSocketMessageType.Text, true, CancellationToken.None);
-    Console.WriteLine($"[{Now()}] >> {frame}");
+    await SendFrame(frame);
+}
+
+// ClientWebSocket allows one send at a time; the demo plugs and the reply path send concurrently.
+async Task SendFrame(string frame)
+{
+    await sendLock.WaitAsync();
+    try
+    {
+        await ws.SendAsync(Encoding.UTF8.GetBytes(frame), WebSocketMessageType.Text, true, CancellationToken.None);
+        Console.WriteLine($"[{Now()}] >> {frame}");
+    }
+    finally { sendLock.Release(); }
 }
 
 // Keeps the last status we reported per connector, so a TriggerMessage(StatusNotification) answers truthfully.
@@ -296,8 +321,7 @@ async Task<JsonElement> CallAndWait(string action, object payload)
     var tcs = new TaskCompletionSource<JsonElement>();
     pending[uid] = tcs;
     var frame = JsonSerializer.Serialize(new object[] { 2, uid, action, payload }, json);
-    await ws.SendAsync(Encoding.UTF8.GetBytes(frame), WebSocketMessageType.Text, true, CancellationToken.None);
-    Console.WriteLine($"[{Now()}] >> {frame}");
+    await SendFrame(frame);
     return await tcs.Task.WaitAsync(TimeSpan.FromSeconds(10));
 }
 
@@ -419,21 +443,32 @@ async Task OnServerCall(string uid, string action, JsonElement payload)
         {
             // A real unit authorizes the given idTag, then starts on that plug. Here: Accepted when no
             // session is open; the main loop (--remote) runs the session with that tag.
-            var ok = currentTransactionId == 0 && !remoteStartTag.HasValue;
             var startTag = payload.GetProperty("idTag").GetString() ?? "";
             var startConnector = payload.TryGetProperty("connectorId", out var rc) ? rc.GetInt32() : 1;
+            bool ok;
+            if (remoteWaitSeconds > 0)
+            {
+                ok = !demoTx.ContainsKey(startConnector) && !demoStart.ContainsKey(startConnector);
+                if (ok) demoStart[startConnector] = startTag;
+            }
+            else
+            {
+                ok = currentTransactionId == 0 && !remoteStartTag.HasValue;
+                if (ok) remoteStartTag = (startTag, startConnector);
+            }
             await Reply(uid, new { status = ok ? "Accepted" : "Rejected" });
-            if (ok) { remoteStartTag = (startTag, startConnector); Console.WriteLine($"[{Now()}] remote start accepted: tag {startTag} on connector {startConnector}"); }
-            else Console.WriteLine($"[{Now()}] remote start rejected — a session is already open");
+            Console.WriteLine(ok ? $"[{Now()}] remote start accepted: tag {startTag} on connector {startConnector}" : $"[{Now()}] remote start rejected — plug {startConnector} already has a session");
             break;
         }
         case "RemoteStopTransaction":
         {
             var requested = payload.GetProperty("transactionId").GetInt32();
-            var ok = currentTransactionId != 0 && requested == currentTransactionId;
+            var demoPlug = demoTx.FirstOrDefault(x => x.Value == requested);
+            var ok = demoPlug.Value == requested && requested != 0 || (currentTransactionId != 0 && requested == currentTransactionId);
             await Reply(uid, new { status = ok ? "Accepted" : "Rejected" });
-            if (ok) remoteStopRequested = true;
-            else Console.WriteLine($"[{Now()}] RemoteStop for {requested} rejected — open session is {currentTransactionId}");
+            if (ok && demoPlug.Value == requested && requested != 0) demoStop[demoPlug.Key] = true;
+            else if (ok) remoteStopRequested = true;
+            else Console.WriteLine($"[{Now()}] RemoteStop for {requested} rejected — no such open session");
             break;
         }
         case "SendLocalList":
