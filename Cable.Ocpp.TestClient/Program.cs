@@ -262,8 +262,23 @@ async Task Call(string action, object payload)
         return;
     }
     var frame = JsonSerializer.Serialize(new object[] { 2, Guid.NewGuid().ToString("N")[..12], action, payload }, json);
+    RememberStatus(action, frame);
     await ws.SendAsync(Encoding.UTF8.GetBytes(frame), WebSocketMessageType.Text, true, CancellationToken.None);
     Console.WriteLine($"[{Now()}] >> {frame}");
+}
+
+// Keeps the last status we reported per connector, so a TriggerMessage(StatusNotification) answers truthfully.
+void RememberStatus(string action, string frame)
+{
+    if (action != "StatusNotification") return;
+    try
+    {
+        using var doc = JsonDocument.Parse(frame);
+        var p = doc.RootElement[3];
+        if (p.TryGetProperty("connectorId", out var c) && p.TryGetProperty("status", out var st))
+            liveStatus[c.GetInt32()] = st.GetString() ?? "Available";
+    }
+    catch (JsonException) { }
 }
 
 // Same as Call, but waits for the matching CALLRESULT and returns its payload (needed for transactionId).
@@ -318,8 +333,9 @@ async Task OnServerCall(string uid, string action, JsonElement payload)
             switch (requested)
             {
                 case "StatusNotification":
+                    // A real unit reports its CURRENT state (Charging while a session runs), not a reset one.
                     foreach (var k in connector is int one ? new[] { one } : availability.Keys.Order().ToArray())
-                        await Call("StatusNotification", new { connectorId = k, status = availability.GetValueOrDefault(k, true) ? "Available" : "Unavailable", errorCode = "NoError", timestamp = DateTime.UtcNow });
+                        await Call("StatusNotification", new { connectorId = k, status = liveStatus.GetValueOrDefault(k, availability.GetValueOrDefault(k, true) ? "Available" : "Unavailable"), errorCode = "NoError", timestamp = DateTime.UtcNow });
                     break;
                 case "Heartbeat": await Call("Heartbeat", new { }); break;
                 case "BootNotification": await Boot(); break;
@@ -466,6 +482,7 @@ partial class Program
     static readonly System.Collections.Concurrent.ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> pending = new();
 
     /// <summary>connectorId → operative. 0 is the unit itself.</summary>
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<int, string> liveStatus = new();
     static readonly System.Collections.Concurrent.ConcurrentDictionary<int, bool> availability =
         new(new[] { KeyValuePair.Create(0, true), KeyValuePair.Create(1, true), KeyValuePair.Create(2, true) });
 
