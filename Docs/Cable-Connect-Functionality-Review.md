@@ -67,7 +67,7 @@
 | M10 | Respect the worker permissions from `my-assets.access[]`; owner: permissions editor on the worker screen | 📱 | |
 | M9 | Pushes received: charger offline / back online, plug faulted / cleared, session too long, car parked after charging | ✅ backend | |
 
-Endpoints and payloads: `Docs/Cable-Connect-Mobile-Spec.md` §2.
+Endpoints, payloads and screens: `Docs/Partner-App-Cable-Connect-Spec.md`.
 
 ## 4. Driver app (Cable)
 
@@ -88,7 +88,7 @@ Endpoints and payloads: `Docs/Cable-Connect-Mobile-Spec.md` §2.
 | D13 | Loyalty points per session | 💡 decision pending | |
 | D14 | Pushes: charging started / charging complete (not only "parked") | 💡 with A18 | |
 
-Endpoints and payloads: `Docs/Cable-Connect-Mobile-Spec.md` §1.
+Endpoints, payloads and screens: `Docs/Cable-App-Cable-Connect-Spec.md`.
 
 ## 5. Rules that apply everywhere (change here first if the team disagrees)
 
