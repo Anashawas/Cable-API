@@ -9,4 +9,6 @@ This file was split per team on Oct 10, 2026. Use:
   page and map badges, start / stop from the app, the charging-now screen, history with price, price alerts, push token
   with language.
 
+- **Price alerts** (Cable app, peak-time reminders): [`Price-Alerts-Mobile-Spec.md`](Price-Alerts-Mobile-Spec.md).
+
 Functionality per app for review: [`Cable-Connect-Functionality-Review.md`](Cable-Connect-Functionality-Review.md).

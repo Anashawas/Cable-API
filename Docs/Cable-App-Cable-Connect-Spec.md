@@ -147,6 +147,8 @@ items like section 4 plus, once closed:
 
 ## 7. Price alerts
 
+> Full screen and push details: [`Price-Alerts-Mobile-Spec.md`](Price-Alerts-Mobile-Spec.md).
+
 - Tariff (anonymous, cache it, refresh on every app open; `version` increases on every change):
   `GET /api/pricing/tou` → `{ version, effectiveFrom, timezone: "Asia/Amman", currency: "JOD", unit: "fils/kWh",
   windows: [ { key, startMin, endMin, tier: "offPeak"|"partial"|"peak", priceFils, nameEn, nameAr } ] }`
