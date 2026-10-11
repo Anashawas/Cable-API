@@ -17,8 +17,8 @@ public record WorkerDto(
 )
 {
     /// <summary>What the worker may do, resolved (null stored = all).</summary>
-    public IReadOnlyList<string> Privileges => StoredPrivileges is null ? Cable.Core.Constants.WorkerPrivileges.All : Cable.Core.Constants.WorkerPrivileges.Parse(StoredPrivileges);
-    public bool UsesAllPrivileges => StoredPrivileges is null;
+    public IReadOnlyList<string> Privileges => Cable.Core.Constants.WorkerPrivileges.Parse(StoredPrivileges);
+    public bool UsesAllPrivileges => Cable.Core.Constants.WorkerPrivileges.UsesAll(StoredPrivileges);
 
     // Returned in dial-ready E.164 (+962...) so tel: links work on the clients.
     // Storage is unchanged (962... in the DB).

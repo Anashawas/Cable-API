@@ -183,7 +183,7 @@ RecurringJob.AddOrUpdate<IBackgroundJobService>(
 RecurringJob.AddOrUpdate<IBackgroundJobService>(
     "price-ocpp-sessions",
     service => service.PriceOcppSessionsAsync(CancellationToken.None),
-    "*/10 * * * *");
+    "* * * * *");   // every minute: the stop handler prices at once; this covers late stops and older OCPP server builds
 
 RecurringJob.AddOrUpdate<IBackgroundJobService>(
     "check-ocpp-alerts",

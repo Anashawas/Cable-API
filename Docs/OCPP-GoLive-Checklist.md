@@ -36,7 +36,8 @@ shown as text (`Other` → "Stopped at the charger").
 - [ ] **Production API config**: `OcppServer: { Url: "https://ocpp.cable-app.com", ApiKey: <the AWS StatusApiKey>, HttpTimeoutSeconds: 35 }` in `appsettings.Production.json` (git-ignored).
 - [ ] **Cable.Ocpp on AWS**: `appsettings.Production.json` with the production connection string + `ASPNETCORE_ENVIRONMENT=Production` in IIS; today it runs the Staging settings against the dev DB.
 - [ ] Publish API (dev first, then prod) — new Hangfire jobs `price-ocpp-sessions` (10 min) and the Phase 3 columns need the new build on **every** instance that shares the Hangfire DB (handover §9d).
-- [ ] Publish Cable.Ocpp to AWS (profile `aws-ocpp`).
+- [ ] Publish Cable.Ocpp to AWS (profile `aws-ocpp`) **and to ocpp-dev** — both must run the Phase 3 build (virtual-tag authorisation for app starts, price at stop, honest disconnect labels).
+- [ ] **Environment wiring (fixed Oct 11)**: the dev API talks to **ocpp-dev** (`WebApi/appsettings.Staging.json` → `OcppServer.Url = https://ocpp-dev.cable-app.com`); production API → AWS. Chargers and simulators used with dev must connect to `wss://ocpp-dev.cable-app.com/ocpp16/`. Pointing the dev API at AWS (as for the Oct 8 RH4 visit) makes every command fail with NotConnected for chargers on ocpp-dev while the admin still shows them Online (both servers write the same dev database).
 - [ ] Set `Ocpp:AuthorizeMode = List` on AWS (it is), confirm `/status` after publish.
 - [ ] Uptime monitor on `https://ocpp.cable-app.com/health`.
 

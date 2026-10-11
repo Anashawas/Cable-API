@@ -98,8 +98,9 @@ internal static class OcppCommandRunner
         db.OcppCommands.Add(row);
         await db.SaveChanges(cancellationToken);
 
+        // Accepted = the charger answered AND said yes. NotConnected / Timeout / CallError never count, whatever the status word.
         return new OcppCommandResultDto(row.Id, action, row.Status, row.ResultStatus, row.ResponsePayload,
-            row.ErrorCode, row.ErrorDescription, outcome.ElapsedMs, IsPositive(row.ResultStatus));
+            row.ErrorCode, row.ErrorDescription, outcome.ElapsedMs, row.Status == "Answered" && IsPositive(row.ResultStatus));
     }
 
     /// <summary>The unit's verdict: every 1.6 CALLRESULT we send carries a top-level "status".</summary>

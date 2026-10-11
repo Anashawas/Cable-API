@@ -2,8 +2,9 @@ namespace Cable.Core.Constants;
 
 /// <summary>
 /// What a worker (ProviderManager) may do in the partner app, chosen by the owner.
-/// Stored comma-separated in ProviderManager.Privileges; null = everything (the
-/// behaviour before privileges existed). The owner and admins always have all of them.
+/// Stored comma-separated in ProviderManager.Privileges. null = everything (never set — the
+/// behaviour before privileges existed); "" = nothing (the owner switched everything off).
+/// The owner and admins always have all of them.
 /// The UI hides what is missing; the API enforces the ones marked "enforced".
 /// </summary>
 public static class WorkerPrivileges
@@ -29,9 +30,9 @@ public static class WorkerPrivileges
 
     public static bool IsKnown(string key) => All.Contains(key, StringComparer.Ordinal);
 
-    /// <summary>null / empty stored value = all privileges.</summary>
+    /// <summary>null = all privileges (never restricted); "" or whitespace = none; otherwise the listed known keys.</summary>
     public static IReadOnlyList<string> Parse(string? stored) =>
-        string.IsNullOrWhiteSpace(stored)
+        stored is null
             ? All
             : stored.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(IsKnown).Distinct(StringComparer.Ordinal).ToList();
 
@@ -42,5 +43,8 @@ public static class WorkerPrivileges
         return set.Count >= All.Length ? null : string.Join(",", All.Where(set.Contains));
     }
 
-    public static bool Has(string? stored, string privilege) => string.IsNullOrWhiteSpace(stored) || Parse(stored).Contains(privilege, StringComparer.Ordinal);
+    public static bool Has(string? stored, string privilege) => Parse(stored).Contains(privilege, StringComparer.Ordinal);
+
+    /// <summary>True only when the worker was never restricted (null) or holds every key.</summary>
+    public static bool UsesAll(string? stored) => stored is null || All.All(Parse(stored).Contains);
 }

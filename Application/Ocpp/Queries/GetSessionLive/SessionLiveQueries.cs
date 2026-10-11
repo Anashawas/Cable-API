@@ -90,6 +90,19 @@ internal static class SessionLiveBuilder
         int? cost = tx.CostFils;
         List<SessionPriceLineDto>? lines = SessionPricingService.ReadLines(tx.CostBreakdownJson);
         int? rate = null; string? windowEn = null, windowAr = null;
+        if (!tx.IsOpen && cost is null && !tx.IsOrphan && !tx.WasRejected && tx.StoppedAt is DateTime stopped && tx.MeterStopWh is long stopWh && tx.EnergyKwh is not null)
+        {
+            // Closed but not priced yet (the OCPP server that received the stop does not price, or it failed):
+            // compute it now for display; the price-ocpp-sessions job stores it within a minute.
+            var tariff = await TouTariffLoader.LoadAsync(db, ct);
+            if (tariff is not null)
+            {
+                var p = SessionPricer.Compute(tariff, tx.StartedAt, stopped, tx.MeterStartWh, stopWh,
+                    samples.Where(s => s.EnergyWh != null).Select(s => (s.MeasuredAt, s.EnergyWh!.Value)));
+                cost = p.CostFils;
+                lines = p.Lines;
+            }
+        }
         if (tx.IsOpen && !tx.WasRejected)
         {
             var tariff = await TouTariffLoader.LoadAsync(db, ct);
