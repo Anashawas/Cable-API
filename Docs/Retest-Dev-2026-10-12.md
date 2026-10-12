@@ -5,6 +5,15 @@
 > what we saw. Please retest from your side and reply with ✅ / ❌ per line (with the request / response for any ❌).
 >
 > Background: `Bugfix-Report-2026-10-11.md` (the four bugs) and `Banner-Call-Action-BE-Reply.md` (banner type 6).
+>
+> | You reported / requested | Retest in |
+> |---|---|
+> | Empty privileges → all 9 (worker 9, station 37), `usesAllPrivileges` false | §1 |
+> | `NotConnected` from dev while the admin showed Online; `webSocketBaseUrl` = production | §2 |
+> | `NotConnected` returned with `accepted: true` | §3 |
+> | Session #37 price `null` after the stop | §4 |
+> | `BANNER_CALL_ACTION_BE_SPEC_AR.md` (type 6, number rules, `+962` output, data clean-up) | §5, §7 |
+> | (found by us) anyone logged in could change banners | §6 |
 
 ---
 
@@ -54,7 +63,7 @@ Was: `NotConnected — "CBL-SIM-37 is not connected to this server"` while the a
 | 2.2 | Admin or partner: **Refresh** on that charger | `status: "Answered"`, `resultStatus: "Accepted"`, `accepted: true`; the simulator logs the TriggerMessage |
 | 2.3 | With a car on a plug (`Preparing`): **Start session** | accepted; within a few seconds the plug is Charging and a session appears, started by **Operator** |
 | 2.4 | **Stop** that session | accepted; the session closes with reason "Stopped from the app" |
-| 2.5 | Admin → Cable Connect → a charger → credentials / connection sheet | address **`wss://ocpp-dev.cable-app.com`** (not `ocpp.cable-app.com`) |
+| 2.5 | Admin → Cable Connect → a charger → credentials / connection sheet, or the API: `GET /api/admin/ocpp/charge-points/{id}`, register (`POST /api/admin/ocpp/charge-points`), rotate password | `webSocketBaseUrl` = **`wss://ocpp-dev.cable-app.com`** (not `ocpp.cable-app.com`) |
 
 ---
 
