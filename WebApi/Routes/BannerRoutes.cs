@@ -4,6 +4,7 @@ using Application.Analytics.Commands.TrackEvent;
 using Application.Banners.Commands.AddBanner;
 using Application.Banners.Commands.DeleteBanner;
 using Application.Banners.Commands.UpdateBanner;
+using Application.Banners.Commands.NormalizeBannerPhones;
 using Application.Banners.Commands.SetBannerTargeting;
 using Application.Banners.Queries.GetAllBanners;
 using Application.Banners.Queries.GetNearbyBanners;
@@ -109,6 +110,17 @@ public static class BannerRoutes
                 op.Responses["200"].Description = "The id of the banner";
                 return op;
             });
+
+        app.MapPost("/admin/normalize-phones", async (IMediator mediator, [FromQuery] bool? dryRun, CancellationToken cancellationToken) =>
+                Results.Ok(await mediator.Send(new NormalizeBannerPhonesCommand(dryRun ?? true), cancellationToken)))
+            .Produces<NormalizeBannerPhonesResultDto>()
+            .RequireAuthorization()
+            .ProducesForbidden()
+            .ProducesUnAuthorized()
+            .ProducesInternalServerError()
+            .WithName("Normalize Banner Phones")
+            .WithSummary("Admin, one-off: bring every banner's Phone (and the ActionUrl of WhatsApp / call banners) to the stored form. dryRun=true (default) only reports. Values that cannot be dialled are listed as Invalid and left untouched.")
+            .WithOpenApi();
 
         app.MapDelete("/DeleteBanner/{id:int}",
                 async (IMediator mediator, int id, CancellationToken cancellationToken) =>

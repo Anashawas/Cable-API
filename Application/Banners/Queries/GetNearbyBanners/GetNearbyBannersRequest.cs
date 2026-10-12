@@ -218,9 +218,9 @@ public class GetNearbyBannersRequestHandler(
         return new NearbyBannerDto(
             banner.Id,
             banner.Name,
-            banner.Phone,
+            BannerRules.PhoneForDisplay(banner.Phone),
             banner.ActionType,
-            banner.ActionUrl,
+            BannerRules.ActionUrlForDisplay(banner.ActionType, banner.ActionUrl),
             banner.TargetType,
             banner.TargetCity,
             banner.CenterLat,

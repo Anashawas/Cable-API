@@ -17,7 +17,8 @@ public class GetAllBannersQueryHandler(IApplicationDbContext applicationDbContex
             .Where(x => !x.IsDeleted)
             .Include(x => x.BannerAttachments)
             .Include(x => x.BannerDurations).ToListAsync(cancellationToken);
-        var banners = result.Select(x => new GetAllBannersDto(x.Id, x.Name, x.Phone,x.ActionType,x.ActionUrl
+        // Phone and call numbers dial-ready ("+962…"); WhatsApp numbers stay bare digits (BannerRules).
+        var banners = result.Select(x => new GetAllBannersDto(x.Id, x.Name, BannerRules.PhoneForDisplay(x.Phone) ?? "", x.ActionType, BannerRules.ActionUrlForDisplay(x.ActionType, x.ActionUrl)
             , x.BannerDurations.Select(b => new BannerDurationSummery(b.Id, b.StartDate, b.EndDate)).ToList(),
             x.BannerAttachments.Select(a => new BannerAttachmentSummery(
                 a.Id, a.ContentType, a.FileName, a.FileSize, a.FileExtension,

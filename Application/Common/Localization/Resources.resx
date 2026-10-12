@@ -111,6 +111,12 @@
   <data name="UserBannerAlreadyExist" xml:space="preserve">
     <value>the user banner already exist</value>
   </data>
+  <data name="InvalidPhoneNumber" xml:space="preserve">
+    <value>Invalid phone number</value>
+  </data>
+  <data name="InvalidBannerActionType" xml:space="preserve">
+    <value>Unknown banner action type. Allowed: 1 link, 2 WhatsApp, 3 station, 4 maps, 5 contact us, 6 phone call</value>
+  </data>
   <data name="StartDateMustBeLessThanEndDate" xml:space="preserve">
     <value>start date must be less than end date</value>
   </data>

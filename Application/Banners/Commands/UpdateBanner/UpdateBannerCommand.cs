@@ -25,16 +25,14 @@ public class UpdateBannerCommandHandler(IApplicationDbContext applicationDbConte
                 cancellationToken)
             ?? throw new NotFoundException($"Can not find banner with id {request.Id}");
 
-        // Normalize phone number if provided
-        var normalizedPhone = !string.IsNullOrEmpty(request.Phone) 
-            ? PhoneNumberUtility.NormalizePhoneNumber(request.Phone) ?? request.Phone 
-            : request.Phone;
+        // Any dialable number, stored as digits with the country code (BannerRules / DialablePhone).
+        var normalizedPhone = BannerRules.NormalizePhone(request.Phone);
 
         banner.Name = request.Name;
         banner.Phone = normalizedPhone;
         banner.Email = request.Email;
         banner.ActionType = request.ActionType;
-        banner.ActionUrl = request.ActionUrl;
+        banner.ActionUrl = BannerRules.NormalizeActionUrl(request.ActionType, request.ActionUrl);
         
         if (request.StartDate.HasValue || request.EndDate.HasValue)
         {

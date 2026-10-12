@@ -10,10 +10,8 @@ public class UpdateBannerCommandValidator : AbstractValidator<UpdateBannerComman
     {
         RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
         RuleFor(x => x.Email).NotEmpty().MaximumLength(50);
-        RuleFor(x => x.Phone)
-            .NotEmpty()
-            .MaximumLength(50)
-            .Must(phone => string.IsNullOrEmpty(phone) || PhoneNumberUtility.IsValidJordanPhoneNumber(phone))
-            .WithMessage($"Phone number must be a valid Jordan mobile number. Supported formats: {string.Join(", ", PhoneNumberUtility.GetSupportedFormats())}");
+        RuleFor(x => x.Phone).NotEmpty().MaximumLength(50);
+        // Any dialable number (mobile, landline, short code, international) — not only Jordan mobiles.
+        BannerRules.AddActionRules(this, x => x.ActionType, x => x.ActionUrl, x => x.Phone);
     }
 }

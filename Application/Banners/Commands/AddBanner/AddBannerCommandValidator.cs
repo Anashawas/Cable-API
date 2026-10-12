@@ -11,6 +11,7 @@ public class AddBannerCommandValidator : AbstractValidator<AddBannerCommand>
     public AddBannerCommandValidator(IApplicationDbContext applicationDbContext)
     {
         _applicationDbContext = applicationDbContext;
+        BannerRules.AddActionRules(this, x => x.ActionType, x => x.ActionUrl, x => x.Phone);
         // RuleFor(x => x.Name).NotEmpty().MaximumLength(200);
         // RuleFor(x => x.Email).NotEmpty().MaximumLength(50);
         // RuleFor(x => x.Phone).NotEmpty().MaximumLength(50);

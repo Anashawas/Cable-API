@@ -174,7 +174,7 @@ public static class PhoneNumberUtility
     /// <summary>
     /// Folds Arabic-Indic (٠-٩) and Extended Arabic-Indic (۰-۹) digits to ASCII.
     /// </summary>
-    private static string ToAsciiDigits(string input)
+    public static string ToAsciiDigits(string input)
     {
         Span<char> buffer = stackalloc char[input.Length];
 

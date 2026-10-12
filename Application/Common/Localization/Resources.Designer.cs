@@ -368,6 +368,18 @@ namespace Application.Common.Localization {
         /// <summary>
         ///   Looks up a localized string similar to start date must be less than end date.
         /// </summary>
+        public static string InvalidPhoneNumber {
+            get {
+                return ResourceManager.GetString("InvalidPhoneNumber", resourceCulture);
+            }
+        }
+
+        public static string InvalidBannerActionType {
+            get {
+                return ResourceManager.GetString("InvalidBannerActionType", resourceCulture);
+            }
+        }
+
         public static string StartDateMustBeLessThanEndDate {
             get {
                 return ResourceManager.GetString("StartDateMustBeLessThanEndDate", resourceCulture);

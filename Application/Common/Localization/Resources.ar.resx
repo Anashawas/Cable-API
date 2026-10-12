@@ -111,6 +111,12 @@
   <data name="UserBannerAlreadyExist" xml:space="preserve">
     <value>المعلن موجود في قاعدة البيانات</value>
   </data>
+  <data name="InvalidPhoneNumber" xml:space="preserve">
+    <value>رقم الهاتف غير صحيح</value>
+  </data>
+  <data name="InvalidBannerActionType" xml:space="preserve">
+    <value>نوع إجراء البانر غير معروف. المسموح: 1 رابط، 2 واتساب، 3 محطة، 4 خرائط، 5 تواصل معنا، 6 اتصال هاتفي</value>
+  </data>
   <data name="StartDateMustBeLessThanEndDate" xml:space="preserve">
     <value>تاريخ البداية لا يمكن ان يكون اكبر من تاريخ النهاية</value>
   </data>

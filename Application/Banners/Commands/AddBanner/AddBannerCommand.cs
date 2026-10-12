@@ -10,10 +10,8 @@ public class AddBannerCommandHandler(IApplicationDbContext applicationDbContext)
 {
     public async Task<int> Handle(AddBannerCommand request, CancellationToken cancellationToken)
     {
-        // Normalize phone number if provided
-        var normalizedPhone = !string.IsNullOrEmpty(request.Phone) 
-            ? PhoneNumberUtility.NormalizePhoneNumber(request.Phone) ?? request.Phone 
-            : request.Phone;
+        // Any dialable number, stored as digits with the country code (BannerRules / DialablePhone).
+        var normalizedPhone = BannerRules.NormalizePhone(request.Phone);
 
         var banner = new Banner()
         {
@@ -21,7 +19,7 @@ public class AddBannerCommandHandler(IApplicationDbContext applicationDbContext)
             Name = request.Name,
             Phone = normalizedPhone,
             ActionType = request.ActionType,
-            ActionUrl = request.ActionUrl,
+            ActionUrl = BannerRules.NormalizeActionUrl(request.ActionType, request.ActionUrl),
         };
         applicationDbContext.Banners.Add(banner);
         var bannerDuration = new BannerDuration()
