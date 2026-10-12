@@ -1,4 +1,5 @@
-﻿using Application.Common.Extensions;
+﻿using Application.Common.Security;
+using Application.Common.Extensions;
 using Cable.Core.Emuns;
 using Cable.Core.Exceptions;
 using Microsoft.AspNetCore.Http;
@@ -10,11 +11,14 @@ public record AddBannerAttachmentsCommand(int BannerId, IFormFileCollection File
 
 public class AddBannerAttachmentsCommandHandler(
     IApplicationDbContext applicationDbContext,
-    IUploadFileService uploadFileService)
+    IUploadFileService uploadFileService,
+    ICurrentUserService currentUserService)
     : IRequestHandler<AddBannerAttachmentsCommand, int[]>
 {
     public async Task<int[]> Handle(AddBannerAttachmentsCommand request, CancellationToken cancellationToken)
     {
+        // Banners appear on every user's home screen: only the Cable team may change them.
+        await AdminRoleGuard.EnsureAdminAsync(applicationDbContext, currentUserService, cancellationToken);
         var banner =
             await applicationDbContext.Banners.FirstOrDefaultAsync(x => x.Id == request.BannerId && !x.IsDeleted,
                 cancellationToken)

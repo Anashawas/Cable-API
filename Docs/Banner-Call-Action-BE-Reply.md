@@ -15,6 +15,13 @@
 | 3.3 One-off clean-up of existing data | ✅ as an admin endpoint using the **same rules** (see below) |
 | Admin option «اتصال هاتفي» | ✅ added to the add and edit forms (it was **not** in the repo yet), with a phone placeholder `0791234567` and a hint for types 2 and 6 |
 
+## Security fix shipped with it
+
+Until now **any logged-in account** (a driver or a partner) could create, edit and delete banners and their images —
+the endpoints only required a login. Add / update / delete banner and add / delete banner images now require the
+**Admin** role (403 otherwise), like targeting already did. Reading banners (`GetAllBanners`, `GetNearbyBanners`) and the
+view / click tracking stay public. Only the admin portal writes banners, so nothing else is affected.
+
 ## Two deliberate differences from the spec
 
 1. **WhatsApp (type 2) `actionUrl` is returned as bare digits** (`962777317444`), not `+962…`. wa.me links must not carry a `+`,

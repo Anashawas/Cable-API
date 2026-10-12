@@ -1,4 +1,5 @@
-﻿
+﻿using Application.Common.Security;
+
 using Cable.Core.Emuns;
 using Cable.Core.Exceptions;
 using Microsoft.EntityFrameworkCore;
@@ -9,11 +10,14 @@ public record DeleteBannerAttachmentCommand(int Id) : IRequest;
 
 public class DeleteBannerAttachmentCommandHandler(
     IApplicationDbContext applicationDbContext,
-    IUploadFileService uploadFileService)
+    IUploadFileService uploadFileService,
+    ICurrentUserService currentUserService)
     : IRequestHandler<DeleteBannerAttachmentCommand>
 {
     public async Task Handle(DeleteBannerAttachmentCommand request, CancellationToken cancellationToken)
     {
+        // Banners appear on every user's home screen: only the Cable team may change them.
+        await AdminRoleGuard.EnsureAdminAsync(applicationDbContext, currentUserService, cancellationToken);
         var bannerAttachments = await applicationDbContext.BannerAttachments.Where(x => x.BannerId == request.Id)
             .ToListAsync(cancellationToken);
         if (bannerAttachments == null)

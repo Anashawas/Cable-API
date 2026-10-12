@@ -1,4 +1,5 @@
-﻿using Cable.Core.Exceptions;
+﻿using Application.Common.Security;
+using Cable.Core.Exceptions;
 using Cable.Core.Utilities;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,11 +16,13 @@ public record UpdateBannerCommand(
     DateOnly? EndDate)
     : IRequest;
 
-public class UpdateBannerCommandHandler(IApplicationDbContext applicationDbContext)
+public class UpdateBannerCommandHandler(IApplicationDbContext applicationDbContext, ICurrentUserService currentUserService)
     : IRequestHandler<UpdateBannerCommand>
 {
     public async Task Handle(UpdateBannerCommand request, CancellationToken cancellationToken)
     {
+        // Banners appear on every user's home screen: only the Cable team may change them.
+        await AdminRoleGuard.EnsureAdminAsync(applicationDbContext, currentUserService, cancellationToken);
         var banner =
             await applicationDbContext.Banners.FirstOrDefaultAsync(x => x.Id == request.Id && !x.IsDeleted,
                 cancellationToken)

@@ -1,15 +1,18 @@
-﻿using Cable.Core.Utilities;
+﻿using Application.Common.Security;
+using Cable.Core.Utilities;
 
 namespace Application.Banners.Commands.AddBanner;
 
 public record AddBannerCommand(string Name, string Phone, string Email,int? ActionType,string? ActionUrl, DateOnly StartDate, DateOnly EndDate)
     : IRequest<int>;
 
-public class AddBannerCommandHandler(IApplicationDbContext applicationDbContext)
+public class AddBannerCommandHandler(IApplicationDbContext applicationDbContext, ICurrentUserService currentUserService)
     : IRequestHandler<AddBannerCommand, int>
 {
     public async Task<int> Handle(AddBannerCommand request, CancellationToken cancellationToken)
     {
+        // Banners appear on every user's home screen: only the Cable team may change them.
+        await AdminRoleGuard.EnsureAdminAsync(applicationDbContext, currentUserService, cancellationToken);
         // Any dialable number, stored as digits with the country code (BannerRules / DialablePhone).
         var normalizedPhone = BannerRules.NormalizePhone(request.Phone);
 
