@@ -31,7 +31,10 @@ public record OwnerChargerCommand(
     int? ConnectorId = null,
     string? Type = null,
     int? TransactionId = null,
-    string? RequestedMessage = null) : IRequest<OcppCommandResultDto>;
+    string? RequestedMessage = null,
+    /// <summary>RemoteStartTransaction only: stop automatically at Jod | Kwh | Soc = ChargeLimitValue.</summary>
+    string? ChargeLimitKind = null,
+    decimal? ChargeLimitValue = null) : IRequest<OcppCommandResultDto>;
 
 public class OwnerChargerCommandValidator : AbstractValidator<OwnerChargerCommand>
 {
@@ -101,6 +104,8 @@ public class OwnerChargerCommandHandler(IApplicationDbContext db, ICurrentUserSe
             {
                 // The station's virtual tag: the unit accepts it only against this very request (TagAuthorizer).
                 await Application.Ocpp.Commands.DriverSessions.OcppRemoteStart.EnsureCanStartAsync(db, request.OcppChargePointId, request.ConnectorId!.Value, cancellationToken);
+                await Application.Ocpp.Commands.DriverSessions.OcppRemoteStart.SetPendingLimitAsync(db, request.OcppChargePointId, request.ConnectorId!.Value,
+                    request.ChargeLimitKind, request.ChargeLimitValue, currentUser.UserId, cancellationToken);
                 payload = Application.Ocpp.Commands.DriverSessions.OcppRemoteStart.Payload(request.ConnectorId!.Value, OcppVirtualTag.ForStation(request.ChargingPointId));
                 break;
             }
@@ -130,7 +135,11 @@ public record OwnerSessionDto(
     string StartSource = "Card",
     string? StopReasonText = null,
     int? CostFils = null,
-    decimal? CostJod = null);
+    decimal? CostJod = null,
+    /// <summary>Battery % at the start of the session and at the latest / final reading.</summary>
+    int? SocStartPercent = null,
+    int? SocEndPercent = null,
+    Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto? ChargeLimit = null);
 
 /// <summary>Owner / manager: sessions at their station, newest first; optional charger and date filters (UTC).</summary>
 public record GetMyStationSessionsRequest(int ChargingPointId, int? OcppChargePointId = null, DateTime? From = null, DateTime? To = null, int? Page = null, int? PageSize = null)
@@ -153,14 +162,18 @@ public class GetMyStationSessionsRequestHandler(IApplicationDbContext db, ICurre
         var page = await q.OrderByDescending(t => t.StartedAt)
             .Select(t => new OwnerSessionDto(
                 t.Id, t.OcppChargePointId, t.ChargePoint.DisplayName, t.ConnectorId, t.IdTag, t.StartedAt, t.StoppedAt,
-                null, t.EnergyKwh, t.StopReason, t.IsOpen, t.StartSource, null, t.CostFils, t.CostFils == null ? null : t.CostFils / 1000m))
+                null, t.EnergyKwh, t.StopReason, t.IsOpen, t.StartSource, null, t.CostFils, t.CostFils == null ? null : t.CostFils / 1000m,
+                t.SocStartPercent, t.SocEndPercent,
+                t.ChargeLimitKind == null ? null : new Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto(
+                    t.ChargeLimitKind, t.ChargeLimitValue, null, null, t.ChargeLimitSetAt, t.ChargeLimitReachedAt)))
             .ToPaginatedAsync(request.Page, request.PageSize, 20, 200, cancellationToken);
 
         // Duration computed in memory: the SQL date-diff helper lives in the SqlServer provider, which Application does not reference.
         return page.As(page.Items.Select(d => d with
         {
             DurationSec = (int)((d.StoppedAt ?? now) - d.StartedAt).TotalSeconds,
-            StopReasonText = OcppStopReason.Describe(d.StopReason),
+            StopReasonText = Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto.StopText(d.StopReason, d.ChargeLimit?.Kind, d.ChargeLimit?.Value, d.ChargeLimit?.ReachedAt).En,
+            ChargeLimit = d.ChargeLimit is null ? null : Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto.From(d.ChargeLimit.Kind, d.ChargeLimit.Value, d.ChargeLimit.SetAt, d.ChargeLimit.ReachedAt),
         }).ToList());
     }
 }

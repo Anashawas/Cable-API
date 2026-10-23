@@ -16,6 +16,9 @@ public class OcppConnectorConfiguration : IEntityTypeConfiguration<OcppConnector
         builder.Property(e => e.VendorErrorCode).HasMaxLength(50);
         builder.Property(e => e.Info).HasMaxLength(500);
         builder.Property(e => e.PowerKw).HasColumnType("decimal(8,2)");
+        builder.Property(e => e.PendingLimitKind).HasMaxLength(10);
+        builder.Property(e => e.PendingLimitValue).HasColumnType("decimal(10,3)");
+        builder.Property(e => e.PendingLimitSetAt).HasColumnType("datetime2(0)");
         builder.Property(e => e.StatusUpdatedAt).HasColumnType("datetime2(3)");
         builder.Property(e => e.StatusReceivedAt).HasColumnType("datetime2(3)").IsRequired();
 

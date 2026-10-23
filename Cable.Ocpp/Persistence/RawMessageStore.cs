@@ -49,10 +49,28 @@ public sealed class RawMessageStore : BackgroundService
 
     public void Log(RawMessage message)
     {
+        // Routine chatter is ~98% of the volume and is already kept elsewhere (LastMessageAt, OcppMeterValue):
+        // not stored, and only at Debug in the text log.
+        if (IsRoutine(message))
+        {
+            _log.LogDebug("{Direction} {ChargePointId} {Action} {Payload}",
+                message.Direction.ToUpperInvariant(), message.ChargePointId, message.Action ?? "-", message.Payload);
+            return;
+        }
+
         _log.LogInformation("{Direction} {ChargePointId} {Action} {Payload}",
             message.Direction.ToUpperInvariant(), message.ChargePointId, message.Action ?? "-", message.Payload);
         _queue.Writer.TryWrite(message);
     }
+
+    /// <summary>
+    /// Heartbeats both ways, and our empty acknowledgements of MeterValues / StatusNotification.
+    /// The charger's own MeterValues frames are still stored (short retention, see OcppLimits);
+    /// every command, reply carrying data, status, start / stop, boot and connect event is kept.
+    /// </summary>
+    internal static bool IsRoutine(RawMessage message) =>
+        message.Action == "Heartbeat"
+        || (message.Direction == "out" && message.MessageType == 3 && message.Action is "MeterValues" or "StatusNotification");
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {

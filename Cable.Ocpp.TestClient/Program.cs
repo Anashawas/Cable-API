@@ -14,6 +14,7 @@
 //              with the SAME timestamps, then stop — proves R1/R3/R5/R6 (no duplicates, same kWh)
 //   --fault    send a Faulted StatusNotification on connector 1, then recover (--fault-code X --fault-info "…" to vary it)
 //   --charge-seconds N   with --plug: keep connector 1 Charging for N seconds before StopTransaction
+//   --interval S  demo mode (--remote): seconds between MeterValues (default 5; e.g. 1 to watch the live push keep up)
 //
 // Phase 2: the simulator also answers central-system commands while it is running
 // (keep it alive with --run N): TriggerMessage, Reset (closes, reconnects, boots again),
@@ -37,6 +38,7 @@ var plug = args.Contains("--plug");
 var replay = args.Contains("--replay");
 var fault = args.Contains("--fault");
 var chargeSeconds = int.Parse(Arg("--charge-seconds") ?? "0");
+var intervalSeconds = double.Parse(Arg("--interval") ?? "5", System.Globalization.CultureInfo.InvariantCulture);   // demo mode: seconds between MeterValues
 var currentTransactionId = 0;        // the open session, for RemoteStopTransaction
 (string Tag, int Connector)? remoteStartTag = null;
 var demoStart = new System.Collections.Concurrent.ConcurrentDictionary<int, string>();   // demo mode: plug → tag of the accepted RemoteStart
@@ -96,6 +98,7 @@ if (plug || replay)
                     new { value = "78.5", measurand = "Current.Import", unit = "A" },
                     new { value = "392.5", measurand = "Voltage", unit = "V" },
                     new { value = (40 + i).ToString(), measurand = "SoC", unit = "Percent" },
+                    new { value = (32 + i * 0.5).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), measurand = "Temperature", unit = "Celsius" },
                 },
             },
         },
@@ -203,33 +206,37 @@ async Task RunDemoPlug(int k, DateTime waitUntil)
 
         // Realistic DC curve: ~40 kW (plug 2 a little faster), 55 Wh per 5-second sample, battery from 40 % capped at 100.
         var i = 0;
+        var wh = 0.0;
         var baseKw = k == 2 ? 48.0 : 39.6;
         var holdUntil = DateTime.UtcNow.AddSeconds(chargeSeconds > 0 ? chargeSeconds : 30);
         while (DateTime.UtcNow < holdUntil && ws.State == WebSocketState.Open && !demoStop.ContainsKey(k))
         {
             i++;
             var kw = baseKw + Math.Sin(i / 7.0) * 1.2;
+            wh += kw * 1000 * intervalSeconds / 3600;   // energy follows power and the reading interval
+            var minutes = i * intervalSeconds / 60;
             await Call("MeterValues", new
             {
                 connectorId = k, transactionId = txId,
                 meterValue = new[] { new { timestamp = DateTime.UtcNow, sampledValue = new object[]
                 {
-                    new { value = (meterStart + i * 55).ToString(), context = "Sample.Periodic", measurand = "Energy.Active.Import.Register", unit = "Wh" },
+                    new { value = (meterStart + (long)wh).ToString(), context = "Sample.Periodic", measurand = "Energy.Active.Import.Register", unit = "Wh" },
                     new { value = ((int)(kw * 1000)).ToString(), measurand = "Power.Active.Import", unit = "W" },
-                    new { value = Math.Min(100, 40 + i / 18).ToString(), measurand = "SoC", unit = "Percent" },
+                    new { value = Math.Min(100, 40 + (int)(minutes / 1.5)).ToString(), measurand = "SoC", unit = "Percent" },
                     new { value = "398.5", measurand = "Voltage", unit = "V" },
-                    new { value = (kw * 1000 / 398.5).ToString("0.0"), measurand = "Current.Import", unit = "A" },
+                    new { value = (kw * 1000 / 398.5).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), measurand = "Current.Import", unit = "A" },
+                    new { value = Math.Min(48, 31 + minutes * 2.4).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture), measurand = "Temperature", unit = "Celsius" },
                 } } },
             });
-            await Task.Delay(TimeSpan.FromSeconds(5));
+            await Task.Delay(TimeSpan.FromSeconds(intervalSeconds));
         }
         var remote = demoStop.TryRemove(k, out _);
-        var meterStop = meterStart + i * 55;
+        var meterStop = meterStart + (long)wh;
         await Call("StatusNotification", new { connectorId = k, status = "Finishing", errorCode = "NoError", timestamp = DateTime.UtcNow });
         await Call("StopTransaction", new { transactionId = txId, idTag = tag, meterStop, timestamp = DateTime.UtcNow, reason = remote ? "Remote" : "Local" });
         await Call("StatusNotification", new { connectorId = k, status = "Available", errorCode = "NoError", timestamp = DateTime.UtcNow });
         demoTx.TryRemove(k, out _);
-        Console.WriteLine($"[{Now()}] plug {k}: session {txId} ended ({(remote ? "Remote" : "Local")}), {(i * 55) / 1000m:0.000} kWh — next car in 10 s");
+        Console.WriteLine($"[{Now()}] plug {k}: session {txId} ended ({(remote ? "Remote" : "Local")}), {(long)wh / 1000m:0.000} kWh — next car in 10 s");
         meterStart = meterStop;
         await Task.Delay(TimeSpan.FromSeconds(10));
     }
@@ -552,7 +559,7 @@ partial class Program
         ["NumberOfConnectors"] = new("2", true),
         ["HeartbeatInterval"] = new("60", false),
         ["MeterValueSampleInterval"] = new("15", false),
-        ["MeterValuesSampledData"] = new("Energy.Active.Import.Register,Power.Active.Import,Current.Import,Voltage,SoC", false),
+        ["MeterValuesSampledData"] = new("Energy.Active.Import.Register,Power.Active.Import,Current.Import,Voltage,SoC,Temperature", false),
         ["ClockAlignedDataInterval"] = new("0", false),
         ["ConnectionTimeOut"] = new("60", false),
         ["AuthorizeRemoteTxRequests"] = new("true", false),

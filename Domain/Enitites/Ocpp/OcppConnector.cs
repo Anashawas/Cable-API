@@ -28,6 +28,15 @@ public class OcppConnector : BaseEntity
     public int? PlugTypeId { get; set; }
     public decimal? PowerKw { get; set; }
 
+    /// <summary>
+    /// A charge limit chosen with a remote start (app / partner / admin), waiting for the session it starts:
+    /// the next App / Operator StartTransaction on this plug within OcppVirtualTag.RemoteStartAuthorizeWindow takes it.
+    /// </summary>
+    public string? PendingLimitKind { get; set; }
+    public decimal? PendingLimitValue { get; set; }
+    public int? PendingLimitSetBy { get; set; }
+    public DateTime? PendingLimitSetAt { get; set; }
+
     public virtual OcppChargePoint ChargePoint { get; set; } = null!;
     public virtual PlugType? PlugType { get; set; }
 }

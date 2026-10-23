@@ -238,6 +238,17 @@ public static class DependencyInjection
             op.RequireHttpsMetadata = true;
             op.SaveToken = true;
             op.TokenValidationParameters = tokenValidationParameters;
+            // Browsers cannot set headers on a WebSocket: the SignalR client sends the JWT as ?access_token= on /hubs.
+            op.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+            {
+                OnMessageReceived = context =>
+                {
+                    var token = context.Request.Query["access_token"];
+                    if (!string.IsNullOrEmpty(token) && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                        context.Token = token;
+                    return Task.CompletedTask;
+                },
+            };
         });
 
         services.AddAuthorization();

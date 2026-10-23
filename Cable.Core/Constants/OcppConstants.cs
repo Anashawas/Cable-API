@@ -101,8 +101,11 @@ public static class OcppLimits
     /// <summary>Open transaction with no StopTransaction for this long is flagged IsStale.</summary>
     public static readonly TimeSpan StaleTransactionAfter = TimeSpan.FromHours(24);
 
-    /// <summary>Raw frame retention.</summary>
-    public const int RawMessageRetentionDays = 30;
+    /// <summary>Raw frame retention: commands, replies, status, start / stop, boot, connect events.</summary>
+    public const int RawMessageRetentionDays = 90;
+
+    /// <summary>The charger's raw MeterValues frames: only for debugging a fresh problem — the data itself lives in OcppMeterValue.</summary>
+    public const int RawMeterValuesRetentionDays = 2;
 
     /// <summary>OCPP 1.6 SendLocalList: a Full update bigger than the unit's SendLocalListMaxLength is refused; 100 is a safe floor for the pilot hardware.</summary>
     public const int LocalListMaxEntries = 100;
@@ -210,4 +213,64 @@ public static class OcppStopReason
         "UnlockCommand" => "فُتح قفل المنفذ",
         _ => reason,
     };
+}
+
+/// <summary>
+/// Readable text for a plug fault (StatusNotification errorCode + vendorErrorCode). The OCPP code says
+/// what kind of fault; "OtherError" / "NoError" (hjl reports Faulted with NoError) carry no meaning, so
+/// the charger's own vendor code is shown instead. Never prints "NoError" / "OtherError" to people.
+/// </summary>
+public static class OcppFaultText
+{
+    /// <summary>Meanings of manufacturer codes, once the vendor confirms them (hjl list requested, Oct 2026).</summary>
+    private static readonly Dictionary<string, (string En, string Ar)> VendorCodes = new(StringComparer.OrdinalIgnoreCase);
+
+    public static string Describe(string? errorCode, string? vendorCode) => Build(errorCode, vendorCode, english: true);
+
+    public static string DescribeAr(string? errorCode, string? vendorCode) => Build(errorCode, vendorCode, english: false);
+
+    /// <summary>hjl puts the code in the info text too ("Connector 1 has encountered an error: 2001-2001") → "2001".</summary>
+    public static string? VendorCodeFromInfo(string? info)
+    {
+        if (string.IsNullOrWhiteSpace(info)) return null;
+        var i = info.LastIndexOf(':');
+        var code = (i >= 0 ? info[(i + 1)..] : info).Trim().Split('-', ' ')[0].Trim();
+        return code.Length is > 0 and <= 20 && code.All(char.IsLetterOrDigit) ? code : null;
+    }
+
+    private static string Build(string? errorCode, string? vendorCode, bool english)
+    {
+        // "2001-2001" → "2001"; "0" means no vendor code.
+        var vendor = vendorCode?.Split('-')[0].Trim();
+        if (string.IsNullOrEmpty(vendor) || vendor == "0") vendor = null;
+
+        var kind = errorCode switch
+        {
+            "ConnectorLockFailure" => english ? "cable lock failure" : "تعذّر قفل الكابل",
+            "EVCommunicationError" => english ? "communication error with the car" : "خطأ في الاتصال مع السيارة",
+            "GroundFailure" => english ? "ground (earth) fault" : "عطل في التأريض",
+            "HighTemperature" => english ? "high temperature" : "ارتفاع درجة الحرارة",
+            "InternalError" => english ? "internal charger error" : "خطأ داخلي في الشاحن",
+            "LocalListConflict" => english ? "card list conflict" : "تعارض في قائمة البطاقات",
+            "OverCurrentFailure" => english ? "over-current" : "تيار زائد",
+            "OverVoltage" => english ? "over-voltage" : "جهد زائد",
+            "PowerMeterFailure" => english ? "energy meter failure" : "عطل في عداد الطاقة",
+            "PowerSwitchFailure" => english ? "power switch failure" : "عطل في مفتاح الطاقة",
+            "ReaderFailure" => english ? "card reader failure" : "عطل في قارئ البطاقات",
+            "ResetFailure" => english ? "restart failed" : "فشل إعادة تشغيل الشاحن",
+            "UnderVoltage" => english ? "under-voltage" : "انخفاض الجهد",
+            "WeakSignal" => english ? "weak network signal" : "ضعف إشارة الاتصال",
+            _ => null,   // OtherError, NoError, unknown: the vendor code is the only information
+        };
+
+        if (vendor is not null && VendorCodes.TryGetValue(vendor, out var known))
+            kind ??= english ? known.En : known.Ar;
+
+        if (kind is null)
+            return vendor is null
+                ? (english ? "unspecified fault" : "عطل غير محدد")
+                : (english ? $"charger fault code {vendor}" : $"رمز عطل الشاحن {vendor}");
+
+        return vendor is null ? kind : (english ? $"{kind} (code {vendor})" : $"{kind} (رمز {vendor})");
+    }
 }

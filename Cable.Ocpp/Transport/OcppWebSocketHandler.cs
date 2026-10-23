@@ -11,6 +11,7 @@ public sealed class OcppWebSocketHandler(
     ConnectionRegistry registry,
     MessageDispatcher dispatcher,
     RawMessageStore store,
+    Cable.Ocpp.Services.LiveEventPublisher live,
     IServiceScopeFactory scopes,
     IOptions<OcppOptions> options,
     IHostApplicationLifetime lifetime,
@@ -77,6 +78,8 @@ public sealed class OcppWebSocketHandler(
             $"{{\"subprotocol\":\"{selected}\",\"offered\":\"{string.Join(",", offered)}\",\"replacedPrevious\":{(replaced is not null).ToString().ToLowerInvariant()}}}",
             remoteIp, DateTime.UtcNow));
         await WithStateAsync(s => s.MarkConnectedAsync(cp.Id, remoteIp, CancellationToken.None), chargePointId, "mark connected");
+        live.Publish(new Application.Ocpp.Live.OcppLiveEvent(Application.Ocpp.Live.OcppLiveEventTypes.Charger,
+            cp.ChargingPointId, cp.Id, null, null, "online", DateTime.UtcNow));
 
         string closeReason = "client closed";
         try
@@ -106,6 +109,9 @@ public sealed class OcppWebSocketHandler(
             store.Log(new RawMessage(chargePointId, "sys", null, null, "DISCONNECT",
                 $"{{\"reason\":\"{closeReason}\",\"messagesIn\":{session.MessagesIn},\"messagesOut\":{session.MessagesOut},\"stillCurrent\":{stillCurrent.ToString().ToLowerInvariant()}}}",
                 remoteIp, DateTime.UtcNow));
+            if (stillCurrent)
+                live.Publish(new Application.Ocpp.Live.OcppLiveEvent(Application.Ocpp.Live.OcppLiveEventTypes.Charger,
+                    session.ChargingPointId, session.OcppChargePointId, null, null, "offline", DateTime.UtcNow));
 
             // Only the current socket may flip the row to disconnected — the replacement is already live.
             if (stillCurrent)

@@ -25,6 +25,10 @@ public class OcppTransactionConfiguration : IEntityTypeConfiguration<OcppTransac
         builder.Property(e => e.StartSource).IsRequired().HasMaxLength(10).HasDefaultValue("Card");
         builder.Property(e => e.CostBreakdownJson);
         builder.Property(e => e.PricedAt).HasColumnType("datetime2(0)");
+        builder.Property(e => e.ChargeLimitKind).HasMaxLength(10);
+        builder.Property(e => e.ChargeLimitValue).HasColumnType("decimal(10,3)");
+        builder.Property(e => e.ChargeLimitSetAt).HasColumnType("datetime2(0)");
+        builder.Property(e => e.ChargeLimitReachedAt).HasColumnType("datetime2(0)");
 
         builder.HasOne(e => e.ChargePoint)
             .WithMany(c => c.Transactions)

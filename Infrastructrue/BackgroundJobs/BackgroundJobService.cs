@@ -547,14 +547,34 @@ public class BackgroundJobService(
 
     public async Task<int> PurgeOcppRawMessagesAsync(CancellationToken cancellationToken = default)
     {
-        var cutoff = DateTime.UtcNow.AddDays(-OcppLimits.RawMessageRetentionDays);
-        var total = 0;
+        var now = DateTime.UtcNow;
+        var cutoff = now.AddDays(-OcppLimits.RawMessageRetentionDays);
+        var meterCutoff = now.AddDays(-OcppLimits.RawMeterValuesRetentionDays);
 
-        // Batched so a month of 15-second meter samples never becomes one giant delete.
+        // 1) Routine chatter Cable.Ocpp no longer stores (heartbeats, our empty MeterValues / StatusNotification
+        //    acknowledgements) — rows written before that change go whatever their age.
+        var routine = await PurgeRawBatchedAsync(m => m.Action == "Heartbeat"
+            || (m.Direction == "out" && m.MessageType == 3 && (m.Action == "MeterValues" || m.Action == "StatusNotification")), cancellationToken);
+        // 2) The charger's raw MeterValues: a short window for debugging; the samples live in OcppMeterValue.
+        var meter = await PurgeRawBatchedAsync(m => m.Action == "MeterValues" && m.CreatedAt < meterCutoff, cancellationToken);
+        // 3) Everything else (commands, status, start / stop, boot, connect events) — reliability reads these.
+        var other = await PurgeRawBatchedAsync(m => m.CreatedAt < cutoff, cancellationToken);
+
+        var total = routine + meter + other;
+        if (total > 0)
+            logger.LogInformation("PurgeOcppRawMessages: deleted {Routine} routine frame(s), {Meter} MeterValues older than {MeterDays} days, {Other} other older than {Days} days",
+                routine, meter, OcppLimits.RawMeterValuesRetentionDays, other, OcppLimits.RawMessageRetentionDays);
+        return total;
+    }
+
+    /// <summary>Batched so a large backlog never becomes one giant delete (and lock) on the shared database.</summary>
+    private async Task<int> PurgeRawBatchedAsync(System.Linq.Expressions.Expression<Func<OcppRawMessage, bool>> predicate, CancellationToken cancellationToken)
+    {
+        var total = 0;
         while (true)
         {
             var batchIds = await applicationDbContext.OcppRawMessages
-                .Where(m => m.CreatedAt < cutoff)
+                .Where(predicate)
                 .OrderBy(m => m.Id)
                 .Select(m => m.Id)
                 .Take(5000)
@@ -565,9 +585,6 @@ public class BackgroundJobService(
                 .Where(m => batchIds.Contains(m.Id))
                 .ExecuteDeleteAsync(cancellationToken);
         }
-
-        if (total > 0)
-            logger.LogInformation("PurgeOcppRawMessages: deleted {Count} frame(s) older than {Days} days", total, OcppLimits.RawMessageRetentionDays);
         return total;
     }
 
@@ -601,14 +618,34 @@ public class BackgroundJobService(
         recipients = recipients.Distinct().ToList();
         if (recipients.Count == 0) return;
 
+        // Every plug of this charger that is faulted now (the alert is sent ~10 s after the first fault,
+        // so a power drop that faults both plugs is one message). The triggering plug is always listed.
+        var faulted = await applicationDbContext.OcppConnectors.AsNoTracking()
+            .Where(c => c.ChargePoint.ChargePointId == connector.ChargePointId && c.ConnectorId > 0
+                        && (c.Status == OcppConnectorStatus.Faulted || c.Id == ocppConnectorId))
+            .OrderBy(c => c.ConnectorId)
+            .Select(c => new { c.ConnectorId, c.ErrorCode, c.VendorErrorCode })
+            .ToListAsync(cancellationToken);
+        if (faulted.Count == 0)
+            faulted.Add(new { connector.ConnectorId, ErrorCode = errorCode, VendorErrorCode = (string?)null });
+
         var chargerName = connector.DisplayName ?? connector.ChargePointId;
-        var where = connector.ConnectorId == 0 ? "" : $" – المقبس {connector.ConnectorId}";
+        var plugs = faulted.Select(f => f.ConnectorId).Where(id => id > 0).Distinct().ToList();
+        var where = plugs.Count switch
+        {
+            0 => "",
+            1 => $" – المقبس {plugs[0]}",
+            _ => $" – المقابس {string.Join(" و ", plugs)}",
+        };
         // Station names often already start with "محطة"; don't produce "محطة محطة الخليفة".
         var stationName = (connector.StationName ?? "").Trim();
         var stationLabel = stationName.StartsWith("محطة", StringComparison.Ordinal) ? stationName : $"محطة {stationName}";
+        var reasons = faulted
+            .Select(f => OcppFaultText.DescribeAr(f.ErrorCode, f.VendorErrorCode ?? OcppFaultText.VendorCodeFromInfo(info)))
+            .Distinct().ToList();
         var title = $"عطل في الشاحن {chargerName}";
-        var body = $"{stationLabel}: الشاحن {chargerName}{where} أبلغ عن عطل ({errorCode})"
-                   + (string.IsNullOrWhiteSpace(info) ? "" : $" — {info}");
+        var reported = plugs.Count > 1 ? "أبلغت" : "أبلغ";
+        var body = $"{stationLabel}: الشاحن {chargerName}{where} {reported} عن عطل — {string.Join("، ", reasons)}";
         var data = JsonSerializer.Serialize(new
         {
             type = "ocpp_fault",

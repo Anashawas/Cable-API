@@ -53,6 +53,23 @@ public static class OcppRemoteStart
 
     public static Dictionary<string, object> Payload(int connectorId, string idTag) =>
         new() { ["connectorId"] = connectorId, ["idTag"] = idTag };
+
+    /// <summary>
+    /// A charge limit chosen with the start ("stop at 7 JOD"): parked on the plug until the session this start
+    /// opens takes it (StartTransaction, within OcppVirtualTag.RemoteStartAuthorizeWindow). No kind = nothing parked.
+    /// </summary>
+    public static async Task SetPendingLimitAsync(IApplicationDbContext db, int ocppChargePointId, int connectorId,
+        string? kind, decimal? value, int? userId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(kind)) return;
+        var (k, v) = OcppChargeLimit.Validate(kind, value);
+        var plug = await db.OcppConnectors.FirstAsync(x => x.OcppChargePointId == ocppChargePointId && x.ConnectorId == connectorId, ct);
+        plug.PendingLimitKind = k;
+        plug.PendingLimitValue = v;
+        plug.PendingLimitSetBy = userId;
+        plug.PendingLimitSetAt = DateTime.UtcNow;
+        await db.SaveChanges(ct);
+    }
 }
 
 public record OcppSessionStartDto(
@@ -65,7 +82,8 @@ public record OcppSessionStartDto(
     string Message);
 
 /// <summary>Driver: start charging on a plug of a charger at a station that shares its live status.</summary>
-public record StartMyOcppSessionCommand(int ChargingPointId, int ChargerId, int ConnectorId) : IRequest<OcppSessionStartDto>;
+/// <param name="ChargeLimitKind">Optional: stop automatically at Jod | Kwh | Soc = ChargeLimitValue.</param>
+public record StartMyOcppSessionCommand(int ChargingPointId, int ChargerId, int ConnectorId, string? ChargeLimitKind = null, decimal? ChargeLimitValue = null) : IRequest<OcppSessionStartDto>;
 
 public class StartMyOcppSessionCommandValidator : AbstractValidator<StartMyOcppSessionCommand>
 {
@@ -99,6 +117,7 @@ public class StartMyOcppSessionCommandHandler(IApplicationDbContext db, ICurrent
             throw new DataValidationException("ChargerId", "You already have a running session. Stop it before starting another.");
 
         var idTag = await EnsureUserTagAsync(db, userId, cancellationToken);
+        await OcppRemoteStart.SetPendingLimitAsync(db, target.ChargePoint.Id, request.ConnectorId, request.ChargeLimitKind, request.ChargeLimitValue, userId, cancellationToken);
         var result = await OcppCommandRunner.RunAsync(db, currentUser, client, target.ChargePoint.Id, "RemoteStartTransaction",
             OcppRemoteStart.Payload(request.ConnectorId, idTag), cancellationToken, skipAccessGuard: true);
 
@@ -176,7 +195,16 @@ public record MySessionDto(
     /// <summary>Latest meter sample while open: power now, battery level, when it was measured.</summary>
     int? PowerW = null,
     int? SocPercent = null,
-    DateTime? LastSampleAt = null);
+    DateTime? LastSampleAt = null,
+    /// <summary>Battery % at the start of the session and at the latest / final reading.</summary>
+    int? SocStartPercent = null,
+    int? SocEndPercent = null,
+    /// <summary>Latest current (A), voltage (V) and charger temperature (°C, when the unit reports it) while open.</summary>
+    decimal? CurrentA = null,
+    decimal? VoltageV = null,
+    decimal? TemperatureC = null,
+    /// <summary>"Stop at …" — null when none.</summary>
+    Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto? ChargeLimit = null);
 
 internal static class MySessionProjection
 {
@@ -185,15 +213,23 @@ internal static class MySessionProjection
             t.Id, t.ChargePoint.ChargingPointId, t.ChargePoint.ChargingPoint.Name, t.OcppChargePointId, t.ChargePoint.DisplayName, t.ConnectorId,
             t.StartedAt, t.StoppedAt, 0, t.EnergyKwh, t.IsOpen, t.StartSource, t.StopReason, null, null,
             t.CostFils, t.CostFils == null ? null : t.CostFils / 1000m, t.TariffVersion, null,
-            null, null, null));
+            null, null, null, t.SocStartPercent, t.SocEndPercent, null, null, null,
+            t.ChargeLimitKind == null ? null : new Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto(
+                t.ChargeLimitKind, t.ChargeLimitValue, null, null, t.ChargeLimitSetAt, t.ChargeLimitReachedAt)));
 
-    public static MySessionDto Finish(MySessionDto d, DateTime now, string? breakdownJson) => d with
+    public static MySessionDto Finish(MySessionDto d, DateTime now, string? breakdownJson)
     {
-        DurationSec = (int)((d.StoppedAt ?? now) - d.StartedAt).TotalSeconds,
-        StopReasonText = OcppStopReason.Describe(d.StopReason),
-        StopReasonTextAr = OcppStopReason.DescribeAr(d.StopReason),
-        Price = SessionPricingService.ReadLines(breakdownJson),
-    };
+        var limit = d.ChargeLimit;
+        var (en, ar) = Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto.StopText(d.StopReason, limit?.Kind, limit?.Value, limit?.ReachedAt);
+        return d with
+        {
+            DurationSec = (int)((d.StoppedAt ?? now) - d.StartedAt).TotalSeconds,
+            StopReasonText = en,
+            StopReasonTextAr = ar,
+            Price = SessionPricingService.ReadLines(breakdownJson),
+            ChargeLimit = limit is null ? null : Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto.From(limit.Kind, limit.Value, limit.SetAt, limit.ReachedAt),
+        };
+    }
 }
 
 /// <summary>Driver: the session running now, with the latest sample; null when none.</summary>
@@ -215,7 +251,7 @@ public class GetMyCurrentOcppSessionRequestHandler(IApplicationDbContext db, ICu
         var sample = await db.OcppMeterValues.AsNoTracking()
             .Where(m => m.OcppTransactionId == open.Id)
             .OrderByDescending(m => m.MeasuredAt)
-            .Select(m => new { m.PowerW, m.SocPercent, m.MeasuredAt, m.EnergyWh })
+            .Select(m => new { m.PowerW, m.SocPercent, m.MeasuredAt, m.EnergyWh, m.CurrentA, m.VoltageV, m.TemperatureC })
             .FirstOrDefaultAsync(cancellationToken);
 
         var dto = MySessionProjection.Finish(open, now, null);
@@ -224,7 +260,11 @@ public class GetMyCurrentOcppSessionRequestHandler(IApplicationDbContext db, ICu
         // Energy so far from the latest register reading (EnergyKwh is only set at stop).
         var start = await db.OcppTransactions.AsNoTracking().Where(t => t.Id == open.Id).Select(t => t.MeterStartWh).FirstAsync(cancellationToken);
         var soFar = sample.EnergyWh is long wh && wh >= start ? (wh - start) / 1000m : dto.EnergyKwh;
-        return dto with { PowerW = sample.PowerW, SocPercent = sample.SocPercent, LastSampleAt = sample.MeasuredAt, EnergyKwh = soFar };
+        return dto with
+        {
+            PowerW = sample.PowerW, SocPercent = sample.SocPercent, LastSampleAt = sample.MeasuredAt, EnergyKwh = soFar,
+            CurrentA = sample.CurrentA, VoltageV = sample.VoltageV, TemperatureC = sample.TemperatureC,
+        };
     }
 }
 

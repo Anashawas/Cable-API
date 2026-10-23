@@ -1,4 +1,5 @@
 using Application.Ocpp;
+using Application.Ocpp.Live;
 using Application.Pricing;
 using System.Text.Json;
 using Application.Common.Interfaces;
@@ -12,7 +13,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Cable.Ocpp.Handlers;
 
 /// <summary>Updates the charger row with what the unit says about itself; never touches sessions (R2).</summary>
-public sealed class BootNotificationHandler(IApplicationDbContext db, Hangfire.IBackgroundJobClient jobs, CommandConfirmer confirmer, ILogger<BootNotificationHandler> log) : IOcppHandler
+public sealed class BootNotificationHandler(IApplicationDbContext db, Hangfire.IBackgroundJobClient jobs, CommandConfirmer confirmer, LiveEventPublisher live, ILogger<BootNotificationHandler> log) : IOcppHandler
 {
     public async Task<object> HandleAsync(OcppSession session, JsonElement payload, CancellationToken cancellationToken)
     {
@@ -39,6 +40,7 @@ public sealed class BootNotificationHandler(IApplicationDbContext db, Hangfire.I
 
         log.LogInformation("BOOT {ChargePointId}: {Vendor} {Model} fw {Firmware} sn {Serial}",
             session.ChargePointId, cp.Vendor, cp.Model, cp.FirmwareVersion, cp.SerialNumber);
+        live.Publish(new OcppLiveEvent(OcppLiveEventTypes.Charger, session.ChargingPointId, session.OcppChargePointId, null, null, "booted", now));
 
         // Cards changed while it was offline (or a push failed): the API's job pushes the list now that it is back.
         if (cp.LocalListStatus is Cable.Core.Constants.OcppLocalListStatus.Pending or Cable.Core.Constants.OcppLocalListStatus.Failed)
@@ -75,7 +77,7 @@ public sealed class HeartbeatHandler(CommandConfirmer confirmer) : IOcppHandler
 }
 
 /// <summary>Upserts the connector row; unknown connector ids are created, never refused. Faulted → owner notification.</summary>
-public sealed class StatusNotificationHandler(IApplicationDbContext db, FaultNotifier faults, CommandConfirmer confirmer) : IOcppHandler
+public sealed class StatusNotificationHandler(IApplicationDbContext db, FaultNotifier faults, CommandConfirmer confirmer, LiveEventPublisher live) : IOcppHandler
 {
     public async Task<object> HandleAsync(OcppSession session, JsonElement payload, CancellationToken cancellationToken)
     {
@@ -104,6 +106,7 @@ public sealed class StatusNotificationHandler(IApplicationDbContext db, FaultNot
         await db.SaveChanges(cancellationToken);
 
         session.Connectors[connectorId] = new ConnectorState(status, errorCode, info, chargerTime, now);
+        live.Publish(new OcppLiveEvent(OcppLiveEventTypes.Connector, session.ChargingPointId, session.OcppChargePointId, connectorId, null, status, now));
 
         if (status == OcppConnectorStatus.Faulted)
             faults.Report(connector.Id, session.ChargePointId, connectorId, errorCode, info);
@@ -136,7 +139,7 @@ public sealed class AuthorizeHandler(TagAuthorizer authorizer) : IOcppHandler
 }
 
 /// <summary>Opens the session; the row's identity is the transactionId the charger will quote from now on.</summary>
-public sealed class StartTransactionHandler(IApplicationDbContext db, TagAuthorizer authorizer, CommandConfirmer confirmer) : IOcppHandler
+public sealed class StartTransactionHandler(IApplicationDbContext db, TagAuthorizer authorizer, CommandConfirmer confirmer, LiveEventPublisher live) : IOcppHandler
 {
     public async Task<object> HandleAsync(OcppSession session, JsonElement payload, CancellationToken cancellationToken)
     {
@@ -180,8 +183,29 @@ public sealed class StartTransactionHandler(IApplicationDbContext db, TagAuthori
             StartSource = source,
             StartedByUserId = startedBy,
         };
+
+        // A limit chosen with the remote start (app / partner / admin) waits on the plug: this session takes it.
+        if (!tx.WasRejected && source != OcppStartSource.Card)
+        {
+            var since = now - OcppVirtualTag.RemoteStartAuthorizeWindow;
+            var plug = await db.OcppConnectors.FirstOrDefaultAsync(c => c.OcppChargePointId == session.OcppChargePointId
+                && c.ConnectorId == tx.ConnectorId && c.PendingLimitKind != null && c.PendingLimitSetAt >= since, cancellationToken);
+            if (plug is not null)
+            {
+                tx.ChargeLimitKind = plug.PendingLimitKind;
+                tx.ChargeLimitValue = plug.PendingLimitValue;
+                tx.ChargeLimitSetBy = plug.PendingLimitSetBy;
+                tx.ChargeLimitSetAt = now;
+                plug.PendingLimitKind = null;
+                plug.PendingLimitValue = null;
+                plug.PendingLimitSetBy = null;
+                plug.PendingLimitSetAt = null;
+            }
+        }
+
         db.OcppTransactions.Add(tx);
         await db.SaveChanges(cancellationToken);
+        live.Publish(new OcppLiveEvent(OcppLiveEventTypes.Session, session.ChargingPointId, session.OcppChargePointId, tx.ConnectorId, tx.Id, "started", now));
 
         // A RemoteStartTransaction we sent is confirmed by the session actually opening.
         if (!tx.WasRejected && source != OcppStartSource.Card)
@@ -194,7 +218,7 @@ public sealed class StartTransactionHandler(IApplicationDbContext db, TagAuthori
 }
 
 /// <summary>Stores samples by the charger's timestamp; a replay after an outage is a no-op (R1, R3).</summary>
-public sealed class MeterValuesHandler(IApplicationDbContext db, CommandConfirmer confirmer, ILogger<MeterValuesHandler> log) : IOcppHandler
+public sealed class MeterValuesHandler(IApplicationDbContext db, CommandConfirmer confirmer, ChargeLimitEnforcer limits, LiveEventPublisher live, ILogger<MeterValuesHandler> log) : IOcppHandler
 {
     public async Task<object> HandleAsync(OcppSession session, JsonElement payload, CancellationToken cancellationToken)
     {
@@ -209,12 +233,20 @@ public sealed class MeterValuesHandler(IApplicationDbContext db, CommandConfirme
         transactionId = await MeterValueWriter.ResolveTransactionAsync(db, session, transactionId, log, cancellationToken);
         var rows = MeterValueParser.Parse(samples.Value, session.OcppChargePointId, connectorId, transactionId, DateTime.UtcNow);
         await MeterValueWriter.InsertNewAsync(db, rows, cancellationToken);
+
+        if (transactionId is int txId)
+        {
+            if (rows.Any(r => r.SocPercent is > 0))
+                await MeterValueWriter.UpdateSocAsync(db, txId, cancellationToken);
+            await limits.CheckAsync(db, session, txId, cancellationToken);
+            live.Publish(new OcppLiveEvent(OcppLiveEventTypes.Session, session.ChargingPointId, session.OcppChargePointId, connectorId, txId, "updated", DateTime.UtcNow));
+        }
         return new { };
     }
 }
 
 /// <summary>Closes the session whenever the Stop arrives (R6); an unknown id becomes an orphan row, not a lost message.</summary>
-public sealed class StopTransactionHandler(IApplicationDbContext db, CommandConfirmer confirmer, ILogger<StopTransactionHandler> log) : IOcppHandler
+public sealed class StopTransactionHandler(IApplicationDbContext db, CommandConfirmer confirmer, LiveEventPublisher live, ILogger<StopTransactionHandler> log) : IOcppHandler
 {
     public async Task<object> HandleAsync(OcppSession session, JsonElement payload, CancellationToken cancellationToken)
     {
@@ -228,6 +260,27 @@ public sealed class StopTransactionHandler(IApplicationDbContext db, CommandConf
             ? null
             : await db.OcppTransactions.FirstOrDefaultAsync(
                 t => t.Id == transactionId && t.OcppChargePointId == session.OcppChargePointId, cancellationToken);
+
+        // The first Stop is final. hjl 1.0.26.x later re-sends a Stop for a session it still remembers,
+        // quoting our id with the meter reading of that moment (Oct 19: #273 closed a day late with the
+        // next session's energy). Acknowledge it so the unit stops retrying, change nothing.
+        if (tx is { IsOpen: false, IsOrphan: false })
+        {
+            log.LogWarning("{ChargePointId}: StopTransaction for session {TransactionId} that is already closed (meterStop {MeterStop}, kept {KeptStop}) — ignored",
+                session.ChargePointId, tx.Id, meterStop, tx.MeterStopWh);
+            return new { idTagInfo = new { status = OcppAuthorizationStatus.Accepted } };
+        }
+
+        // Some firmware (hjl 1.0.26.x) replays sessions it ran offline as StartTransaction (we issue an id)
+        // followed at once by a StopTransaction that quotes its OWN local id instead of ours. Close the
+        // session we just opened for it rather than leaving it open forever and its energy unpriced.
+        if (tx is null)
+        {
+            tx = await FindReplayedStartAsync(session, OcppPayload.Str(payload, "idTag"), stoppedAt, meterStop, now, cancellationToken);
+            if (tx is not null)
+                log.LogWarning("{ChargePointId}: StopTransaction quotes unknown id {TransactionId} — matched to replayed session {MatchedId} (same idTag, opened {Seconds:0}s ago)",
+                    session.ChargePointId, transactionId, tx.Id, (now - tx.ReceivedStartAt).TotalSeconds);
+        }
 
         if (tx is null)
         {
@@ -251,6 +304,8 @@ public sealed class StopTransactionHandler(IApplicationDbContext db, CommandConf
         tx.ReceivedStopAt = now;
         tx.StopReason = reason;
         tx.IsOpen = false;
+        // "Stale" means "open with no Stop for 24 h"; a session that did get its Stop is no longer stale.
+        tx.IsStale = false;
         // A meter that went backwards (replaced / reset) is flagged by a null, never a negative kWh.
         tx.EnergyKwh = !tx.IsOrphan && meterStop >= tx.MeterStartWh ? (meterStop - tx.MeterStartWh) / 1000m : null;
         await db.SaveChanges(cancellationToken);
@@ -277,8 +332,40 @@ public sealed class StopTransactionHandler(IApplicationDbContext db, CommandConf
             var rows = MeterValueParser.Parse(samples.Value, session.OcppChargePointId, tx.ConnectorId, tx.Id, now);
             await MeterValueWriter.InsertNewAsync(db, rows, cancellationToken);
         }
+        if (!tx.IsOrphan)
+        {
+            await MeterValueWriter.UpdateSocAsync(db, tx.Id, cancellationToken);
+            live.Publish(new OcppLiveEvent(OcppLiveEventTypes.Session, session.ChargingPointId, session.OcppChargePointId, tx.ConnectorId, tx.Id, "stopped", now));
+        }
 
         return new { idTagInfo = new { status = OcppAuthorizationStatus.Accepted } };
+    }
+
+    /// <summary>How recently the replayed StartTransaction must have reached us: replays arrive back to back.</summary>
+    internal static readonly TimeSpan ReplayMatchWindow = TimeSpan.FromMinutes(15);
+
+    /// <summary>
+    /// The open session on this charger that a Stop with an unknown id most likely belongs to: same idTag
+    /// (when the Stop carries one), started by the charger's clock no later than the stop, meter not
+    /// running backwards, and received by us within <see cref="ReplayMatchWindow"/> — the latest such start.
+    /// Live sessions opened earlier than the window are never touched.
+    /// </summary>
+    private async Task<OcppTransaction?> FindReplayedStartAsync(OcppSession session, string? stopIdTag, DateTime stoppedAt,
+        long meterStop, DateTime now, CancellationToken cancellationToken)
+    {
+        var receivedSince = now - ReplayMatchWindow;
+        var candidates = await db.OcppTransactions
+            .Where(t => t.OcppChargePointId == session.OcppChargePointId && t.IsOpen && !t.IsOrphan
+                        && t.ReceivedStartAt >= receivedSince && t.StartedAt <= stoppedAt && t.MeterStartWh <= meterStop)
+            .OrderByDescending(t => t.StartedAt).ThenByDescending(t => t.Id)
+            .ToListAsync(cancellationToken);
+
+        // Without an idTag the Stop could belong to either plug: only an unambiguous single candidate is taken.
+        if (string.IsNullOrWhiteSpace(stopIdTag))
+            return candidates.Count == 1 ? candidates[0] : null;
+
+        var tag = OcppCredentials.NormalizeIdTag(stopIdTag);
+        return candidates.FirstOrDefault(t => OcppCredentials.NormalizeIdTag(t.IdTag) == tag);
     }
 }
 
@@ -309,6 +396,17 @@ internal static class MeterValueWriter
         log.LogWarning("{ChargePointId}: MeterValues for unknown transaction {TransactionId} — stored without a session",
             session.ChargePointId, transactionId);
         return null;
+    }
+
+    /// <summary>Battery % at the first and latest reading that carried one (readings may arrive out of order after an outage).</summary>
+    public static async Task UpdateSocAsync(IApplicationDbContext db, int transactionId, CancellationToken cancellationToken)
+    {
+        var socs = db.OcppMeterValues.AsNoTracking().Where(m => m.OcppTransactionId == transactionId && m.SocPercent > 0);
+        var first = await socs.OrderBy(m => m.MeasuredAt).ThenBy(m => m.Id).Select(m => m.SocPercent).FirstOrDefaultAsync(cancellationToken);
+        if (first is null) return;
+        var last = await socs.OrderByDescending(m => m.MeasuredAt).ThenByDescending(m => m.Id).Select(m => m.SocPercent).FirstOrDefaultAsync(cancellationToken);
+        await db.OcppTransactions.Where(t => t.Id == transactionId)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.SocStartPercent, first).SetProperty(t => t.SocEndPercent, last), cancellationToken);
     }
 
     /// <summary>Insert only what is not already there (R3). The unique index is the backstop for races.</summary>

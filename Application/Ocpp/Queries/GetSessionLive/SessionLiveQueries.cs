@@ -15,7 +15,8 @@ namespace Application.Ocpp.Queries.GetSessionLive;
 // for any. Polled every few seconds by the partner web while a plug is busy.
 // ---------------------------------------------------------------------------
 
-public record SessionSampleDto(DateTime At, int? PowerW, int? SocPercent, decimal? EnergyKwh);
+public record SessionSampleDto(DateTime At, int? PowerW, int? SocPercent, decimal? EnergyKwh,
+    decimal? CurrentA = null, decimal? VoltageV = null, decimal? TemperatureC = null);
 
 public record SessionLiveDto(
     int Id,
@@ -50,7 +51,14 @@ public record SessionLiveDto(
     string? CurrentWindowNameAr,
     List<SessionPriceLineDto>? Price,
     /// <summary>Up to 120 points, oldest first.</summary>
-    List<SessionSampleDto> Series);
+    List<SessionSampleDto> Series,
+    /// <summary>Latest charger temperature (°C) when the unit reports it.</summary>
+    decimal? TemperatureC = null,
+    /// <summary>Battery % at the start of the session and at the latest / final reading.</summary>
+    int? SocStartPercent = null,
+    int? SocEndPercent = null,
+    /// <summary>"Stop at …" — null when none.</summary>
+    Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto? ChargeLimit = null);
 
 internal static class SessionLiveBuilder
 {
@@ -65,6 +73,7 @@ internal static class SessionLiveBuilder
             {
                 t.Id, t.OcppChargePointId, t.ChargePoint.ChargingPointId, t.ChargePoint.DisplayName, t.ConnectorId, t.StartedAt, t.StoppedAt, t.IsOpen,
                 t.StartSource, t.StopReason, t.MeterStartWh, t.MeterStopWh, t.EnergyKwh, t.CostFils, t.CostBreakdownJson, t.WasRejected, t.IsOrphan,
+                t.SocStartPercent, t.SocEndPercent, t.ChargeLimitKind, t.ChargeLimitValue, t.ChargeLimitSetAt, t.ChargeLimitReachedAt,
             })
             .FirstOrDefaultAsync(ct)
             ?? throw new NotFoundException("cannot find session " + transactionId);
@@ -72,7 +81,7 @@ internal static class SessionLiveBuilder
         var samples = await db.OcppMeterValues.AsNoTracking()
             .Where(m => m.OcppTransactionId == tx.Id)
             .OrderBy(m => m.MeasuredAt)
-            .Select(m => new { m.MeasuredAt, m.PowerW, m.SocPercent, m.EnergyWh, m.VoltageV, m.CurrentA })
+            .Select(m => new { m.MeasuredAt, m.PowerW, m.SocPercent, m.EnergyWh, m.VoltageV, m.CurrentA, m.TemperatureC })
             .ToListAsync(ct);
 
         var last = samples.LastOrDefault();
@@ -120,7 +129,8 @@ internal static class SessionLiveBuilder
 
         // Downsample evenly to MaxPoints, always keeping the last one.
         var series = samples.Select(s => new SessionSampleDto(s.MeasuredAt, s.PowerW, s.SocPercent,
-                s.EnergyWh is long e && e >= tx.MeterStartWh ? (e - tx.MeterStartWh) / 1000m : null)).ToList();
+                s.EnergyWh is long e && e >= tx.MeterStartWh ? (e - tx.MeterStartWh) / 1000m : null,
+                s.CurrentA, s.VoltageV, s.TemperatureC)).ToList();
         if (series.Count > MaxPoints)
         {
             var step = (double)series.Count / MaxPoints;
@@ -129,14 +139,18 @@ internal static class SessionLiveBuilder
             series = picked;
         }
 
+        var stopText = Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto.StopText(tx.StopReason, tx.ChargeLimitKind, tx.ChargeLimitValue, tx.ChargeLimitReachedAt);
         return new SessionLiveDto(
             tx.Id, tx.ChargingPointId, tx.OcppChargePointId, tx.DisplayName, tx.ConnectorId, tx.StartedAt, tx.StoppedAt, tx.IsOpen,
             (int)((tx.StoppedAt ?? now) - tx.StartedAt).TotalSeconds, tx.StartSource, tx.StopReason,
-            OcppStopReason.Describe(tx.StopReason), OcppStopReason.DescribeAr(tx.StopReason),
+            stopText.En, stopText.Ar,
             energy, last?.PowerW, last?.SocPercent, last?.VoltageV, last?.CurrentA, last?.MeasuredAt,
             last is null ? null : (int)(now - last.MeasuredAt).TotalSeconds,
             powered.Count == 0 ? null : powered.Max(), powered.Count == 0 ? null : (int)powered.Average(),
-            cost, cost is int c ? c / 1000m : null, rate, windowEn, windowAr, lines, series);
+            cost, cost is int c ? c / 1000m : null, rate, windowEn, windowAr, lines, series,
+            samples.LastOrDefault(s => s.TemperatureC != null)?.TemperatureC,
+            tx.SocStartPercent, tx.SocEndPercent,
+            Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto.From(tx.ChargeLimitKind, tx.ChargeLimitValue, tx.ChargeLimitSetAt, tx.ChargeLimitReachedAt));
     }
 }
 

@@ -15,9 +15,16 @@ public sealed class FaultNotifier(IBackgroundJobClient jobs, ILogger<FaultNotifi
 {
     private readonly ConcurrentDictionary<string, DateTime> _lastSent = new();
 
+    /// <summary>
+    /// The alert waits this long so every plug that faults in the same event (a power drop faults
+    /// both plugs, often twice: OtherError then NoError) goes out as one message per charger.
+    /// </summary>
+    internal static readonly TimeSpan GroupDelay = TimeSpan.FromSeconds(10);
+
     public void Report(int ocppConnectorId, string chargePointId, int connectorId, string errorCode, string? info)
     {
-        var key = $"{chargePointId}:{connectorId}:{errorCode}";
+        // One alert per charger per window: the job lists every plug faulted at send time.
+        var key = chargePointId;
         var now = DateTime.UtcNow;
         if (_lastSent.TryGetValue(key, out var last) && now - last < OcppLimits.FaultNotificationDedupe)
             return;
@@ -25,7 +32,7 @@ public sealed class FaultNotifier(IBackgroundJobClient jobs, ILogger<FaultNotifi
 
         try
         {
-            jobs.Enqueue<IBackgroundJobService>(s => s.NotifyOcppFaultAsync(ocppConnectorId, errorCode, info, CancellationToken.None));
+            jobs.Schedule<IBackgroundJobService>(s => s.NotifyOcppFaultAsync(ocppConnectorId, errorCode, info, CancellationToken.None), GroupDelay);
             log.LogWarning("FAULT {ChargePointId} connector {ConnectorId}: {ErrorCode} {Info} — notification enqueued",
                 chargePointId, connectorId, errorCode, info);
         }

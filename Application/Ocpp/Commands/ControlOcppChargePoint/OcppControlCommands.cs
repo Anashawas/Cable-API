@@ -284,7 +284,7 @@ public class RemoteStopOcppTransactionCommandHandler(IApplicationDbContext db, I
 /// The unit authorizes that tag only against this request, then opens the session, which is
 /// recorded with StartSource Operator and the admin as StartedByUserId. Confirmed by StartTransaction.
 /// </summary>
-public record RemoteStartOcppTransactionCommand(int Id, int ConnectorId) : IRequest<OcppCommandResultDto>;
+public record RemoteStartOcppTransactionCommand(int Id, int ConnectorId, string? ChargeLimitKind = null, decimal? ChargeLimitValue = null) : IRequest<OcppCommandResultDto>;
 
 public class RemoteStartOcppTransactionCommandValidator : AbstractValidator<RemoteStartOcppTransactionCommand>
 {
@@ -300,6 +300,8 @@ public class RemoteStartOcppTransactionCommandHandler(IApplicationDbContext db, 
     public async Task<OcppCommandResultDto> Handle(RemoteStartOcppTransactionCommand request, CancellationToken cancellationToken)
     {
         var target = await DriverSessions.OcppRemoteStart.EnsureCanStartAsync(db, request.Id, request.ConnectorId, cancellationToken);
+        await AdminRoleGuard.EnsureAdminAsync(db, currentUser, cancellationToken);
+        await DriverSessions.OcppRemoteStart.SetPendingLimitAsync(db, request.Id, request.ConnectorId, request.ChargeLimitKind, request.ChargeLimitValue, currentUser.UserId, cancellationToken);
         return await OcppCommandRunner.RunAsync(db, currentUser, client, request.Id, "RemoteStartTransaction",
             DriverSessions.OcppRemoteStart.Payload(request.ConnectorId, Cable.Core.Constants.OcppVirtualTag.ForStation(target.ChargePoint.ChargingPointId)), cancellationToken);
     }

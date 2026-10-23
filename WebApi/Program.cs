@@ -79,6 +79,15 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(op =>
 });
 
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+// Live Cable Connect updates (hub /hubs/ocpp) — see Routes/OcppLiveRoutes.cs.
+// Same JSON as the REST responses (camelCase, string enums, Jordan-time dates); clients only send
+// small Join/Leave calls, so the receive limit is kept low. Detailed errors only in Development.
+builder.Services.AddSignalR(o =>
+    {
+        o.EnableDetailedErrors = builder.Environment.IsDevelopment();
+        o.MaximumReceiveMessageSize = 8 * 1024;
+    })
+    .AddJsonProtocol(o => ConfigureJsonSerliaizer(o.PayloadSerializerOptions));
 
 var app = builder.Build();
 
@@ -313,7 +322,9 @@ app.MapUserRoutes()
     .MapChargerBrandRoutes()
     .MapSubscriptionRoutes()
     .MapOcppRoutes()
-    .MapPricingRoutes();
+    .MapPricingRoutes()
+    .MapHealthRoutes()
+    .MapOcppLiveRoutes();
 
 // Unknown non-API URLs get the landing 404 page; API-ish paths keep JSON-style 404s.
 app.MapLandingPageFallback();

@@ -41,4 +41,11 @@ public sealed class OcppOptions
     public string SelfPingUrl { get; set; } = "";
 
     public int SelfPingIntervalSeconds { get; set; } = 240;
+
+    /// <summary>
+    /// The API's internal live-events endpoint (…/api/internal/ocpp/events). Each plug status, session start /
+    /// reading / stop and charger connect / disconnect is posted there (header X-Api-Key = <see cref="StatusApiKey"/>,
+    /// the same key the API uses for /commands) and pushed to the web over SignalR. Empty = off.
+    /// </summary>
+    public string ApiEventsUrl { get; set; } = "";
 }

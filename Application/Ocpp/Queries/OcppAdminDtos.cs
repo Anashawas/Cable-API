@@ -47,14 +47,26 @@ public record OcppTransactionDto(
     /// <summary>Price under the time-of-use tariff (fils / JOD); null while open or when the energy is unknown.</summary>
     int? CostFils = null,
     decimal? CostJod = null,
-    int? TariffVersion = null)
+    int? TariffVersion = null,
+    /// <summary>Battery % at the start of the session and at the latest / final reading.</summary>
+    int? SocStartPercent = null,
+    int? SocEndPercent = null,
+    Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto? ChargeLimit = null,
+    string? StopReasonTextAr = null)
 {
-    public static OcppTransactionDto From(OcppTransaction t, DateTime nowUtc) => new(
+    public static OcppTransactionDto From(OcppTransaction t, DateTime nowUtc)
+    {
+        var stop = Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto.StopText(t.StopReason, t.ChargeLimitKind, t.ChargeLimitValue, t.ChargeLimitReachedAt);
+        return new(
         t.Id, t.ConnectorId, t.IdTag, t.StartedAt, t.StoppedAt,
         (int)((t.StoppedAt ?? nowUtc) - t.StartedAt).TotalSeconds,
         t.MeterStartWh, t.MeterStopWh, t.EnergyKwh, t.StopReason, t.IsOpen, t.IsStale, t.IsOrphan, t.WasRejected,
-        t.StartSource, t.StartedByUserId, OcppStopReason.Describe(t.StopReason),
-        t.CostFils, t.CostFils is int f ? f / 1000m : null, t.TariffVersion);
+        t.StartSource, t.StartedByUserId,
+        stop.En,
+        t.CostFils, t.CostFils is int f ? f / 1000m : null, t.TariffVersion, t.SocStartPercent, t.SocEndPercent,
+        Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto.From(t.ChargeLimitKind, t.ChargeLimitValue, t.ChargeLimitSetAt, t.ChargeLimitReachedAt),
+        stop.Ar);
+    }
 }
 
 /// <summary>One row of the admin charger list.</summary>

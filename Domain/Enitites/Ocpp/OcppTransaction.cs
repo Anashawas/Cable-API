@@ -62,6 +62,19 @@ public class OcppTransaction : BaseEntity
 
     public DateTime? PricedAt { get; set; }
 
+    /// <summary>Battery % at the first reading that carried one, and at the latest (the final one once closed).</summary>
+    public int? SocStartPercent { get; set; }
+    public int? SocEndPercent { get; set; }
+
+    /// <summary>Stop the session automatically at this amount: Jod | Kwh | Soc (OcppChargeLimit). Null = no limit.</summary>
+    public string? ChargeLimitKind { get; set; }
+    public decimal? ChargeLimitValue { get; set; }
+    public int? ChargeLimitSetBy { get; set; }
+    public DateTime? ChargeLimitSetAt { get; set; }
+
+    /// <summary>When Cable.Ocpp sent the RemoteStop because the limit was reached (null = not reached / to retry).</summary>
+    public DateTime? ChargeLimitReachedAt { get; set; }
+
     public virtual OcppChargePoint ChargePoint { get; set; } = null!;
     public virtual ICollection<OcppMeterValue> MeterValues { get; set; } = new List<OcppMeterValue>();
 }
