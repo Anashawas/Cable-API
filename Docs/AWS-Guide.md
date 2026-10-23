@@ -17,13 +17,14 @@
 | Region | **Stockholm (eu-north-1)**. In the AWS console, the region picker (top right) must say Stockholm or you will see an empty account. |
 | Server (instance) | **Cable-OCPP** — Windows Server 2025, 2 vCPU, 2 GB RAM, 60 GB SSD, 3 TB transfer / month |
 | Price | **$22 / month**, fixed. Extra only for snapshots (a few cents per GB) and transfer above 3 TB (you are far below). |
+| Plan | **Paid (pay-as-you-go)** since Oct 12, 2026. **$200 credits** pay the bill first ($100 sign-up + $100 earned from the 5 "Explore AWS" activities on Oct 12; all expire Oct 5, 2027 — at ~$22/month they last until ~summer 2027). The activity test resources (Lambda, EC2, RDS) were deleted the same day. Cost insights on Oct 13 listed **no Lightsail cost** after a week of running → the Lightsail free months (3 months on the $22 Windows bundle) appear to apply until ~early Jan 2027; confirm on the November bill. Project **"Blank Slate"** (holds the server) has a **$50 / month spend limit**: at the limit AWS **pauses the project** → raise it *before* any bigger plan (e.g. to $80 before moving to $44). Early cost control: only "Stop new resource launches" — never "Pause top cost drivers" (that is the charger server). Emails at 50 / 75 / 90 % of the limit. Settings → Billing (settings.aws.com/billing). |
 | Public IP | **13.61.45.26** (static) → DNS `ocpp.cable-app.com` (the A record is in the SmarterASP DNS panel, not in AWS) |
 | What runs on it | IIS site `ocpp` (folder `C:\inetpub\ocpp`, app pool `ocpp`, Always Running) = `Cable.Ocpp` |
 | HTTPS certificate | Let's Encrypt via **win-acme**, renews itself (needs port 80 open) |
 | Open ports | **443** chargers (wss) and HTTPS · **80** certificate renewal · **8172** Web Deploy from Visual Studio (only your IPs) · **3389** remote desktop |
 | Deploy | Visual Studio → `aws-ocpp - Web Deploy` profile, user `Administrator`, password from Lightsail |
 | Health | `https://ocpp.cable-app.com/health` → 200. `/status` (with the `X-Api-Key` header) lists connected chargers |
-| **Database it uses today** | **the dev database** (environment *Staging*). It becomes the production charger server only at the production switch (go-live checklist §2). |
+| **Database it uses today** | **the production database** (environment *Production*) since **Oct 13, 2026** (`appsettings.Production.json`, `EnvironmentName` set in the `aws-ocpp` publish profile only). Dev chargers and simulators use `ocpp-dev.cable-app.com` (SmarterASP, dev DB). |
 
 How the pieces fit:
 
@@ -107,8 +108,8 @@ Lightsail → **Instances** → **Cable-OCPP** → **Networking** tab → **IPv4
 |---|---|---|
 | HTTPS | 443 | **Any IPv4** (chargers connect from anywhere) |
 | HTTP | 80 | **Any IPv4** (certificate renewal) |
-| Custom TCP | 8172 | **Restrict to IP addresses**: `94.128.0.0/15` (home range) and `188.236.0.0/16` (office range) |
-| RDP | 3389 | **Restrict to IP addresses** (same two ranges) **and tick "Allow Lightsail browser RDP"** |
+| Custom TCP | 8172 | **Restrict to IP addresses**: `94.128.0.0/15` (home range), `188.236.0.0/16` (office range), `185.41.216.0/24` (added Oct 13, 2026) |
+| RDP | 3389 | **Lightsail browser RDP only** (current setting — safest; remote desktop only through the Lightsail web page) |
 
 The ranges stop the "Could not connect to the remote computer" error every time your home / office IP changes,
 while still keeping the deploy and remote-desktop ports closed to the internet. Remote desktop through the Lightsail
@@ -118,10 +119,13 @@ Do the same under **IPv6 Firewall** if it is enabled: 443 and 80 open, nothing e
 
 ### Step 7 — Backups (snapshots)
 
-1. **Cable-OCPP** → **Snapshots** tab.
-2. **Automatic snapshots** → switch **On**, time **00:00 UTC** (03:00 Jordan, when nobody charges). Lightsail keeps the last 7 days.
-3. If the automatic option is not offered for this Windows server, use **Create snapshot** manually — at least **before every deploy** and once a week.
-   Name it with the date, e.g. `cable-ocpp-2026-10-12`.
+The server holds no data (that is in the SmarterASP database) — a snapshot protects the **setup**: IIS, Web Deploy, win-acme +
+certificate, the server's appsettings. Restoring takes ~15 min instead of 2–4 h of rebuilding.
+
+1. **Cable-OCPP** → **Snapshots** tab. *Automatic snapshots are not supported for Windows instances* → manual only.
+2. **Create snapshot** → name with the date, e.g. `cable-ocpp-2026-10-13` (first one taken Oct 13, 2026).
+3. Take a new one **before every change** (Cable.Ocpp deploy, Windows updates, IIS / certificate changes), then delete the oldest — keep **2 at most** (~$1–3 / month).
+4. Keep a copy of the server's appsettings file (connection string, API key) in the password manager.
 
 To restore: Snapshots tab → the snapshot → **Create new instance**; then move the static IP to the new instance (Networking).
 The DNS name stays the same because the IP moves with it.
@@ -137,7 +141,17 @@ The DNS name stays the same because the IP moves with it.
 
 AWS alarms tell you the **machine** is down, not that **the charger server inside it** stopped. Add a free check on the URL:
 
-1. uptimerobot.com → free account → **Add New Monitor** → type **HTTP(s)**, URL `https://ocpp.cable-app.com/health`, interval 5 min.
+1. uptimerobot.com → free account (cable.electric.car@gmail.com) → **New monitor** → type **HTTP(s)**, interval 5 min, email alert:
+
+| Monitor | URL | Down means |
+|---|---|---|
+| Charger server (prod) | `https://ocpp.cable-app.com/health` | chargers cannot connect |
+| Cable API (prod) | `https://cable-app.com/api/health` | API down or its database unreachable (503) |
+| SMS (prod) | `https://cable-app.com/api/health/sms` | OTP SMS cannot be sent: provider account / sender name not active, or balance below `SmsService:MinBalance` (default 1000) — the JSON `problem` says which |
+| Charger server (dev) — optional | `https://ocpp-dev.cable-app.com/health` | test charger server down |
+
+   `/api/health` and `/api/health/sms` exist after the API publish of Oct 2026; they answer GET **and HEAD** (UptimeRobot's default),
+   200 when healthy, 503 when not. Before that publish the API had no HEAD-capable URL, so a plain HTTP monitor on it showed a false "Down".
 2. Alert contact: your email (and the phone app if you want push).
 
 ---
