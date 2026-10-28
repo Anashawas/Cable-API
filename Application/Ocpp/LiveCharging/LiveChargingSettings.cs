@@ -53,6 +53,8 @@ public class SetLiveChargingSettingsCommandHandler(IApplicationDbContext db, ICu
             await UpsertAsync(AppSettingsProvider.OcppAppStartMaxDistanceKey, m.ToString(CultureInfo.InvariantCulture), cancellationToken);
         if (request.RequireLocation is bool r)
             await UpsertAsync(AppSettingsProvider.OcppAppStartRequireLocationKey, r ? "true" : "false", cancellationToken);
+        // Automatic points are not used (decision Oct 28): the admin API no longer switches them on; the
+        // command keeps the parameter only so a deliberate SQL / future change can still use it.
         if (request.AutoPointsEnabled is bool a)
             await UpsertAsync(AppSettingsProvider.OcppAutoPointsEnabledKey, a ? "true" : "false", cancellationToken);
 

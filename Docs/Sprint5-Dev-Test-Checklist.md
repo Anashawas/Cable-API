@@ -19,10 +19,10 @@ tracker postponed). **Dev only — production untouched.** Backend detail per ar
 ## Settings that start OFF / at defaults (admin → Cable Connect → live charging settings)
 | Setting | Default | Meaning |
 |---|---|---|
-| `Ocpp.AutoPoints.Enabled` | **off** | Automatic loyalty points when a driver's session ends. Only sessions ending after it is switched on count |
+| `Ocpp.AutoPoints.Enabled` | **off — not used** | Decision Oct 28: no automatic charging points. The admin switch was removed |
 | `Ocpp.AppStart.RequireLocation` | on | App start needs the phone's location |
 | `Ocpp.AppStart.MaxDistanceMeters` | 300 | Max distance from the station for an app start |
-| `Billing.PointsPerJod` | 1000 | **Confirm** — all margin / break-even maths uses it |
+| Point value | 50 points = 1 JOD | From the default points conversion rate (confirmed). The seeded loyalty plans (20/50/100 points per scan) lose money at this value — adjust their tiers in admin → Plans (the calculator shows red / green) |
 | `Billing.TargetMarginPercent` | 20 | Bundle margin target |
 | `Billing.BundleMinimumTransactionAmount` | 2 JOD | Minimum transaction for bundle partners |
 
@@ -34,15 +34,15 @@ tracker postponed). **Dev only — production untouched.** Backend detail per ar
 - [ ] Start from a sticker code (`CHG-…`) → session recorded `Sticker`; another plug's code → `CODE_MISMATCH`
 - [ ] Second running session → 409 `sessionAlreadyOpen`
 - [ ] Session details with chart, cost so far, station tariff (when set), receipt PDF + verify page
-- [ ] Pushes: started, finished (with points when automatic points are on), "car finished, unplug"
-- [ ] Monthly summary; link / unlink an RFID card (another user's card → 409)
+- [ ] Pushes: started, finished, "car finished, unplug"
+- [ ] Monthly summary
 - [ ] "Problem with this session" (7 days, one open per session); "plug didn't work" report → owner push
 
 ### Admin web (`dev.cable-app.com/admin`)
 - [ ] Charging sessions list (filters, search by phone / #id, CSV) and detail
-- [ ] User profile → Charging tab (sessions, cards, unlink), promos (revoke)
+- [ ] User profile → Charging tab (sessions), promos (revoke)
 - [ ] Station: own tariff (set / remove), sticker codes (renew, PDF), plug reports (resolve)
-- [ ] Live charging settings (incl. automatic points switch)
+- [ ] Live charging settings (max distance, require location)
 - [ ] Cable Gifts: create (image), order list, fulfil with voucher code, cancel → points back, CSV, dashboard count
 - [ ] Promo campaigns: create (scope rules), codes + CSV, assign, report with Cable vs partner split and budget
 - [ ] Plans: edit price / points rule (tier validation), margin calculator, history, feature matrix
@@ -73,8 +73,6 @@ tracker postponed). **Dev only — production untouched.** Backend detail per ar
   confirm with 0 points; renewal adds to what is left.
 
 ## Known points to decide / follow up
-- RFID card linking trusts the typed number (someone knowing another card number could link it). Option: confirm
-  by tapping the card at a charger within a few minutes.
 - Gift refund line in the points history is written in the device language (purchase line in the request
   language) — cosmetic.
 - At a bundle partner whose bundle is already used up, the preview's promo list may still show points (the scan

@@ -344,14 +344,13 @@ ELSE PRINT 'SKIP plan change log seed';
 GO
 
 /* ---------------------------------------------------------------------------
-   4. Settings (decisions 10, 12, 19). Billing.PointsPerJod must be confirmed — all margin maths use it.
+   4. Settings (decisions 12, 19). The point value (decision 10) is the default PointsConversionRate.
    --------------------------------------------------------------------------- */
-IF NOT EXISTS (SELECT 1 FROM dbo.AppSetting WHERE [Key] = 'Billing.PointsPerJod' AND IsDeleted = 0)
-BEGIN
-    INSERT INTO dbo.AppSetting ([Key], Value, CreatedAt, IsDeleted) VALUES ('Billing.PointsPerJod', '1000', GETUTCDATE(), 0);
-    PRINT 'Seeded AppSetting Billing.PointsPerJod = 1000';
-END
-ELSE PRINT 'SKIP AppSetting Billing.PointsPerJod exists';
+-- Billing.PointsPerJod is NOT seeded: the value of a point comes from the default PointsConversionRate
+-- (decision 10, confirmed Oct 2026: 50 points = 1 JOD), so the percentage model and the margin maths share one number.
+-- A row seeded by an earlier run of this script (value 1000) is removed.
+DELETE FROM dbo.AppSetting WHERE [Key] = 'Billing.PointsPerJod' AND Value = '1000';
+PRINT 'Billing.PointsPerJod follows the default points conversion rate';
 
 IF NOT EXISTS (SELECT 1 FROM dbo.AppSetting WHERE [Key] = 'Billing.TargetMarginPercent' AND IsDeleted = 0)
 BEGIN

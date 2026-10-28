@@ -151,7 +151,8 @@ public static class BillingSettings
 {
     /// <summary>Points per 1 JOD of value (decision 10: 1,000 points = 1 JOD). Margin maths depends on it.</summary>
     public const string PointsPerJodKey = "Billing.PointsPerJod";
-    public const double DefaultPointsPerJod = 1000;
+    /// <summary>Only when there is neither a Billing.PointsPerJod row nor a default PointsConversionRate (the real source: 50 points = 1 JOD).</summary>
+    public const double DefaultPointsPerJod = 50;
 
     /// <summary>Cable's target margin on loyalty plans (decision 19: 20%).</summary>
     public const string TargetMarginPercentKey = "Billing.TargetMarginPercent";

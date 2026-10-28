@@ -315,7 +315,7 @@ All messages are Arabic or English by `Accept-Language`.
 
 | Key | Default | |
 |---|---|---|
-| `Billing.PointsPerJod` | 1000 (seeded) | decision 10 — **confirm**: all margin maths use it. Without the row: default conversion rate, then 1000 |
+| `Billing.PointsPerJod` | not seeded | decision 10 (confirmed): a point's value comes from the default PointsConversionRate (50 points = 1 JOD). An admin may still add the row to override it |
 | `Billing.TargetMarginPercent` | 20 | decision 19 |
 | `Billing.BundleMinimumTransactionAmount` | 2 | decision 12 |
 | `Subscription.GraceMode` / `GraceDays` | unchanged | decision 4 |

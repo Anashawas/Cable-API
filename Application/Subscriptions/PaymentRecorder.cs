@@ -111,6 +111,8 @@ public sealed class PaymentRecorder(
         db.Payments.Add(payment);
 
         await SubscriptionEntitySync.ApplyAsync(db, subscription, on: true, now, ct);
+        if (entityType == SubscriptionEntityTypes.OcppConnect)
+            await ExtendIncludedPremiumAsync(entityId, subscription, now, ct);
         await db.SaveChanges(ct);
 
         payment.ReferenceNo = $"RCP-{JordanTime.FromUtc(paidDateUtc):yyyy}-{payment.Id:D6}";
@@ -130,6 +132,37 @@ public sealed class PaymentRecorder(
         }
 
         return new Recorded(subscription, payment, receiptError, planRecord);
+    }
+
+    /// <summary>
+    /// Cable Connect includes Premium: a Connect payment also keeps the station's Premium (map placement, images…)
+    /// on until at least the same date, without a second payment. A Premium already running longer is left alone.
+    /// </summary>
+    private async Task ExtendIncludedPremiumAsync(int chargingPointId, Subscription connect, DateTime now, CancellationToken ct)
+    {
+        var premium = await db.Subscriptions
+            .FirstOrDefaultAsync(s => s.EntityType == SubscriptionEntityTypes.StationPremium && s.EntityId == chargingPointId && !s.IsDeleted, ct);
+        if (premium == null)
+        {
+            premium = new Subscription
+            {
+                EntityType = SubscriptionEntityTypes.StationPremium,
+                EntityId = chargingPointId,
+                StartDate = now < connect.StartDate ? now : connect.StartDate,
+                ExpiresAt = connect.ExpiresAt,
+                PlanMonths = connect.PlanMonths
+            };
+            db.Subscriptions.Add(premium);
+        }
+        else
+        {
+            if (premium.ExpiresAt >= connect.ExpiresAt && !premium.IsSwitchedOff) return;
+            if (connect.ExpiresAt > premium.ExpiresAt) premium.ExpiresAt = connect.ExpiresAt;
+            premium.IsSwitchedOff = false;
+            premium.SwitchedOffAt = null;
+            premium.SwitchedOffByUserId = null;
+        }
+        await SubscriptionEntitySync.ApplyAsync(db, premium, on: true, now, ct);
     }
 
     /// <summary>

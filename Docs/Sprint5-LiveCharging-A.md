@@ -8,7 +8,7 @@ Source: `LIVE_CHARGING_SESSION.md` §4.2, 4.4, 4.7, 4.8, 4.9, 11.c, 13.4 and N-5
 | 4.4 | A station's own time-of-use tariff, used for every price of its sessions | `/api/admin/ocpp/stations/{cp}/tariff`, `/api/provider/charging-points/{cp}/tariff`, `/api/charging-points/{id}/tariff` |
 | 4.7 | Automatic points when a driver's session ends (off by default) | Hangfire job + `pointsAwarded` on the session DTOs and the finished push |
 | 4.8 | Monthly summary | `GET /api/users/me/ocpp-sessions/summary?month=YYYY-MM` |
-| 4.9 | Link an RFID card to my account | `/api/users/me/ocpp-cards`, admin `/api/admin/users/{userId}/ocpp-cards` |
+| 4.9 | ~~Link an RFID card to my account~~ | **Removed (Oct 28):** cards belong to stations and their staff, not drivers |
 | 13.4 | The driver's car on the session; `reportsSoc` learning | `carId` on start, `car` on the session DTOs, `reportsSoc` on the user's cars |
 | N-5 | "Your car has finished charging — could you unplug it?" to the driver | alert job (`check-ocpp-alerts`) |
 
@@ -146,27 +146,9 @@ GET /api/users/me/ocpp-sessions/summary?month=2026-10
 
 Jordan calendar month; `month` omitted = the current month; bad format → 400. Same sessions as the history list (no rejected / orphan rows), by start time; a session still running counts in `sessions`, its kWh / JOD once closed.
 
-## 5. RFID cards on my account (4.9)
+## 5. RFID cards on my account (4.9) — removed
 
-Backed by `OcppUserIdTag` (already used at `StartTransaction` to credit a card session to a user). A link applies **from the next session** with the card; past sessions are not re-credited.
-
-| Method | Path | Body / result |
-|---|---|---|
-| GET | `/api/users/me/ocpp-cards` | `[ { "id": 12, "idTag": "04A2B3C4D5", "label": "My card", "isEnabled": true, "linkedAt": "…", "isAppTag": false } ]` (the app's own `CBL-U…` tag is not listed) |
-| POST | `/api/users/me/ocpp-cards` | `{ "idTag": "04a2b3c4d5", "label": "My card" }` → the card |
-| DELETE | `/api/users/me/ocpp-cards/{id}` | 200 |
-| GET | `/api/admin/users/{userId}/ocpp-cards` | all of them, the app tag with `isAppTag: true` |
-| DELETE | `/api/admin/users/{userId}/ocpp-cards/{id}` | unlink; on the app tag it switches app charging off for the account instead |
-
-`idTag` is trimmed and upper-cased (`OcppCredentials.NormalizeIdTag`), 1–20 of `A–Z 0–9 _ . : # -`.
-
-| Status | `code` | When |
-|---|---|---|
-| 400 | — | bad format, or a reserved Cable tag (`CBL-U…`, `CBL-S…`) |
-| 409 | `CARD_ALREADY_LINKED` | another account has this card |
-| 422 | `CARD_LIMIT_REACHED` (+ `maxCards`) | 5 cards already |
-
-Linking my own card again is idempotent (updates the label).
+Not built: RFID cards belong to the station (owner / workers, managed as the station's accepted cards), not to drivers. The driver and admin card-link endpoints were removed.
 
 ## 6. The driver's car (13.4)
 
@@ -201,6 +183,5 @@ Admin: `GET / PUT /api/admin/ocpp/live-charging-settings` — `{ "maxDistanceMet
 3. **Car:** start with someone else's `carId` → 400. With your car → `/current` shows `car.name`. A simulator that sends SoC → after stop, `CarModel.ReportsSoc = 1` for that model; `GetAllUserCars` shows `reportsSoc: true`.
 4. **Station tariff:** `GET /api/charging-points/37/tariff` → `source: national`. `PUT /api/admin/ocpp/stations/37/tariff` with the national windows at different prices → `source: station`. Start a session: `/current` `currentRateFils` = the station price; stop: `costFils` and `price[].priceFils` use it, `TariffChargingPointId = 37`. A 1 JOD limit stops at the station price. `DELETE` → back to national.
 5. **Monthly summary:** `GET …/summary` (this month) and `?month=2026-09`; compare with the history list. `?month=2026-13` → 400.
-6. **Cards:** link `TESTCARD1` → listed; link it from a second test account → 409 `CARD_ALREADY_LINKED`; add 5 cards → the 6th is 422 `CARD_LIMIT_REACHED`; link `CBL-U1` → 400. Add `TESTCARD1` to station 37's authorized tags, start with it on the simulator → the session appears in the driver's history and they get the pushes.
 7. **Automatic points:** give station 37 an active PartnerAgreement (e.g. 10 % reward, 5 % commission). With the switch off, finish a session → `PointsProcessedAt` stays NULL, no PartnerTransaction. `PUT live-charging-settings { "autoPointsEnabled": true }`, finish another → the push says "+N نقطة", `PartnerTransaction` `OCPP-{id}` Completed, the user's points balance and the station wallet / settlement change; re-run the job from the Hangfire dashboard → nothing changes. A staff (partner app) start → no points. Block the user from loyalty → `PointsSkipReason = userBlocked`, no partner transaction.
 8. **N-5:** leave the simulator in Finishing past the parked threshold after a driver session → the driver gets the unplug push once (data `status: parked`); the owner gets the stage-2 push later.
