@@ -1,3 +1,4 @@
+using Application.CableGifts;
 using Cable.Core;
 using Microsoft.EntityFrameworkCore;
 
@@ -28,6 +29,8 @@ public class GetMyPointsHistoryRequestHandler(
     ICurrentUserService currentUserService)
     : IRequestHandler<GetMyPointsHistoryRequest, List<PointsHistoryDto>>
 {
+    private sealed record GiftLine(int Id, string OrderCode, int? PointsTransactionId, int? RefundTransactionId, string NameAr, string NameEn);
+
     public async Task<List<PointsHistoryDto>> Handle(GetMyPointsHistoryRequest request, CancellationToken cancellationToken)
     {
         var userId = currentUserService.UserId
@@ -88,6 +91,34 @@ public class GetMyPointsHistoryRequestHandler(
                 .ToDictionaryAsync(x => x.Id, x => x.Name, cancellationToken)
             : new Dictionary<int, string>();
 
+        // Gift orders (Sprint 5): the purchase and its refund are re-rendered in the reader's language, so the two
+        // lines always match whatever language each was stored in.
+        var giftOrderIds = transactions
+            .Where(t => t.ReferenceType == GiftHistoryTexts.ReferenceType && t.ReferenceId.HasValue)
+            .Select(t => t.ReferenceId!.Value)
+            .Distinct()
+            .ToList();
+
+        var giftOrders = (giftOrderIds.Count > 0
+                ? await applicationDbContext.GiftOrders.AsNoTracking()
+                    .Where(o => giftOrderIds.Contains(o.Id))
+                    .Select(o => new GiftLine(o.Id, o.OrderCode, o.PointsTransactionId, o.RefundTransactionId, o.Gift.NameAr, o.Gift.NameEn))
+                    .ToListAsync(cancellationToken)
+                : [])
+            .ToDictionary(o => o.Id);
+
+        var language = GiftHistoryTexts.RequestLanguage;
+        string? NoteOf(int id, int points, string? referenceType, int? referenceId, string? stored)
+        {
+            if (referenceType != GiftHistoryTexts.ReferenceType || referenceId is not int orderId
+                || !giftOrders.TryGetValue(orderId, out var o))
+                return stored;
+            var isRefund = o.RefundTransactionId == id || (o.PointsTransactionId != id && points > 0);
+            return isRefund
+                ? GiftHistoryTexts.Refund(language, o.NameAr, o.NameEn, o.OrderCode)
+                : GiftHistoryTexts.Purchase(language, o.NameAr, o.NameEn, o.OrderCode);
+        }
+
         return transactions.Select(t =>
         {
             string? providerName = null;
@@ -106,7 +137,7 @@ public class GetMyPointsHistoryRequestHandler(
                 t.BalanceAfter,
                 t.ReferenceType,
                 t.ReferenceId,
-                t.Note,
+                NoteOf(t.Id, t.Points, t.ReferenceType, t.ReferenceId, t.Note),
                 t.ActionName,
                 providerName,
                 t.CreatedAt);

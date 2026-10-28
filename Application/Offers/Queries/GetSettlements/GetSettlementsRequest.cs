@@ -1,3 +1,4 @@
+using Application.Common.Security;
 using Domain.Enitites;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,12 +16,16 @@ public record GetSettlementsRequest(
     : IRequest<List<ProviderSettlementDto>>;
 
 public class GetSettlementsRequestHandler(
-    IApplicationDbContext applicationDbContext)
+    IApplicationDbContext applicationDbContext,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetSettlementsRequest, List<ProviderSettlementDto>>
 {
     public async Task<List<ProviderSettlementDto>> Handle(GetSettlementsRequest request,
         CancellationToken cancellationToken)
     {
+        // Every partner's settlement: Cable admins only (partners use GetProviderSettlements).
+        await AdminRoleGuard.EnsureAdminAsync(applicationDbContext, currentUserService, cancellationToken);
+
         var query = SettlementQueryHelper.ApplyFilters(
             applicationDbContext, request.Status, request.Month, request.Year,
             request.PeriodType, request.Week, null);

@@ -135,6 +135,8 @@ public interface IApplicationDbContext
     // Sprint 5 live charging (B): plug sticker codes, "plug didn't work" reports
     DbSet<OcppConnectorCode> OcppConnectorCodes { get; set; }
     DbSet<OcppConnectorReport> OcppConnectorReports { get; set; }
+    DbSet<UserOcppSetting> UserOcppSettings { get; set; }
+    DbSet<OcppReceiptEmail> OcppReceiptEmails { get; set; }
 
     // Time-of-use tariff + price alerts
     DbSet<TouTariff> TouTariffs { get; set; }

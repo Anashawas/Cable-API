@@ -207,6 +207,19 @@ now carry, for a transaction with a promo:
 Settlements (`GetProviderSettlement(s)`, `GetSettlements`): new field `promoDiscountsPaidByCable` — the line
 "خصومات تتحمّلها كيبل" (sum of `cableShareJod`), already included in `netBalance` (owed by Cable to the partner).
 
+Admin settlement exports (leftovers): the settlements CSV (`GET /api/offers/GetSettlementsCsv`, same filters) has a new last
+column `PromoDiscountsPaidByCable`; the line items of one settlement (`GET /api/offers/GetSettlementTransactions?settlementId=`) carry
+`promoDiscountsPaidByCable` on the settlement and, per partner line with a promo, `promoTitle` (request language),
+`promoDiscountJod`, `promoCableShareJod`, `promoProviderShareJod` (null on lines without a promo). Existing fields unchanged.
+
+Boost caps (leftovers): points a `BonusPoints` promo adds on a boosted scan are the promo's — they no longer count toward
+the boost's `maxBonusPointsPerUser` / `maxTotalBonusPoints`, nor its "spent" figure in the admin boosts list. Only the
+boost's own extra points (awarded − base − promo bonus) do.
+
+Preview at a bundle partner whose bundle is used up (leftovers): `basePoints` is 0 like `pointsToBeAwarded`, and the promo
+quotes (`eligiblePromos`, `promo`) start from 0 base points as the scan will (a `BonusPoints` promo still adds its
+bonus); `pointsUnavailableReason` stays `partnerQuotaReached`.
+
 Server rules (§2.9):
 
 | | |

@@ -139,12 +139,12 @@ public static class OcppRoutes
             .WithSummary("Driver: one of their own sessions in detail — readings curve (series: power, battery, kWh, A, V, °C), cost so far and price lines while open, battery start → end, limit and stop reason. For the session screen and the history details.")
             .WithOpenApi();
 
-        app.MapGet("/", async (IMediator mediator, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken ct) =>
-                Results.Ok(await mediator.Send(new GetMyOcppSessionsRequest(page, pageSize), ct)))
+        app.MapGet("/", async (IMediator mediator, [FromQuery] int? page, [FromQuery] int? pageSize, [FromQuery] string? month, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetMyOcppSessionsRequest(page, pageSize, month), ct)))
             .Produces<PagedResult<MySessionDto>>()
-            .RequireAuthorization().ProducesUnAuthorized().ProducesInternalServerError()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesValidationProblem().ProducesInternalServerError()
             .WithName("Get my charging sessions")
-            .WithSummary("Driver: past sessions newest first (card and app alike) with energy, duration, why it stopped and the price under the tariff in force (costFils / costJod + per-window breakdown).")
+            .WithSummary("Driver: past sessions newest first (card and app alike) with energy, duration, why it stopped and the price under the tariff in force (costFils / costJod + per-window breakdown). Optional month=YYYY-MM keeps only sessions started in that Jordan calendar month (the same set as /summary?month=); 400 when the month is malformed.")
             .WithOpenApi();
 
         return app;

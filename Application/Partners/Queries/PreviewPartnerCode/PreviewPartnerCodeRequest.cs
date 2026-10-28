@@ -115,7 +115,9 @@ public class PreviewPartnerCodeRequestHandler(
 
         // Scan bundles (Sprint 5): a bundle with no scan left gives no points (partnerQuotaReached).
         var bundle = await Application.Billing.LoyaltyBundleScans.PreviewAsync(applicationDbContext, transaction, cancellationToken);
-        if (bundle is { QuotaReached: true }) pointsToBeAwarded = 0;
+        // The scan then records BasePoints 0 too, so the preview shows 0 base points as well.
+        var bundleQuotaReached = bundle is { QuotaReached: true };
+        if (bundleQuotaReached) (basePoints, pointsToBeAwarded) = (0, 0);
 
         // Surface a loyalty block here rather than letting the user confirm and
         // hit the failure inside the award step, which would roll the whole
@@ -167,7 +169,7 @@ public class PreviewPartnerCodeRequestHandler(
 
         // Promo codes (Sprint 5): eligiblePromos, and with userPromoId the promo and its points. Read-only.
         return await promoApplicator.DecoratePreviewAsync(preview, transaction, userId, request.UserPromoId,
-            boost?.Multiplier, cancellationToken);
+            boost?.Multiplier, cancellationToken, bundleQuotaReached);
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using Application.Common.Interfaces;
+using Application.Loyalty;
 using Application.Settings;
 using Cable.Core.Emuns;
 using Cable.Core.Utilities;
@@ -172,7 +173,8 @@ public class LoyaltyBoostService(IApplicationDbContext applicationDbContext) : I
         if (boost.MaxBonusPointsPerUser is null && boost.MaxTotalBonusPoints is null)
             return false;
 
-        // Bonus is the difference, so no separate counter has to be kept in step.
+        // Bonus is the difference, so no separate counter has to be kept in step. A BonusPoints promo used on
+        // the same scan is the promo's, not the boost's: BoostSpend leaves it out of the cap.
         var awarded = applicationDbContext.PartnerTransactions
             .AsNoTracking()
             .Where(t => t.AppliedBoostId == boost.Id
@@ -181,8 +183,7 @@ public class LoyaltyBoostService(IApplicationDbContext applicationDbContext) : I
 
         if (boost.MaxTotalBonusPoints is { } totalCap)
         {
-            var spent = await awarded
-                .SumAsync(t => (t.PointsAwarded ?? 0) - (t.BasePoints ?? 0), cancellationToken);
+            var spent = await BoostSpend.ExtraPointsAsync(applicationDbContext, awarded, cancellationToken);
 
             if (spent >= totalCap)
                 return true;
@@ -190,9 +191,8 @@ public class LoyaltyBoostService(IApplicationDbContext applicationDbContext) : I
 
         if (boost.MaxBonusPointsPerUser is { } userCap)
         {
-            var spentByUser = await awarded
-                .Where(t => t.UserId == userId)
-                .SumAsync(t => (t.PointsAwarded ?? 0) - (t.BasePoints ?? 0), cancellationToken);
+            var spentByUser = await BoostSpend.ExtraPointsAsync(applicationDbContext,
+                awarded.Where(t => t.UserId == userId), cancellationToken);
 
             if (spentByUser >= userCap)
                 return true;

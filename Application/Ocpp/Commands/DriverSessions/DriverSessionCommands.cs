@@ -370,7 +370,8 @@ public class GetMyOcppSessionRequestHandler(IApplicationDbContext db, ICurrentUs
 }
 
 /// <summary>Driver: past sessions, newest first, with the price of each.</summary>
-public record GetMyOcppSessionsRequest(int? Page = null, int? PageSize = null) : IRequest<PagedResult<MySessionDto>>;
+/// <param name="Month">Optional YYYY-MM: only sessions started in that Jordan calendar month (same set as the month summary).</param>
+public record GetMyOcppSessionsRequest(int? Page = null, int? PageSize = null, string? Month = null) : IRequest<PagedResult<MySessionDto>>;
 
 public class GetMyOcppSessionsRequestHandler(IApplicationDbContext db, ICurrentUserService currentUser)
     : IRequestHandler<GetMyOcppSessionsRequest, PagedResult<MySessionDto>>
@@ -380,8 +381,16 @@ public class GetMyOcppSessionsRequestHandler(IApplicationDbContext db, ICurrentU
         var userId = currentUser.UserId ?? throw new NotAuthorizedAccessException("User not authenticated");
         var now = DateTime.UtcNow;
 
-        var page = await MySessionProjection.Project(
-                db.OcppTransactions.AsNoTracking().Where(t => t.StartedByUserId == userId && !t.WasRejected && !t.IsOrphan).OrderByDescending(t => t.StartedAt), now)
+        var q = db.OcppTransactions.AsNoTracking().Where(t => t.StartedByUserId == userId && !t.WasRejected && !t.IsOrphan);
+        if (!string.IsNullOrWhiteSpace(request.Month))
+        {
+            if (!JordanMonth.TryParse(request.Month, out var year, out var month))
+                throw new DataValidationException("Month", LiveChargingTexts.MonthInvalid());
+            var (from, to) = JordanMonth.Range(year, month);
+            q = q.Where(t => t.StartedAt >= from && t.StartedAt < to);
+        }
+
+        var page = await MySessionProjection.Project(q.OrderByDescending(t => t.StartedAt), now)
             .ToPaginatedAsync(request.Page, request.PageSize, 20, 100, cancellationToken);
 
         var ids = page.Items.Select(i => i.Id).ToList();

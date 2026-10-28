@@ -1,3 +1,4 @@
+using Application.Common.Security;
 using Cable.Core.Emuns;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,12 +27,16 @@ public record GetSettlementSummaryRequest(
     int? PeriodType = null, int? Week = null) : IRequest<SettlementSummaryDto>;
 
 public class GetSettlementSummaryRequestHandler(
-    IApplicationDbContext applicationDbContext)
+    IApplicationDbContext applicationDbContext,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetSettlementSummaryRequest, SettlementSummaryDto>
 {
     public async Task<SettlementSummaryDto> Handle(GetSettlementSummaryRequest request,
         CancellationToken cancellationToken)
     {
+        // Every partner's settlement: Cable admins only (partners use GetProviderSettlements).
+        await AdminRoleGuard.EnsureAdminAsync(applicationDbContext, currentUserService, cancellationToken);
+
         var query = applicationDbContext.ProviderSettlements
             .AsNoTracking()
             .Where(x => !x.IsDeleted);

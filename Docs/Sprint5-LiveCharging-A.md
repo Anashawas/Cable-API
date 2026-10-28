@@ -146,6 +146,8 @@ GET /api/users/me/ocpp-sessions/summary?month=2026-10
 
 Jordan calendar month; `month` omitted = the current month; bad format → 400. Same sessions as the history list (no rejected / orphan rows), by start time; a session still running counts in `sessions`, its kWh / JOD once closed.
 
+The history list takes the same filter (leftovers): `GET /api/users/me/ocpp-sessions?month=2026-10&page=1&pageSize=20` returns only the sessions started in that Jordan month (exactly the set the summary counts), still paged and newest first. Without `month` it is unchanged; a malformed month → 400.
+
 ## 5. RFID cards on my account (4.9) — removed
 
 Not built: RFID cards belong to the station (owner / workers, managed as the station's accepted cards), not to drivers. The driver and admin card-link endpoints were removed.

@@ -6,6 +6,9 @@ namespace Cable.Middlewares;
 /// - "/" and "/ar/" are rewritten to their folder's index.html so the
 ///   static-files middleware can serve them
 /// - bare "/ar" is 301-redirected to "/ar/" so hand-typed URLs work
+/// - deep links /c/{code}, /r/{receiptNo} (and /ar|en/c|r/…) are rewritten to
+///   that folder's index.html, which reads the code from the URL
+///   (GET only, only when the page exists)
 /// Only acts when a matching folder with index.html exists under wwwroot,
 /// so API routes are never touched (there is no wwwroot/api folder).
 /// </summary>
@@ -18,7 +21,13 @@ internal sealed class LandingPageMiddleware(RequestDelegate next, IWebHostEnviro
 
         if (webRoot is not null && HttpMethods.IsGet(httpContext.Request.Method) && !Path.HasExtension(path))
         {
-            if (path.EndsWith('/'))
+            if (DeepLinkPage(path) is { } page
+                && File.Exists(Path.Combine(webRoot, page.TrimStart('/').Replace('/', Path.DirectorySeparatorChar))))
+            {
+                // Sticker / receipt links: one static page per kind reads the code from the URL client-side.
+                httpContext.Request.Path = page;
+            }
+            else if (path.EndsWith('/'))
             {
                 var indexFile = Path.Combine(webRoot, path.Trim('/').Replace('/', Path.DirectorySeparatorChar), "index.html");
                 if (File.Exists(indexFile))
@@ -33,6 +42,23 @@ internal sealed class LandingPageMiddleware(RequestDelegate next, IWebHostEnviro
         }
 
         await next(httpContext);
+    }
+
+    /// <summary>
+    /// The plug-sticker and receipt deep links (§10 / §13.2): /c/{code} and /r/{receiptNo} (optional trailing
+    /// slash, optional /ar or /en prefix) → that folder's index.html, e.g. /ar/c/CHG-7K2M9Q → /ar/c/index.html.
+    /// Null for anything else (including /c/ itself, which the folder rule serves).
+    /// </summary>
+    internal static string? DeepLinkPage(string path)
+    {
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var offset = segments.Length == 3 && (segments[0] is "ar" or "en") ? 1 : 0;
+        if (segments.Length != 2 + offset) return null;
+
+        var kind = segments[offset];
+        if (kind is not ("c" or "r") || segments[offset + 1].Length is 0 or > 64) return null;
+
+        return (offset == 1 ? "/" + segments[0] : "") + "/" + kind + "/index.html";
     }
 }
 

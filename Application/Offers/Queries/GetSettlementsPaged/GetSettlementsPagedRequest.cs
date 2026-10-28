@@ -1,3 +1,4 @@
+using Application.Common.Security;
 using Application.Common.Models;
 using Application.Offers.Queries.GetSettlements;
 using Microsoft.EntityFrameworkCore;
@@ -16,12 +17,16 @@ public record GetSettlementsPagedRequest(
     : IRequest<PagedResult<ProviderSettlementDto>>;
 
 public class GetSettlementsPagedRequestHandler(
-    IApplicationDbContext applicationDbContext)
+    IApplicationDbContext applicationDbContext,
+    ICurrentUserService currentUserService)
     : IRequestHandler<GetSettlementsPagedRequest, PagedResult<ProviderSettlementDto>>
 {
     public async Task<PagedResult<ProviderSettlementDto>> Handle(GetSettlementsPagedRequest request,
         CancellationToken cancellationToken)
     {
+        // Every partner's settlement: Cable admins only (partners use GetProviderSettlements).
+        await AdminRoleGuard.EnsureAdminAsync(applicationDbContext, currentUserService, cancellationToken);
+
         var query = SettlementQueryHelper.ApplyFilters(
             applicationDbContext, request.Status, request.Month, request.Year,
             request.PeriodType, request.Week, request.Search);

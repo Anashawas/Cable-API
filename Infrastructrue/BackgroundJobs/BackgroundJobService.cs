@@ -19,7 +19,8 @@ public class BackgroundJobService(
     INotificationService notificationService,
     IOcppCommandClient ocppCommands,
     ILogger<BackgroundJobService> logger,
-    Application.Ocpp.Points.IOcppSessionPointsService ocppSessionPoints) : IBackgroundJobService
+    Application.Ocpp.Points.IOcppSessionPointsService ocppSessionPoints,
+    Application.Ocpp.LiveCharging.SessionReceiptEmailer receiptEmailer) : IBackgroundJobService
 {
     public async Task<int> ExpireOfferTransactionCodesAsync(CancellationToken cancellationToken = default)
     {
@@ -670,6 +671,20 @@ public class BackgroundJobService(
 
         logger.LogInformation("NotifyOcppDriverSession: session {TransactionId} {Kind} → user {UserId}, {Devices} device(s)",
             transactionId, kind, userId, tokens.Count);
+
+        // §13.2: the receipt PDF by email when the driver opted in (off by default). Priced and pointed by now;
+        // the emailer never throws and sends at most once per session, so a job retry cannot double it.
+        if (kind == Application.Ocpp.DriverSessionMessages.Completed)
+        {
+            try
+            {
+                await receiptEmailer.SendIfOptedInAsync(transactionId, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "NotifyOcppDriverSession: receipt email for session {TransactionId} failed", transactionId);
+            }
+        }
     }
 
     public async Task NotifyOcppFaultAsync(int ocppConnectorId, string errorCode, string? info, CancellationToken cancellationToken = default)
