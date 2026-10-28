@@ -1,6 +1,7 @@
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Ocpp.Commands.ControlOcppChargePoint;
+using Application.Ocpp.LiveCharging;
 using Application.Ocpp.Queries;
 using Application.Ocpp.Queries.GetSessionLive;
 using Application.Pricing;
@@ -80,11 +81,19 @@ public record OcppSessionStartDto(
     string? ResultStatus,
     string IdTag,
     /// <summary>What the app should tell the driver.</summary>
-    string Message);
+    string Message,
+    /// <summary>4.2: metres from the phone to the station (null when either position is unknown).</summary>
+    int? DistanceMeters = null,
+    /// <summary>13.4: the car recorded on the session (the one chosen, or the driver's only car).</summary>
+    int? CarId = null);
 
 /// <summary>Driver: start charging on a plug of a charger at a station that shares its live status.</summary>
 /// <param name="ChargeLimitKind">Optional: stop automatically at Jod | Kwh | Soc = ChargeLimitValue.</param>
-public record StartMyOcppSessionCommand(int ChargingPointId, int ChargerId, int ConnectorId, string? ChargeLimitKind = null, decimal? ChargeLimitValue = null) : IRequest<OcppSessionStartDto>;
+/// <param name="Lat">4.2: the phone's position; required unless Ocpp.AppStart.RequireLocation = false.</param>
+/// <param name="AccuracyMeters">The fix's accuracy radius; up to 100 m of it is credited.</param>
+/// <param name="CarId">13.4: one of the driver's cars (UserCar id); none = their only car, if they have exactly one.</param>
+public record StartMyOcppSessionCommand(int ChargingPointId, int ChargerId, int ConnectorId, string? ChargeLimitKind = null, decimal? ChargeLimitValue = null,
+    double? Lat = null, double? Lng = null, double? AccuracyMeters = null, int? CarId = null) : IRequest<OcppSessionStartDto>;
 
 public class StartMyOcppSessionCommandValidator : AbstractValidator<StartMyOcppSessionCommand>
 {
@@ -93,6 +102,12 @@ public class StartMyOcppSessionCommandValidator : AbstractValidator<StartMyOcppS
         RuleFor(x => x.ChargingPointId).GreaterThan(0);
         RuleFor(x => x.ChargerId).GreaterThan(0);
         RuleFor(x => x.ConnectorId).GreaterThanOrEqualTo(1);
+        RuleFor(x => x.Lat).InclusiveBetween(-90, 90).When(x => x.Lat is not null);
+        RuleFor(x => x.Lng).InclusiveBetween(-180, 180).When(x => x.Lng is not null);
+        RuleFor(x => x.Lng).NotNull().When(x => x.Lat is not null).WithMessage("lat and lng go together");
+        RuleFor(x => x.Lat).NotNull().When(x => x.Lng is not null).WithMessage("lat and lng go together");
+        RuleFor(x => x.AccuracyMeters).InclusiveBetween(0, 100_000).When(x => x.AccuracyMeters is not null);
+        RuleFor(x => x.CarId).GreaterThan(0).When(x => x.CarId is not null);
     }
 }
 
@@ -108,6 +123,9 @@ public class StartMyOcppSessionCommandHandler(IApplicationDbContext db, ICurrent
         if (!visibility.VisibleToDrivers)
             throw new DataValidationException("ChargingPointId", "This station does not offer app charging.");
 
+        // 4.2: the driver must be at the station (server-side; the app's own check is only a convenience).
+        var proximity = await AppStartProximity.EnsureNearAsync(db, request.ChargingPointId, request.Lat, request.Lng, request.AccuracyMeters, cancellationToken);
+
         var target = await OcppRemoteStart.EnsureCanStartAsync(db, request.ChargerId, request.ConnectorId, cancellationToken);
         if (target.ChargePoint.ChargingPointId != request.ChargingPointId)
             throw new NotFoundException("cannot find charger " + request.ChargerId + " at this station");
@@ -120,8 +138,14 @@ public class StartMyOcppSessionCommandHandler(IApplicationDbContext db, ICurrent
                     ? "عندك شحن شغّال. أوقفه قبل ما تبدأ شحن ثاني."
                     : "You already have a running session. Stop it before starting another.");
 
+        var carId = await Application.Ocpp.LiveCharging.SessionCars.ResolveForStartAsync(db, userId, request.CarId, cancellationToken);
+
         var idTag = await EnsureUserTagAsync(db, userId, cancellationToken);
         await OcppRemoteStart.SetPendingLimitAsync(db, target.ChargePoint.Id, request.ConnectorId, request.ChargeLimitKind, request.ChargeLimitValue, userId, cancellationToken);
+        // 11.c / 13.4: where the driver was and which car — taken by the session this start opens (Cable.Ocpp StartTransaction).
+        await Application.Ocpp.LiveCharging.OcppPendingStart.SetAsync(db, target.ChargePoint.Id, request.ConnectorId,
+            new Application.Ocpp.LiveCharging.OcppPendingStart.Context(userId, request.Lat, request.Lng,
+                request.AccuracyMeters is double acc ? (int)Math.Round(acc) : null, proximity.DistanceMeters, carId), cancellationToken);
         var result = await OcppCommandRunner.RunAsync(db, currentUser, client, target.ChargePoint.Id, "RemoteStartTransaction",
             OcppRemoteStart.Payload(request.ConnectorId, idTag), cancellationToken, skipAccessGuard: true);
 
@@ -130,7 +154,7 @@ public class StartMyOcppSessionCommandHandler(IApplicationDbContext db, ICurrent
             : result.Status != "Answered"
                 ? "The charger did not answer. Check it is online and try again."
                 : "The charger refused to start (" + (result.ResultStatus ?? "Rejected") + "). Try another plug or tap a card.";
-        return new OcppSessionStartDto(result.CommandId, result.Accepted, result.Status, result.ResultStatus, idTag, message);
+        return new OcppSessionStartDto(result.CommandId, result.Accepted, result.Status, result.ResultStatus, idTag, message, proximity.DistanceMeters, carId);
     }
 
     /// <summary>The driver's virtual tag, created on first use. The same tag links card-less sessions to the user everywhere.</summary>
@@ -208,7 +232,17 @@ public record MySessionDto(
     decimal? VoltageV = null,
     decimal? TemperatureC = null,
     /// <summary>"Stop at …" — null when none.</summary>
-    Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto? ChargeLimit = null);
+    Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto? ChargeLimit = null,
+    /// <summary>4.7: automatic points of this session (null = not decided / none; 0 = decided, none).</summary>
+    int? PointsAwarded = null,
+    /// <summary>13.4: the driver's car on an app start.</summary>
+    SessionCarDto? Car = null,
+    /// <summary>4.4, open only (/current): the tariff window right now at this station — costFils / costJod are then the cost so far.</summary>
+    int? CurrentRateFils = null,
+    string? CurrentWindowNameEn = null,
+    string? CurrentWindowNameAr = null,
+    /// <summary>station = the station's own tariff prices it; national = the national tariff.</summary>
+    string? TariffSource = null);
 
 internal static class MySessionProjection
 {
@@ -219,7 +253,19 @@ internal static class MySessionProjection
             t.CostFils, t.CostFils == null ? null : t.CostFils / 1000m, t.TariffVersion, null,
             null, null, null, t.SocStartPercent, t.SocEndPercent, null, null, null,
             t.ChargeLimitKind == null ? null : new Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto(
-                t.ChargeLimitKind, t.ChargeLimitValue, null, null, t.ChargeLimitSetAt, t.ChargeLimitReachedAt)));
+                t.ChargeLimitKind, t.ChargeLimitValue, null, null, t.ChargeLimitSetAt, t.ChargeLimitReachedAt),
+            t.PointsAwarded,
+            // The car's id only; WithCarsAsync fills the name.
+            t.CarId == null ? null : new SessionCarDto(t.CarId.Value, "", null),
+            null, null, null,
+            t.PricedAt == null ? null : t.TariffChargingPointId == null ? StationTariffs.SourceNational : StationTariffs.SourceStation));
+
+    /// <summary>13.4: the car names for a page of sessions (one query).</summary>
+    public static async Task<List<MySessionDto>> WithCarsAsync(IApplicationDbContext db, List<MySessionDto> items, CancellationToken ct)
+    {
+        var cars = await SessionCars.LoadAsync(db, items.Select(i => i.Car?.Id), ct);
+        return items.Select(i => i.Car is null ? i : i with { Car = cars.GetValueOrDefault(i.Car.Id) }).ToList();
+    }
 
     public static MySessionDto Finish(MySessionDto d, DateTime now, string? breakdownJson)
     {
@@ -258,11 +304,31 @@ public class GetMyCurrentOcppSessionRequestHandler(IApplicationDbContext db, ICu
             .Select(m => new { m.PowerW, m.SocPercent, m.MeasuredAt, m.EnergyWh, m.CurrentA, m.VoltageV, m.TemperatureC })
             .FirstOrDefaultAsync(cancellationToken);
 
-        var dto = MySessionProjection.Finish(open, now, null);
+        var dto = (await MySessionProjection.WithCarsAsync(db, [MySessionProjection.Finish(open, now, null)], cancellationToken))[0];
+        var start = await db.OcppTransactions.AsNoTracking().Where(t => t.Id == open.Id).Select(t => t.MeterStartWh).FirstAsync(cancellationToken);
+
+        // 4.4: cost so far at the station's own tariff (else the national one) and the window in force now.
+        var effective = await StationTariffs.LoadEffectiveAsync(db, open.ChargingPointId, cancellationToken);
+        if (effective is not null)
+        {
+            var energy = await db.OcppMeterValues.AsNoTracking()
+                .Where(m => m.OcppTransactionId == open.Id && m.EnergyWh != null)
+                .OrderBy(m => m.MeasuredAt)
+                .Select(m => new { m.MeasuredAt, m.EnergyWh })
+                .ToListAsync(cancellationToken);
+            var latestWh = energy.Count > 0 ? Math.Max(energy[^1].EnergyWh!.Value, start) : start;
+            var soFarPrice = SessionPricer.Compute(effective.Tariff, open.StartedAt, now, start, latestWh, energy.Select(e => (e.MeasuredAt, e.EnergyWh!.Value)));
+            var window = SessionPricer.WindowNow(effective.Tariff, now);
+            dto = dto with
+            {
+                CostFils = soFarPrice.CostFils, CostJod = soFarPrice.CostJod, TariffVersion = soFarPrice.TariffVersion, Price = soFarPrice.Lines,
+                CurrentRateFils = window?.PriceFils, CurrentWindowNameEn = window?.NameEn, CurrentWindowNameAr = window?.NameAr,
+                TariffSource = effective.Source,
+            };
+        }
         if (sample is null) return dto;
 
         // Energy so far from the latest register reading (EnergyKwh is only set at stop).
-        var start = await db.OcppTransactions.AsNoTracking().Where(t => t.Id == open.Id).Select(t => t.MeterStartWh).FirstAsync(cancellationToken);
         var soFar = sample.EnergyWh is long wh && wh >= start ? (wh - start) / 1000m : dto.EnergyKwh;
         return dto with
         {
@@ -313,6 +379,7 @@ public class GetMyOcppSessionsRequestHandler(IApplicationDbContext db, ICurrentU
             .Select(t => new { t.Id, t.CostBreakdownJson })
             .ToDictionaryAsync(t => t.Id, t => t.CostBreakdownJson, cancellationToken);
 
-        return page.As(page.Items.Select(d => MySessionProjection.Finish(d, now, breakdowns.GetValueOrDefault(d.Id))).ToList());
+        return page.As(await MySessionProjection.WithCarsAsync(db,
+            page.Items.Select(d => MySessionProjection.Finish(d, now, breakdowns.GetValueOrDefault(d.Id))).ToList(), cancellationToken));
     }
 }

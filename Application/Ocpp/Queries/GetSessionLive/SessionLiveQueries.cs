@@ -59,7 +59,13 @@ public record SessionLiveDto(
     int? SocEndPercent = null,
     /// <summary>"Stop at …" — null when none.</summary>
     Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto? ChargeLimit = null,
-    string? StationName = null);
+    string? StationName = null,
+    /// <summary>4.7: automatic points of this session (null = not decided / none; 0 = decided, none).</summary>
+    int? PointsAwarded = null,
+    /// <summary>13.4: the driver's car on an app start.</summary>
+    Application.Ocpp.LiveCharging.SessionCarDto? Car = null,
+    /// <summary>4.4: station = priced with the station's own tariff; national = the national tariff.</summary>
+    string? TariffSource = null);
 
 internal static class SessionLiveBuilder
 {
@@ -75,6 +81,7 @@ internal static class SessionLiveBuilder
                 t.Id, t.OcppChargePointId, t.ChargePoint.ChargingPointId, StationName = t.ChargePoint.ChargingPoint.Name, t.ChargePoint.DisplayName, t.ConnectorId, t.StartedAt, t.StoppedAt, t.IsOpen,
                 t.StartSource, t.StopReason, t.MeterStartWh, t.MeterStopWh, t.EnergyKwh, t.CostFils, t.CostBreakdownJson, t.WasRejected, t.IsOrphan,
                 t.SocStartPercent, t.SocEndPercent, t.ChargeLimitKind, t.ChargeLimitValue, t.ChargeLimitSetAt, t.ChargeLimitReachedAt,
+                t.PointsAwarded, t.CarId, t.TariffChargingPointId, t.PricedAt,
             })
             .FirstOrDefaultAsync(ct)
             ?? throw new NotFoundException("cannot find session " + transactionId);
@@ -100,11 +107,14 @@ internal static class SessionLiveBuilder
         int? cost = tx.CostFils;
         List<SessionPriceLineDto>? lines = SessionPricingService.ReadLines(tx.CostBreakdownJson);
         int? rate = null; string? windowEn = null, windowAr = null;
+        string? tariffSource = tx.PricedAt is null ? null : tx.TariffChargingPointId is null ? StationTariffs.SourceNational : StationTariffs.SourceStation;
         if (!tx.IsOpen && cost is null && !tx.IsOrphan && !tx.WasRejected && tx.StoppedAt is DateTime stopped && tx.MeterStopWh is long stopWh && tx.EnergyKwh is not null)
         {
             // Closed but not priced yet (the OCPP server that received the stop does not price, or it failed):
             // compute it now for display; the price-ocpp-sessions job stores it within a minute.
-            var tariff = await TouTariffLoader.LoadAsync(db, ct);
+            var effective = await StationTariffs.LoadEffectiveAsync(db, tx.ChargingPointId, ct);
+            var tariff = effective?.Tariff;
+            tariffSource = effective?.Source;
             if (tariff is not null)
             {
                 var p = SessionPricer.Compute(tariff, tx.StartedAt, stopped, tx.MeterStartWh, stopWh,
@@ -115,7 +125,9 @@ internal static class SessionLiveBuilder
         }
         if (tx.IsOpen && !tx.WasRejected)
         {
-            var tariff = await TouTariffLoader.LoadAsync(db, ct);
+            var effective = await StationTariffs.LoadEffectiveAsync(db, tx.ChargingPointId, ct);
+            var tariff = effective?.Tariff;
+            tariffSource = effective?.Source;
             if (tariff is not null)
             {
                 var latestWh = samples.Where(s => s.EnergyWh != null).Select(s => s.EnergyWh).LastOrDefault() ?? tx.MeterStartWh;
@@ -152,7 +164,10 @@ internal static class SessionLiveBuilder
             samples.LastOrDefault(s => s.TemperatureC != null)?.TemperatureC,
             tx.SocStartPercent, tx.SocEndPercent,
             Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto.From(tx.ChargeLimitKind, tx.ChargeLimitValue, tx.ChargeLimitSetAt, tx.ChargeLimitReachedAt),
-            tx.StationName);
+            tx.StationName,
+            tx.PointsAwarded,
+            (await Application.Ocpp.LiveCharging.SessionCars.LoadAsync(db, [tx.CarId], ct)).GetValueOrDefault(tx.CarId ?? 0),
+            tariffSource);
     }
 }
 

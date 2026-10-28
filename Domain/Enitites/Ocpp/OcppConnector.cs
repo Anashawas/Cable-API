@@ -37,6 +37,19 @@ public class OcppConnector : BaseEntity
     public int? PendingLimitSetBy { get; set; }
     public DateTime? PendingLimitSetAt { get; set; }
 
+    /// <summary>
+    /// Sprint 5 live charging (A): what the driver's app start knew — the driver, the phone's position and distance
+    /// to the station, the car — waiting for the session it starts, like the pending limit. Only that driver's
+    /// App StartTransaction on this plug within OcppVirtualTag.RemoteStartAuthorizeWindow takes it.
+    /// </summary>
+    public int? PendingStartUserId { get; set; }
+    public DateTime? PendingStartSetAt { get; set; }
+    public double? PendingStartLat { get; set; }
+    public double? PendingStartLng { get; set; }
+    public int? PendingStartAccuracyMeters { get; set; }
+    public int? PendingStartDistanceMeters { get; set; }
+    public int? PendingCarId { get; set; }
+
     public virtual OcppChargePoint ChargePoint { get; set; } = null!;
     public virtual PlugType? PlugType { get; set; }
 }

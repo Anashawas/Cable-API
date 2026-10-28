@@ -6,9 +6,14 @@ public record GetAllUserCarsRequest : IRequest<List<GetAllUserCarsDto>>;
 
 public record GetAllUserCarsDto(int CarTypeId, string CarTypeName, List<CarModelWithPlugs> CarModels);
 
-public record CarModelWithPlugs(int CarModelId, string CarModelName, List<PlugTypeSummary> PlugTypes);
+/// <param name="ReportsSoc">
+/// Cable Connect learning: true once a car of this model reported its battery % during a session; null = not seen yet.
+/// The app hides the "stop at battery %" option unless it is true (and always on AC chargers).
+/// </param>
+public record CarModelWithPlugs(int CarModelId, string CarModelName, List<PlugTypeSummary> PlugTypes, bool? ReportsSoc = null);
 
-public record PlugTypeSummary(int Id, string? Name, string SerialNumber);
+/// <param name="UserCarId">The user's car row — what POST /api/users/me/ocpp-sessions/start takes as carId.</param>
+public record PlugTypeSummary(int Id, string? Name, string SerialNumber, int? UserCarId = null);
 
 public class GetAllUserCarsQueryHandler(IApplicationDbContext applicationDbContext, ICurrentUserService currentUserService)
     : IRequestHandler<GetAllUserCarsRequest, List<GetAllUserCarsDto>>
@@ -38,8 +43,10 @@ public class GetAllUserCarsQueryHandler(IApplicationDbContext applicationDbConte
                         carModelGroup.Select(x => new PlugTypeSummary(
                             x.PlugType.Id,
                             x.PlugType.Name,
-                            x.PlugType.SerialNumber))
-                        .ToList()))
+                            x.PlugType.SerialNumber,
+                            x.Id))
+                        .ToList(),
+                        carModelGroup.First().CarModel.ReportsSoc))
                     .ToList()))
             .ToList();
 

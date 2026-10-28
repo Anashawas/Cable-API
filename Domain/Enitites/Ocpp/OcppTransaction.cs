@@ -75,6 +75,29 @@ public class OcppTransaction : BaseEntity
     /// <summary>When Cable.Ocpp sent the RemoteStop because the limit was reached (null = not reached / to retry).</summary>
     public DateTime? ChargeLimitReachedAt { get; set; }
 
+    // ---- Sprint 5 live charging (A) ----
+
+    /// <summary>App start only: where the phone was when the driver pressed Start, and how far that is from the station (proximity rule).</summary>
+    public double? StartLat { get; set; }
+    public double? StartLng { get; set; }
+    public int? StartAccuracyMeters { get; set; }
+    public int? StartDistanceMeters { get; set; }
+
+    /// <summary>App start only: the driver's car (UserCar.Id) — chosen at start, or their only car.</summary>
+    public int? CarId { get; set; }
+
+    /// <summary>The station whose own time-of-use tariff priced this session; null = the national tariff (TariffVersion is that tariff's version).</summary>
+    public int? TariffChargingPointId { get; set; }
+
+    /// <summary>Automatic loyalty points (Ocpp.AutoPoints.Enabled): what the driver got (0 = processed, nothing awarded), the completed PartnerTransaction, when it was decided and why it was skipped.</summary>
+    public int? PointsAwarded { get; set; }
+    public int? PartnerTransactionId { get; set; }
+    public DateTime? PointsProcessedAt { get; set; }
+    public string? PointsSkipReason { get; set; }
+
+    /// <summary>When the driver was told "your car has finished — could you unplug it?" (once per session).</summary>
+    public DateTime? ParkedNotifiedAt { get; set; }
+
     public virtual OcppChargePoint ChargePoint { get; set; } = null!;
     public virtual ICollection<OcppMeterValue> MeterValues { get; set; } = new List<OcppMeterValue>();
 }

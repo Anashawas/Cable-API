@@ -324,7 +324,8 @@ app.MapUserRoutes()
     .MapOcppRoutes()
     .MapPricingRoutes()
     .MapHealthRoutes()
-    .MapOcppLiveRoutes();
+    .MapOcppLiveRoutes()
+    .MapLiveChargingRoutes();   // Sprint 5 live charging (A)
 
 // Unknown non-API URLs get the landing 404 page; API-ish paths keep JSON-style 404s.
 app.MapLandingPageFallback();

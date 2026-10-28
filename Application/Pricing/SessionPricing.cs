@@ -64,6 +64,13 @@ public static class SessionPricer
     /// <summary>The tariff window in force at a UTC instant (Jordan wall-clock), for "rate now" displays.</summary>
     public static TouWindowDto? WindowNow(TouTariffDto tariff, DateTime utc) => WindowAt(tariff, JordanTime.FromUtc(utc)).Window;
 
+    /// <summary>The window in force at a UTC instant and when (UTC) it ends — for "now: off-peak until 5:00 pm".</summary>
+    public static (TouWindowDto? Window, DateTime EndsAtUtc) WindowSpan(TouTariffDto tariff, DateTime utc)
+    {
+        var (window, endLocal) = WindowAt(tariff, JordanTime.FromUtc(utc));
+        return (window, JordanTime.ToUtc(DateTime.SpecifyKind(endLocal, DateTimeKind.Unspecified)));
+    }
+
     /// <summary>Share of the span [t0, t1] (UTC) that falls in each tariff window, by Jordan wall-clock time.</summary>
     private static IEnumerable<(string Key, decimal Share)> SplitByWindow(TouTariffDto tariff, DateTime t0, DateTime t1)
     {
@@ -108,12 +115,15 @@ public static class SessionPricingService
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
+    /// <param name="tariff">The national tariff when the caller already loaded it (a batch). The station's own tariff, when it has one, always wins (4.4).</param>
     /// <returns>true when CostFils was set; false when the session cannot be priced (open, orphan, unknown energy, no tariff).</returns>
     public static async Task<bool> PriceAsync(IApplicationDbContext db, OcppTransaction tx, TouTariffDto? tariff, CancellationToken ct)
     {
         if (tx.IsOpen || tx.IsOrphan || tx.StoppedAt is null || tx.MeterStopWh is null || tx.EnergyKwh is null) return false;
-        tariff ??= await TouTariffLoader.LoadAsync(db, ct);
-        if (tariff is null) return false;
+        var effective = await StationTariffs.LoadForChargerAsync(db, tx.OcppChargePointId, ct, tariff);
+        if (effective is null) return false;
+        tariff = effective.Tariff;
+        tx.TariffChargingPointId = effective.StationId;
 
         var samples = await db.OcppMeterValues.AsNoTracking()
             .Where(m => m.OcppTransactionId == tx.Id && m.EnergyWh != null)

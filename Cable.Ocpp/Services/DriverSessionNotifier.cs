@@ -25,8 +25,40 @@ public sealed class DriverSessionNotifier(IBackgroundJobClient jobs, ILogger<Dri
 
     public void Completed(OcppTransaction tx, DateTime now)
     {
-        if (IsDriverSession(tx) && tx.StoppedAt is DateTime stopped && now - stopped < FreshFor)
-            Enqueue(tx.Id, DriverSessionMessages.Completed);
+        if (!IsDriverSession(tx)) return;
+
+        // 4.7: automatic points first (the session is priced by now; the job is a no-op unless Ocpp.AutoPoints.Enabled),
+        // then the "finished" push as its continuation, so the push can say "+330 points". Replays get points, no push.
+        var pointsJob = EnqueuePoints(tx.Id);
+        if (tx.StoppedAt is not DateTime stopped || now - stopped >= FreshFor) return;
+        if (pointsJob is null) { Enqueue(tx.Id, DriverSessionMessages.Completed); return; }
+
+        var transactionId = tx.Id;
+        try
+        {
+            jobs.ContinueJobWith<IBackgroundJobService>(pointsJob,
+                s => s.NotifyOcppDriverSessionAsync(transactionId, DriverSessionMessages.Completed, CancellationToken.None),
+                JobContinuationOptions.OnAnyFinishedState);
+        }
+        catch (Exception ex)
+        {
+            log.LogWarning(ex, "Session {TransactionId}: could not chain the driver's finished push — sending it on its own", transactionId);
+            Enqueue(transactionId, DriverSessionMessages.Completed);
+        }
+    }
+
+    private string? EnqueuePoints(int transactionId)
+    {
+        try
+        {
+            return jobs.Enqueue<Application.Ocpp.Points.IOcppSessionPointsService>(s => s.AwardAfterStopAsync(transactionId, CancellationToken.None));
+        }
+        catch (Exception ex)
+        {
+            // The price-ocpp-sessions job's catch-up awards it within a minute.
+            log.LogWarning(ex, "Session {TransactionId}: could not enqueue the automatic points job", transactionId);
+            return null;
+        }
     }
 
     internal static bool IsDriverSession(OcppTransaction tx) =>

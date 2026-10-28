@@ -29,7 +29,9 @@ public static class DriverSessionMessages
         string? StopReason,
         string? LimitKind,
         decimal? LimitValue,
-        DateTime? LimitReachedAt);
+        DateTime? LimitReachedAt,
+        /// <summary>4.7 automatic points; shown when &gt; 0.</summary>
+        int? PointsAwarded = null);
 
     public static (string Title, string Body) Compose(string kind, Session s, string? language)
     {
@@ -66,6 +68,8 @@ public static class DriverSessionMessages
         var why = ar ? arText : en;
         var body = string.Join(" · ", parts);
         if (!string.IsNullOrWhiteSpace(why)) body += (body.Length > 0 ? "\n" : "") + (ar ? "السبب: " : "Reason: ") + why;
+        if (s.PointsAwarded is int points && points > 0)
+            body += (body.Length > 0 ? (string.IsNullOrWhiteSpace(why) ? "\n" : " · ") : "") + LiveCharging.LiveChargingTexts.Points(points, ar);
         return (title, body);
     }
 

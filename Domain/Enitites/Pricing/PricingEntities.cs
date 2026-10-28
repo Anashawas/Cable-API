@@ -18,6 +18,12 @@ public class TouTariff : BaseAuditableEntity
     public bool IsActive { get; set; } = true;
     public string? Note { get; set; }
 
+    /// <summary>
+    /// Null = the national tariff. Set = that station's own tariff, which overrides the national one for its
+    /// sessions (same windows shape; versions count per station). One active row per station.
+    /// </summary>
+    public int? ChargingPointId { get; set; }
+
     public virtual ICollection<TouTariffWindow> Windows { get; set; } = new List<TouTariffWindow>();
 }
 

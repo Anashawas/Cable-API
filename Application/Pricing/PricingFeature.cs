@@ -31,8 +31,9 @@ public static class TouTariffLoader
 {
     public static async Task<TouTariffDto?> LoadAsync(IApplicationDbContext db, CancellationToken ct)
     {
+        // The national tariff only: a station's own tariff (ChargingPointId set) never replaces it — see StationTariffs.
         var t = await db.TouTariffs.AsNoTracking()
-            .Where(x => x.IsActive && !x.IsDeleted)
+            .Where(x => x.IsActive && !x.IsDeleted && x.ChargingPointId == null)
             .OrderByDescending(x => x.Version)
             .Select(x => new
             {
@@ -73,7 +74,7 @@ public class UpdateTouTariffCommandHandler(IApplicationDbContext db, ICurrentUse
         await AdminRoleGuard.EnsureAdminAsync(db, currentUser, cancellationToken);
 
         var current = await db.TouTariffs.Include(t => t.Windows)
-            .Where(t => t.IsActive && !t.IsDeleted).OrderByDescending(t => t.Version)
+            .Where(t => t.IsActive && !t.IsDeleted && t.ChargingPointId == null).OrderByDescending(t => t.Version)
             .FirstOrDefaultAsync(cancellationToken);
 
         var next = new TouTariff
@@ -312,7 +313,7 @@ public class GetPriceAlertAdminOverviewRequestHandler(IApplicationDbContext db, 
     {
         await AdminRoleGuard.EnsureAdminAsync(db, currentUser, cancellationToken);
         var tariff = await TouTariffLoader.LoadAsync(db, cancellationToken);
-        var versions = await db.TouTariffs.AsNoTracking().Where(t => !t.IsDeleted).OrderByDescending(t => t.Version)
+        var versions = await db.TouTariffs.AsNoTracking().Where(t => !t.IsDeleted && t.ChargingPointId == null).OrderByDescending(t => t.Version)
             .Select(t => new TouTariffVersionDto(t.Version, t.EffectiveFrom, t.IsActive, t.Note, t.CreatedAt)).Take(20).ToListAsync(cancellationToken);
         var quiet = await PriceAlertQuietHours.GetAsync(db, cancellationToken);
 

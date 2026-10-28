@@ -48,7 +48,9 @@ public static class OcppRoutes
     public record RemoteStopRequest(int TransactionId);
     /// <summary>ChargeLimitKind Jod | Kwh | Soc + ChargeLimitValue: optional "stop at …" for the session this start opens.</summary>
     public record RemoteStartRequest(int ConnectorId, string? ChargeLimitKind = null, decimal? ChargeLimitValue = null);
-    public record StartMySessionRequest(int ChargingPointId, int ChargerId, int ConnectorId, string? ChargeLimitKind = null, decimal? ChargeLimitValue = null);
+    /// <summary>Lat / Lng / AccuracyMeters: the phone's position (proximity rule); CarId: one of the driver's cars (Sprint 5 live charging A).</summary>
+    public record StartMySessionRequest(int ChargingPointId, int ChargerId, int ConnectorId, string? ChargeLimitKind = null, decimal? ChargeLimitValue = null,
+        double? Lat = null, double? Lng = null, double? AccuracyMeters = null, int? CarId = null);
     public record ShareLiveStatusRequest(bool Share);
     public record AlertThresholdsRequest(int? OfflineMinutes, int? FaultedMinutes, int? LongSessionMinutes, int? ParkedMinutes);
     public record LiveStatusBlockRequest(bool Blocked, string? Reason);
@@ -87,12 +89,14 @@ public static class OcppRoutes
     private static RouteGroupBuilder MapDriverSessionRoutes(this RouteGroupBuilder app)
     {
         app.MapPost("/start", async (IMediator mediator, StartMySessionRequest body, CancellationToken ct) =>
-                Results.Ok(await mediator.Send(new StartMyOcppSessionCommand(body.ChargingPointId, body.ChargerId, body.ConnectorId, body.ChargeLimitKind, body.ChargeLimitValue), ct)))
+                Results.Ok(await mediator.Send(new StartMyOcppSessionCommand(body.ChargingPointId, body.ChargerId, body.ConnectorId, body.ChargeLimitKind, body.ChargeLimitValue,
+                    body.Lat, body.Lng, body.AccuracyMeters, body.CarId), ct)))
             .Produces<OcppSessionStartDto>()
             .RequireAuthorization().ProducesUnAuthorized().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
             .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .WithName("Start my charging session")
-            .WithSummary("Driver: start charging on a plug (chargerId = ChargerLiveDto.Id, connectorId = PlugLiveDto.ConnectorId from GET /api/charging-points/{id}/live) without a card. accepted=true means the charger took the request; poll /current until the session appears (a few seconds). 400 with a message when the station does not offer app charging, the plug is busy / out of order, or the charger is offline. 409 with code sessionAlreadyOpen when you already have a running session. Check PlugLiveDto.canStartFromApp first to show or hide the button.")
+            .WithSummary("Driver: start charging on a plug (chargerId = ChargerLiveDto.Id, connectorId = PlugLiveDto.ConnectorId from GET /api/charging-points/{id}/live) without a card. accepted=true means the charger took the request; poll /current until the session appears (a few seconds). 400 with a message when the station does not offer app charging, the plug is busy / out of order, or the charger is offline. 409 with code sessionAlreadyOpen when you already have a running session. Check PlugLiveDto.canStartFromApp first to show or hide the button. Send lat, lng, accuracyMeters (the phone's fix): 422 LOCATION_REQUIRED without them, 422 TOO_FAR_FROM_STATION (distanceMeters, maxMeters) when distance − min(accuracy, 100) > Ocpp.AppStart.MaxDistanceMeters (300). Optional carId (UserCar id; default = your only car).")
             .WithOpenApi();
 
         app.MapPut("/{id:int}/limit", async (IMediator mediator, [FromRoute] int id, ChargeLimitRequest body, CancellationToken ct) =>

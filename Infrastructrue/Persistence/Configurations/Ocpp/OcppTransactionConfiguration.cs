@@ -30,6 +30,11 @@ public class OcppTransactionConfiguration : IEntityTypeConfiguration<OcppTransac
         builder.Property(e => e.ChargeLimitSetAt).HasColumnType("datetime2(0)");
         builder.Property(e => e.ChargeLimitReachedAt).HasColumnType("datetime2(0)");
 
+        // Sprint 5 live charging (A) — Scripts/Sprint5_LiveCharging_A.sql
+        builder.Property(e => e.PointsProcessedAt).HasColumnType("datetime2(0)");
+        builder.Property(e => e.PointsSkipReason).HasMaxLength(40);
+        builder.Property(e => e.ParkedNotifiedAt).HasColumnType("datetime2(0)");
+
         builder.HasOne(e => e.ChargePoint)
             .WithMany(c => c.Transactions)
             .HasForeignKey(e => e.OcppChargePointId)
@@ -45,6 +50,11 @@ public class OcppTransactionConfiguration : IEntityTypeConfiguration<OcppTransac
         builder.HasIndex(e => new { e.StartedByUserId, e.StartedAt })
             .HasDatabaseName("IX_OcppTransaction_StartedBy_StartedAt")
             .HasFilter("[StartedByUserId] IS NOT NULL");
+
+        // Automatic points catch-up (Sprint5_LiveCharging_A.sql): driver sessions not decided yet.
+        builder.HasIndex(e => e.StoppedAt)
+            .HasDatabaseName("IX_OcppTransaction_PointsPending")
+            .HasFilter("[PointsProcessedAt] IS NULL AND [StartedByUserId] IS NOT NULL");
 
         // The stale-session job and "current session" lookups.
         builder.HasIndex(e => e.IsOpen)

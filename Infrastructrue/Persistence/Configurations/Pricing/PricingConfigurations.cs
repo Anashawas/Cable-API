@@ -21,6 +21,8 @@ public class TouTariffConfiguration : IEntityTypeConfiguration<TouTariff>
         builder.Property(e => e.CreatedAt).HasColumnType("datetime");
         builder.Property(e => e.ModifiedAt).HasColumnType("datetime");
         builder.HasMany(e => e.Windows).WithOne(w => w.Tariff).HasForeignKey(w => w.TouTariffId).OnDelete(DeleteBehavior.Cascade);
+        // A station's own tariff (Sprint5_LiveCharging_A.sql); null = the national tariff.
+        builder.HasIndex(e => new { e.ChargingPointId, e.IsActive }).HasDatabaseName("IX_TouTariff_ChargingPoint").HasFilter("[ChargingPointId] IS NOT NULL");
     }
 }
 

@@ -18,7 +18,8 @@ public class BackgroundJobService(
     IApplicationDbContext applicationDbContext,
     INotificationService notificationService,
     IOcppCommandClient ocppCommands,
-    ILogger<BackgroundJobService> logger) : IBackgroundJobService
+    ILogger<BackgroundJobService> logger,
+    Application.Ocpp.Points.IOcppSessionPointsService ocppSessionPoints) : IBackgroundJobService
 {
     public async Task<int> ExpireOfferTransactionCodesAsync(CancellationToken cancellationToken = default)
     {
@@ -510,8 +511,10 @@ public class BackgroundJobService(
     public async Task<int> PriceOcppSessionsAsync(CancellationToken cancellationToken = default)
     {
         // Sessions closed but not priced: the stop handler failed, or the tariff / columns arrived later.
+        // The national tariff is loaded once; a station with its own tariff is priced with that (PriceAsync).
         var tariff = await TouTariffLoader.LoadAsync(applicationDbContext, cancellationToken);
-        if (tariff is null) return 0;
+        if (tariff is null && !await applicationDbContext.TouTariffs.AnyAsync(t => t.ChargingPointId != null && t.IsActive && !t.IsDeleted, cancellationToken))
+            return 0;
 
         var pending = await applicationDbContext.OcppTransactions
             .Where(t => !t.IsOpen && !t.IsOrphan && t.PricedAt == null && t.EnergyKwh != null && t.StoppedAt != null)
@@ -526,8 +529,12 @@ public class BackgroundJobService(
         if (priced > 0)
         {
             await applicationDbContext.SaveChanges(cancellationToken);
-            logger.LogInformation("PriceOcppSessions: priced {Count} session(s) with tariff v{Version}", priced, tariff.Version);
+            logger.LogInformation("PriceOcppSessions: priced {Count} session(s) with national tariff v{Version} or the station's own", priced, tariff?.Version);
         }
+
+        // Sprint 5 (4.7): automatic points for priced driver sessions the after-stop job missed (off unless Ocpp.AutoPoints.Enabled).
+        try { await ocppSessionPoints.AwardPendingAsync(cancellationToken); }
+        catch (Exception ex) { logger.LogWarning(ex, "PriceOcppSessions: automatic points catch-up failed; retried next minute"); }
         return priced;
     }
 
@@ -621,7 +628,7 @@ public class BackgroundJobService(
         var t = tx.Row;
         var session = new Application.Ocpp.DriverSessionMessages.Session(tx.StationName, tx.ChargerName, t.ConnectorId,
             t.StartedAt, t.StoppedAt, t.EnergyKwh, t.CostFils, t.SocStartPercent, t.SocEndPercent, t.StopReason,
-            t.ChargeLimitKind, t.ChargeLimitValue, t.ChargeLimitReachedAt);
+            t.ChargeLimitKind, t.ChargeLimitValue, t.ChargeLimitReachedAt, t.PointsAwarded);
 
         var tokens = await applicationDbContext.NotificationTokens.AsNoTracking()
             .Where(n => n.UserId == userId && n.AppType == FirebaseAppType.UserApp)
@@ -635,6 +642,8 @@ public class BackgroundJobService(
             ["sessionId"] = transactionId.ToString(),
             ["chargingPointId"] = tx.ChargingPointId.ToString(),
         };
+        if (kind == Application.Ocpp.DriverSessionMessages.Completed && t.PointsAwarded is > 0)
+            data["pointsAwarded"] = t.PointsAwarded.Value.ToString();   // 4.7 automatic points
 
         foreach (var group in tokens.GroupBy(n => string.Equals(n.Language, "en", StringComparison.OrdinalIgnoreCase) ? "en" : "ar"))
         {
@@ -1011,26 +1020,26 @@ public class BackgroundJobService(
         {
             if (open.Any(a => a.Type == OcppAlertType.ParkedAfterCharging && a.OcppChargePointId == t.ChargePointRowId && a.ConnectorId == t.ConnectorId)) continue;
 
-            // Whose car? The latest session on that plug → its idTag → OcppUserIdTag.
-            var lastTag = await applicationDbContext.OcppTransactions.AsNoTracking()
+            // Whose car? The latest session on that plug — a driver's own session (app start, or a card linked to
+            // them; never a staff start), the same rule as the driver session pushes.
+            var last = await applicationDbContext.OcppTransactions.AsNoTracking()
                 .Where(x => x.OcppChargePointId == t.ChargePointRowId && x.ConnectorId == t.ConnectorId && !x.WasRejected)
                 .OrderByDescending(x => x.StartedAt)
-                .Select(x => x.IdTag)
+                .Select(x => new { x.Id, x.IdTag, x.StartedByUserId, x.StartSource, x.WasRejected, x.IsOrphan, x.ParkedNotifiedAt })
                 .FirstOrDefaultAsync(cancellationToken);
-            var driverId = lastTag is null ? null : await applicationDbContext.OcppUserIdTags.AsNoTracking()
-                .Where(u => u.IdTag == lastTag && u.IsEnabled && !u.IsDeleted)
-                .Select(u => (int?)u.UserId)
-                .FirstOrDefaultAsync(cancellationToken);
+            var lastTag = last?.IdTag;
+            var driverId = last is not null && Application.Ocpp.Points.OcppAutoPointsRules.IsDriverSession(last.StartedByUserId, last.StartSource, last.WasRejected, last.IsOrphan)
+                ? last.StartedByUserId : null;
 
             var minutes = (int)(now - t.Since).TotalMinutes;
             int recipients;
             DateTime? escalatedAt = null;
             if (driverId is int driver)
             {
-                recipients = await NotifyOcppAlertAsync(t, OcppAlertType.ParkedAfterCharging,
-                    "سيارتك خلصت شحن",
-                    $"{t.StationLabel}: انتهى شحن سيارتك على {t.Name}{t.Where} منذ {minutes} دقيقة — ممكن تفصلها لتفسح المقبس للسواق التالي؟",
-                    cancellationToken, onlyUsers: [driver], appType: FirebaseAppType.UserApp);
+                // N-5: "your car has finished — could you unplug it?" in the driver's language, once per session.
+                recipients = last!.ParkedNotifiedAt is null
+                    ? await NotifyOcppDriverParkedAsync(last.Id, driver, t, now, cancellationToken)
+                    : 0;
             }
             else
             {
@@ -1302,6 +1311,50 @@ public class BackgroundJobService(
                 return n.StartsWith("محطة", StringComparison.Ordinal) ? n : $"محطة {n}";
             }
         }
+    }
+
+    /// <summary>
+    /// N-5 (Sprint 5 live charging A): the driver's push + inbox when their car finished charging but is still on the
+    /// plug — per token language, data type ocpp_session / status parked so the app opens the session. Marks the
+    /// session (ParkedNotifiedAt) so it is sent once. Returns 1 when the driver was told.
+    /// </summary>
+    private async Task<int> NotifyOcppDriverParkedAsync(int transactionId, int userId, AlertTarget t, DateTime now, CancellationToken ct)
+    {
+        var tokens = await applicationDbContext.NotificationTokens.AsNoTracking()
+            .Where(n => n.UserId == userId && n.AppType == FirebaseAppType.UserApp)
+            .Select(n => new { n.Token, n.Language })
+            .ToListAsync(ct);
+
+        var data = new Dictionary<string, string>
+        {
+            ["type"] = Application.Ocpp.DriverSessionMessages.DataType,
+            ["status"] = Application.Ocpp.LiveCharging.DriverSessionStatus.Parked,
+            ["sessionId"] = transactionId.ToString(),
+            ["chargingPointId"] = t.ChargingPointId.ToString(),
+        };
+
+        // Driver-facing charger name only (never the OCPP id like RH4).
+        foreach (var group in tokens.GroupBy(n => string.Equals(n.Language, "en", StringComparison.OrdinalIgnoreCase) ? "en" : "ar"))
+        {
+            var (pushTitle, pushBody) = Application.Ocpp.LiveCharging.LiveChargingTexts.Parked(group.Key, t.StationName, t.DisplayName, t.ConnectorId ?? 0);
+            try { await notificationService.SendMessagesAsync(group.Select(n => n.Token).Distinct().ToList(), pushTitle, pushBody, FirebaseAppType.UserApp, data); }
+            catch (Exception ex) { logger.LogWarning(ex, "NotifyOcppDriverParked: FCM send failed for session {TransactionId} ({Lang})", transactionId, group.Key); }
+        }
+
+        var (title, body) = Application.Ocpp.LiveCharging.LiveChargingTexts.Parked(tokens.FirstOrDefault()?.Language, t.StationName, t.DisplayName, t.ConnectorId ?? 0);
+        var typeId = await applicationDbContext.NotificationTypes.AsNoTracking()
+            .Where(n => n.Name == "charging_session_parked" || n.Name == "charging_session_completed")
+            .OrderBy(n => n.Name == "charging_session_parked" ? 0 : 1)
+            .Select(n => (int?)n.Id)
+            .FirstOrDefaultAsync(ct) ?? 1;
+        await NotificationInboxHelper.CreateNotificationInboxRecordsAsync(
+            applicationDbContext, [userId], typeId, title, body, null, JsonSerializer.Serialize(data), ct);
+
+        await applicationDbContext.OcppTransactions.Where(x => x.Id == transactionId)
+            .ExecuteUpdateAsync(s => s.SetProperty(x => x.ParkedNotifiedAt, (DateTime?)now), ct);
+
+        logger.LogInformation("NotifyOcppDriverParked: session {TransactionId} → user {UserId}, {Devices} device(s)", transactionId, userId, tokens.Count);
+        return 1;
     }
 
     private async Task<AlertTarget?> LoadTargetAsync(int ocppChargePointId, CancellationToken ct, int? connectorId = null) =>

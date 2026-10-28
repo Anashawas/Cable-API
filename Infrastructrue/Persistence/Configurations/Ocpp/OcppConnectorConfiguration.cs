@@ -19,6 +19,7 @@ public class OcppConnectorConfiguration : IEntityTypeConfiguration<OcppConnector
         builder.Property(e => e.PendingLimitKind).HasMaxLength(10);
         builder.Property(e => e.PendingLimitValue).HasColumnType("decimal(10,3)");
         builder.Property(e => e.PendingLimitSetAt).HasColumnType("datetime2(0)");
+        builder.Property(e => e.PendingStartSetAt).HasColumnType("datetime2(0)");   // Sprint5_LiveCharging_A.sql
         builder.Property(e => e.StatusUpdatedAt).HasColumnType("datetime2(3)");
         builder.Property(e => e.StatusReceivedAt).HasColumnType("datetime2(3)").IsRequired();
 

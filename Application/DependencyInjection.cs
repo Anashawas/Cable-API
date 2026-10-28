@@ -24,6 +24,9 @@ public static class DependencyInjection
         // Shared by RecordPayment and the legacy premium endpoint.
         services.AddScoped<Subscriptions.PaymentRecorder>();
 
+        // Sprint 5 live charging (A): automatic points when a driver's session ends (Hangfire job, run by the API).
+        services.AddScoped<Ocpp.Points.IOcppSessionPointsService, Ocpp.Points.OcppSessionPointsService>();
+
         return services;
     }
 }

@@ -203,6 +203,9 @@ public sealed class StartTransactionHandler(IApplicationDbContext db, TagAuthori
             }
         }
 
+        // Sprint 5 (A): the app start's position / distance and car, parked on the plug for this driver's session.
+        await Application.Ocpp.LiveCharging.OcppPendingStart.ApplyAsync(db, session.OcppChargePointId, tx, now, cancellationToken);
+
         db.OcppTransactions.Add(tx);
         await db.SaveChanges(cancellationToken);
         live.Publish(new OcppLiveEvent(OcppLiveEventTypes.Session, session.ChargingPointId, session.OcppChargePointId, tx.ConnectorId, tx.Id, "started", now));
@@ -336,6 +339,9 @@ public sealed class StopTransactionHandler(IApplicationDbContext db, CommandConf
         if (!tx.IsOrphan)
         {
             await MeterValueWriter.UpdateSocAsync(db, tx.Id, cancellationToken);
+            // Sprint 5 (A, 13.4): a car that reported a battery % marks its model ReportsSoc. Never fails the reply.
+            try { await Application.Ocpp.LiveCharging.CarSocLearning.MarkAsync(db, tx.Id, cancellationToken); }
+            catch (Exception ex) { log.LogWarning(ex, "{ChargePointId}: could not record battery-% support for session {TransactionId}", session.ChargePointId, tx.Id); }
             live.Publish(new OcppLiveEvent(OcppLiveEventTypes.Session, session.ChargingPointId, session.OcppChargePointId, tx.ConnectorId, tx.Id, "stopped", now));
             drivers.Completed(tx, now);
         }

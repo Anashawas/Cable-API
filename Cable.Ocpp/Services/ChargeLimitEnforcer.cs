@@ -50,7 +50,8 @@ public sealed class ChargeLimitEnforcer(IServiceScopeFactory scopes, CommandSend
         var rateFils = 0;
         if (tx.ChargeLimitKind == OcppChargeLimit.Jod)
         {
-            var tariff = await TouTariffLoader.LoadAsync(db, cancellationToken);
+            // The station's own tariff when it has one (4.4), else the national one.
+            var tariff = (await StationTariffs.LoadEffectiveAsync(db, session.ChargingPointId, cancellationToken))?.Tariff;
             if (tariff is null) return;   // no tariff = no price = cannot judge a JOD limit
             costFils = SessionPricer.Compute(tariff, tx.StartedAt, now, tx.MeterStartWh, latestWh,
                 withEnergy.Select(s => (s.MeasuredAt, s.EnergyWh!.Value))).CostFils;
