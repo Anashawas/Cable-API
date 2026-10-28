@@ -116,6 +116,10 @@ public class ScanPartnerCodeCommandHandler(
             transaction.CompletedAt = DateTime.UtcNow;
             transaction.Status = (int)PartnerTransactionStatus.Completed;
 
+            // Scan bundles (Sprint 5): take exactly one scan, atomically; with none left the code still
+            // completes but earns no points. No-op for percentage-billed codes.
+            await Application.Billing.LoyaltyBundleScans.ConsumeOnCompletionAsync(applicationDbContext, transaction, cancellationToken);
+
             // Resolve the loyalty boost here rather than when the code was
             // issued: the customer is unknown at that point, and both the
             // first-charge rule and the per-user cap depend on who they are.

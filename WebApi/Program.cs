@@ -280,6 +280,19 @@ RecurringJob.AddOrUpdate<IBackgroundJobService>(
     service => service.PurgeOcppRawMessagesAsync(CancellationToken.None),
     "30 2 * * *"); // Daily at 02:30 UTC
 
+// Partner billing (Sprint 5): owner pushes before / at expiry and at grace end (daily, 07:00 UTC = 10:00 Amman),
+// and every 10 min activation pushes, trial ends (no grace), bundle 20% / 10% / 0% pushes and unlimited-plan
+// soft-cap / break-even admin alerts. Each event is sent once (BillingEvent).
+RecurringJob.AddOrUpdate<Application.Billing.Jobs.IBillingJobs>(
+    "billing-subscription-reminders",
+    service => service.SendSubscriptionRemindersAsync(CancellationToken.None),
+    "0 7 * * *");
+
+RecurringJob.AddOrUpdate<Application.Billing.Jobs.IBillingJobs>(
+    "billing-watch",
+    service => service.RunBillingWatchAsync(CancellationToken.None),
+    "*/10 * * * *");
+
 app.MapUserRoutes()
     .MapChargingPointsRoutes()
     .MapChargingPointTypesRoutes()
@@ -326,7 +339,8 @@ app.MapUserRoutes()
     .MapPricingRoutes()
     .MapHealthRoutes()
     .MapOcppLiveRoutes()
-    .MapLiveChargingRoutes();   // Sprint 5 live charging (A)
+    .MapLiveChargingRoutes()   // Sprint 5 live charging (A)
+    .MapBillingRoutes();       // Sprint 5 partner billing
 
 // Unknown non-API URLs get the landing 404 page; API-ish paths keep JSON-style 404s.
 app.MapLandingPageFallback();

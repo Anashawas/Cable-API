@@ -39,6 +39,14 @@ public class PartnerAgreementConfiguration : IEntityTypeConfiguration<PartnerAgr
         builder.Property(e => e.Note)
             .HasMaxLength(500);
 
+        builder.Property(e => e.BillingModel)
+            .IsRequired()
+            .HasMaxLength(20)
+            .HasDefaultValue("percentage");
+
+        builder.Property(e => e.BillingModelChangedAt)
+            .HasColumnType("datetime");
+
         builder.Property(e => e.IsDeleted)
             .IsRequired()
             .HasDefaultValue(false);

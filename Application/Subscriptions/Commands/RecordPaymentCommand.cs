@@ -37,7 +37,12 @@ public record RecordPaymentCommand(
     string? Currency = null,
     string? Note = null,
     /// <summary>File name of an already-uploaded proof image (CableAttachments).</summary>
-    string? ReceiptImageFileName = null) : IRequest<RecordPaymentResult>;
+    string? ReceiptImageFileName = null,
+    /// <summary>Partner billing (optional): the plan / price option bought. Inferred from entityType when omitted.</summary>
+    int? PlanId = null,
+    int? PriceOptionId = null,
+    /// <summary>Partner billing (optional): the upgrade request this payment answers; otherwise the matching pending one is fulfilled.</summary>
+    int? UpgradeRequestId = null) : IRequest<RecordPaymentResult>;
 
 public class RecordPaymentCommandValidator : AbstractValidator<RecordPaymentCommand>
 {
@@ -72,7 +77,10 @@ public class RecordPaymentCommandHandler(
             planMonths: request.PlanMonths, explicitPeriodEnd: null,
             request.Amount, request.Currency, request.Method,
             paidDateUtc: JordanTime.ToUtc(request.PaidDate),
-            request.Payer, request.Note, request.ReceiptImageFileName, cancellationToken);
+            request.Payer, request.Note, request.ReceiptImageFileName, cancellationToken,
+            request.PlanId is null && request.PriceOptionId is null && request.UpgradeRequestId is null
+                ? null
+                : new Billing.PlanPaymentLink(request.PlanId, request.PriceOptionId, request.UpgradeRequestId));
 
         var p = recorded.Payment;
         return new RecordPaymentResult(

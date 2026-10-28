@@ -12,7 +12,9 @@ public record WalletBalanceDto(
     decimal? WalletCreditLimit,
     decimal? AvailableCredit,
     decimal TotalDeposited,
-    decimal TotalDeducted
+    decimal TotalDeducted,
+    /// <summary>Scan bundle counter (Sprint 5); null on the percentage model with no bundle history.</summary>
+    Application.Billing.LoyaltyBundleDto? LoyaltyBundle = null
 );
 
 public record GetWalletBalanceRequest(
@@ -87,7 +89,8 @@ public class GetWalletBalanceRequestHandler(
             creditLimit,
             availableCredit,
             totalDeposited,
-            totalDeducted
+            totalDeducted,
+            await Application.Billing.LoyaltyBundleService.GetDtoAsync(applicationDbContext, request.ProviderType, request.ProviderId, cancellationToken)
         );
     }
 }

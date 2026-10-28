@@ -34,7 +34,8 @@ public class AddWalletDepositCommandHandler(
             or (int)WalletTransactionType.CommissionDeduction
             or (int)WalletTransactionType.CommissionRefund
             or (int)WalletTransactionType.OfferPaymentCredit
-            or (int)WalletTransactionType.OfferPaymentRefund)
+            or (int)WalletTransactionType.OfferPaymentRefund
+            or (int)WalletTransactionType.BundlePurchase)
             throw new DataValidationException("TransactionType", "SettlementDeduction, CommissionDeduction, CommissionRefund, OfferPaymentCredit and OfferPaymentRefund types are reserved for system use");
 
         if (request.Amount == 0)

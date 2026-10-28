@@ -48,6 +48,11 @@ public class InitiatePartnerTransactionCommandHandler(
             applicationDbContext, currentUserService, agreement.ProviderType, agreement.ProviderId,
             cancellationToken, requiredPrivilege: Cable.Core.Constants.WorkerPrivileges.PointOfSale);
 
+        // Scan bundles (Sprint 5): null on the percentage model, which then runs exactly as before.
+        // On a bundle: 409 bundleExhausted at 0 scans, mandatory minimum amount, points from the plan's rule.
+        var bundleTerms = await Application.Billing.LoyaltyBundleScans.ResolveForNewCodeAsync(
+            applicationDbContext, agreement, request.TransactionAmount, cancellationToken);
+
         // Check minimum transaction amount
         if (agreement.MinimumTransactionAmount.HasValue && request.TransactionAmount < agreement.MinimumTransactionAmount.Value)
             throw new DataValidationException("TransactionAmount",
@@ -70,6 +75,13 @@ public class InitiatePartnerTransactionCommandHandler(
         var commissionAmount = request.TransactionAmount * (decimal)(agreement.CommissionPercentage / 100.0);
         var pointsEligibleAmount = request.TransactionAmount * (decimal)(agreement.PointsRewardPercentage / 100.0);
         var pointsToBeAwarded = (int)Math.Floor((double)pointsEligibleAmount * conversionRate);
+        if (bundleTerms is not null)
+        {
+            // Prepaid: no commission is reserved; the scan is taken from the bundle when the code completes.
+            commissionAmount = 0m;
+            pointsEligibleAmount = request.TransactionAmount;
+            pointsToBeAwarded = bundleTerms.Points;
+        }
 
         // Generate unique transaction code before transaction scope
         var transactionCode = await GenerateUniqueCode(cancellationToken);
@@ -139,7 +151,7 @@ public class InitiatePartnerTransactionCommandHandler(
                 ProviderId = agreement.ProviderId,
                 TransactionAmount = request.TransactionAmount,
                 CurrencyCode = request.CurrencyCode,
-                CommissionPercentage = agreement.CommissionPercentage,
+                CommissionPercentage = bundleTerms is null ? agreement.CommissionPercentage : 0,
                 CommissionAmount = commissionAmount,
                 PointsRewardPercentage = agreement.PointsRewardPercentage,
                 PointsConversionRate = conversionRate,
@@ -155,6 +167,8 @@ public class InitiatePartnerTransactionCommandHandler(
             };
 
             applicationDbContext.PartnerTransactions.Add(transaction);
+            if (bundleTerms is not null)
+                Application.Billing.LoyaltyBundleScans.Track(applicationDbContext, transaction, bundleTerms);
             await applicationDbContext.SaveChanges(cancellationToken);
 
             // Create wallet audit record (transaction.Id now available)

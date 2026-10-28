@@ -40,7 +40,7 @@ public record PreviewPartnerCodeResult(
 /// <summary>Why a partner transaction earns no points (PreviewPartnerCode.PointsUnavailableReason).</summary>
 public static class PointsUnavailableReasons
 {
-    /// <summary>The partner's loyalty quota is used up. Reserved for scan bundles; not produced yet.</summary>
+    /// <summary>The partner's prepaid scan bundle is used up (Sprint 5 scan bundles). Vague on purpose towards the customer.</summary>
     public const string PartnerQuotaReached = "partnerQuotaReached";
 
     /// <summary>The partner gives no points right now (0% reward or no points rate configured).</summary>
@@ -108,11 +108,15 @@ public class PreviewPartnerCodeRequestHandler(
             ? basePoints
             : (int)Math.Floor(basePoints * boost.Multiplier);
 
+        // Scan bundles (Sprint 5): a bundle with no scan left gives no points (partnerQuotaReached).
+        var bundle = await Application.Billing.LoyaltyBundleScans.PreviewAsync(applicationDbContext, transaction, cancellationToken);
+        if (bundle is { QuotaReached: true }) pointsToBeAwarded = 0;
+
         // Surface a loyalty block here rather than letting the user confirm and
         // hit the failure inside the award step, which would roll the whole
         // scan back after they had already committed to it.
         var blockReason = await GetLoyaltyBlockReason(userId, pointsToBeAwarded, cancellationToken);
-        var (pointsUnavailableReason, minimumAmountForPoints) = WhyNoPoints(transaction, pointsToBeAwarded);
+        var (pointsUnavailableReason, minimumAmountForPoints) = bundle?.Explain(pointsToBeAwarded) ?? WhyNoPoints(transaction, pointsToBeAwarded);
 
         string? providerName = null;
         if (transaction.ProviderType == "ChargingPoint")

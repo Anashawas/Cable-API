@@ -31,7 +31,8 @@ public sealed class PaymentRecorder(
         string? Email,
         string? Note);
 
-    public record Recorded(Subscription Subscription, Payment Payment, string? ReceiptError);
+    /// <param name="PlanRecord">The partner-billing subscription record this payment opened (null for banners / before plans are seeded).</param>
+    public record Recorded(Subscription Subscription, Payment Payment, string? ReceiptError, PlanSubscription? PlanRecord = null);
 
     /// <summary>
     /// Records a payment. Pass <paramref name="planMonths"/> for the normal flow;
@@ -43,7 +44,7 @@ public sealed class PaymentRecorder(
         int? planMonths, DateTime? explicitPeriodEnd,
         decimal amount, string? currency, PaymentMethod method, DateTime paidDateUtc,
         PayerInput payerInput, string? note, string? receiptImageFileName,
-        CancellationToken ct)
+        CancellationToken ct, Billing.PlanPaymentLink? planLink = null)
     {
         if (!SubscriptionEntityTypes.IsValid(entityType))
             throw new DataValidationException("EntityType", $"Unknown entity type '{entityType}'");
@@ -116,7 +117,19 @@ public sealed class PaymentRecorder(
         var receiptError = await GenerateReceiptAsync(subscription, payment, payer, entityName, ct);
         await db.SaveChanges(ct);
 
-        return new Recorded(subscription, payment, receiptError);
+        // Partner billing (Sprint 5): open the subscription record and fulfil the pending upgrade
+        // request. Like the receipt, a failure here must not un-record a payment already taken.
+        PlanSubscription? planRecord = null;
+        try
+        {
+            planRecord = await Billing.PlanSubscriptionLedger.OnPaymentRecordedAsync(db, subscription, payment, planLink, currentUser.UserId, ct);
+        }
+        catch (Exception ex) when (planLink is null)
+        {
+            logger.LogError(ex, "Plan subscription record failed for payment {PaymentId}", payment.Id);
+        }
+
+        return new Recorded(subscription, payment, receiptError, planRecord);
     }
 
     /// <summary>

@@ -182,7 +182,8 @@ public class GetPaymentReceiptRequestHandler(
 
     private async Task<bool> IsOwnerAsync(Subscription s, int userId, CancellationToken ct) => s.EntityType switch
     {
-        SubscriptionEntityTypes.StationPremium => await applicationDbContext.ChargingPoints.AsNoTracking()
+        // Cable Connect is billed per station too, so its owner may download that receipt as well.
+        SubscriptionEntityTypes.StationPremium or SubscriptionEntityTypes.OcppConnect => await applicationDbContext.ChargingPoints.AsNoTracking()
             .AnyAsync(c => c.Id == s.EntityId && c.OwnerId == userId, ct),
         SubscriptionEntityTypes.ServiceProviderPremium => await applicationDbContext.ServiceProviders.AsNoTracking()
             .AnyAsync(p => p.Id == s.EntityId && p.OwnerId == userId, ct),
