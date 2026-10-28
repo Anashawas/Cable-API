@@ -23,7 +23,10 @@ public class ProviderSettlement : BaseAuditableEntity
     public decimal OfferPaymentAmount { get; set; }
     public int TotalPointsDeducted { get; set; }
 
-    // Net balance: OfferPaymentAmount - PartnerCommissionAmount
+    // Promo discounts paid by Cable (sum of PromoUsage.CableShareJod) — owed by Cable to the provider
+    public decimal PromoCableShareAmount { get; set; }
+
+    // Net balance: OfferPaymentAmount + PromoCableShareAmount - PartnerCommissionAmount
     // Positive = Cable owes provider, Negative = Provider owes Cable
     public decimal NetBalance { get; set; }
 

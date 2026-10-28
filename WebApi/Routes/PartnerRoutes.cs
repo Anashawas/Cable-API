@@ -74,8 +74,8 @@ public static class PartnerRoutes
 
         // Preview a scanned partner QR code (read-only — shown for confirmation)
         app.MapGet("/PreviewPartnerCode",
-                async (IMediator mediator, [FromQuery] string code, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new PreviewPartnerCodeRequest(code), cancellationToken)))
+                async (IMediator mediator, [FromQuery] string code, [FromQuery] int? userPromoId, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new PreviewPartnerCodeRequest(code, userPromoId), cancellationToken)))
             .Produces<PreviewPartnerCodeResult>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
@@ -84,13 +84,24 @@ public static class PartnerRoutes
             .ProducesInternalServerError()
             .WithName("Preview Partner Code")
             .WithSummary("Resolve a scanned partner QR code to its details, without completing it")
-            .WithDescription("Call immediately after the user scans, to populate the confirmation sheet: provider name, amount, currency, commission, points to be awarded, and the seconds left before the code expires. Awards nothing and does not complete the transaction — call ScanPartnerCode once the user confirms. CanConfirm is false with a BlockReason when the user's loyalty account is blocked, so the block surfaces before they commit. Returns 404 if the code is unknown or no longer awaiting a scan, and a validation error if it has expired.")
+            .WithDescription("Call immediately after the user scans, to populate the confirmation sheet: provider name, amount, currency, commission, points to be awarded, and the seconds left before the code expires. Awards nothing and does not complete the transaction — call ScanPartnerCode once the user confirms. CanConfirm is false with a BlockReason when the user's loyalty account is blocked, so the block surfaces before they commit. Returns 404 if the code is unknown or no longer awaiting a scan, and a validation error if it has expired. Promo codes: eligiblePromos lists the user's promos that apply (show \"Apply code\" only when not empty); call again with userPromoId to get promo { discountJod, finalAmountJod, bonusPoints } with the points fields recomputed on the final amount (422 PROMO_NOT_APPLICABLE | PROMO_ALREADY_USED | PROMO_EXPIRED | PROMO_BUDGET_EXHAUSTED | PROMO_NOT_FOUND).")
             .WithOpenApi();
 
         // Scan partner QR code (user confirms → transaction completes, points awarded)
         app.MapPost("/ScanPartnerCode",
-                async (IMediator mediator, [FromQuery] string code, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new ScanPartnerCodeCommand(code), cancellationToken)))
+                async (IMediator mediator, HttpRequest httpRequest, [FromQuery] string? code, [FromQuery] int? userPromoId,
+                        CancellationToken cancellationToken) =>
+                {
+                    // Older builds send ?code= with no body (unchanged); the promo build may send { code, userPromoId }.
+                    var body = code is null || userPromoId is null
+                        ? await ScanPartnerCodeRequest.TryReadAsync(httpRequest, cancellationToken)
+                        : null;
+                    var transactionCode = code ?? body?.Code;
+                    if (string.IsNullOrWhiteSpace(transactionCode))
+                        throw new Cable.Core.DataValidationException("code", "The transaction code is required");
+                    return Results.Ok(await mediator.Send(
+                        new ScanPartnerCodeCommand(transactionCode, userPromoId ?? body?.UserPromoId), cancellationToken));
+                })
             .Produces<ScanPartnerCodeResult>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
@@ -99,7 +110,7 @@ public static class PartnerRoutes
             .ProducesInternalServerError()
             .WithName("Scan Partner Code")
             .WithSummary("Confirm a scanned partner QR code to complete the transaction and earn points")
-            .WithDescription("Called once the user confirms the details returned by PreviewPartnerCode. Validates the code, completes the transaction, updates the settlement, and awards loyalty points — all in one database transaction. Safe to call directly without a preview; the same validation runs either way.")
+            .WithDescription("Called once the user confirms the details returned by PreviewPartnerCode. Validates the code, completes the transaction, updates the settlement, and awards loyalty points — all in one database transaction. Safe to call directly without a preview; the same validation runs either way. Optional userPromoId (query or body { code, userPromoId }): the promo becomes Used together with the completion (a failed scan leaves it Available) and the result carries promo { title, discountJod, finalAmountJod, bonusPoints }.")
             .WithOpenApi();
 
         // Get my partner transactions

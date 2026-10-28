@@ -138,5 +138,14 @@ public interface IApplicationDbContext
     DbSet<UserPriceAlert> UserPriceAlerts { get; set; }
     DbSet<PriceAlertLog> PriceAlertLogs { get; set; }
 
+    // Sprint 5: Cable gifts + promo codes
+    DbSet<CableGift> CableGifts { get; set; }
+    DbSet<GiftOrder> GiftOrders { get; set; }
+    DbSet<PromoCampaign> PromoCampaigns { get; set; }
+    DbSet<PromoCode> PromoCodes { get; set; }
+    DbSet<UserPromo> UserPromos { get; set; }
+    DbSet<PromoUsage> PromoUsages { get; set; }
+    DbSet<PromoClaimAttempt> PromoClaimAttempts { get; set; }
+
     Task<int> SaveChanges(CancellationToken cancellationToken = default);
 }

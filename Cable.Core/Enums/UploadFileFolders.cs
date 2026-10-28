@@ -13,5 +13,7 @@ public enum UploadFileFolders
     CableViewImages,
     CableAnnouncements,
     /// <summary>Generated payment receipts. Deliberately absent from AllowedUploadFiles: served only through the authorized receipt endpoint.</summary>
-    CableReceipts
+    CableReceipts,
+    /// <summary>Cable gift images (Sprint 5). Public, like offer images.</summary>
+    CableGifts
 }

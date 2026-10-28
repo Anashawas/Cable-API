@@ -34,7 +34,11 @@ public record PreviewPartnerCodeResult(
     /// Deliberately vague towards the customer: the partner's commercial terms are not shown.</summary>
     string? PointsUnavailableReason = null,
     /// <summary>With belowMinimumAmount: the smallest amount that earns points at this partner (for "minimum is 2 JOD").</summary>
-    decimal? MinimumAmountForPoints = null
+    decimal? MinimumAmountForPoints = null,
+    /// <summary>The user's promos that apply to this code (Sprint 5); the "Apply code" row shows only when not empty.</summary>
+    List<Application.Promos.EligiblePromoDto>? EligiblePromos = null,
+    /// <summary>With userPromoId: the computed promo; the points fields above are then the promo's.</summary>
+    Application.Promos.PreviewPromoDto? Promo = null
 );
 
 /// <summary>Why a partner transaction earns no points (PreviewPartnerCode.PointsUnavailableReason).</summary>
@@ -50,7 +54,7 @@ public static class PointsUnavailableReasons
     public const string BelowMinimumAmount = "belowMinimumAmount";
 }
 
-public record PreviewPartnerCodeRequest(string TransactionCode) : IRequest<PreviewPartnerCodeResult>;
+public record PreviewPartnerCodeRequest(string TransactionCode, int? UserPromoId = null) : IRequest<PreviewPartnerCodeResult>;
 
 /// <summary>
 /// Read-only companion to <c>ScanPartnerCodeCommand</c>: resolves a scanned
@@ -65,7 +69,8 @@ public record PreviewPartnerCodeRequest(string TransactionCode) : IRequest<Previ
 public class PreviewPartnerCodeRequestHandler(
     IApplicationDbContext applicationDbContext,
     ICurrentUserService currentUserService,
-    ILoyaltyBoostService loyaltyBoostService)
+    ILoyaltyBoostService loyaltyBoostService,
+    Application.Promos.PromoApplicator promoApplicator)
     : IRequestHandler<PreviewPartnerCodeRequest, PreviewPartnerCodeResult>
 {
     public async Task<PreviewPartnerCodeResult> Handle(PreviewPartnerCodeRequest request,
@@ -135,7 +140,7 @@ public class PreviewPartnerCodeRequestHandler(
         // negative countdown.
         var expiresInSeconds = (int)Math.Max(0, Math.Floor((transaction.CodeExpiresAt - now).TotalSeconds));
 
-        return new PreviewPartnerCodeResult(
+        var preview = new PreviewPartnerCodeResult(
             transaction.Id,
             transaction.TransactionCode,
             providerName ?? "Unknown",
@@ -155,6 +160,10 @@ public class PreviewPartnerCodeRequestHandler(
             pointsUnavailableReason is null,
             pointsUnavailableReason,
             minimumAmountForPoints);
+
+        // Promo codes (Sprint 5): eligiblePromos, and with userPromoId the promo and its points. Read-only.
+        return await promoApplicator.DecoratePreviewAsync(preview, transaction, userId, request.UserPromoId,
+            boost?.Multiplier, cancellationToken);
     }
 
     /// <summary>

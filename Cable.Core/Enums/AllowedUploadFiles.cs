@@ -11,5 +11,6 @@ public enum AllowedUploadFiles
     CableSocialMediaIcons,
     CableViewImages,
     CableAnnouncements,
-    CableCarTypes
+    CableCarTypes,
+    CableGifts
 }

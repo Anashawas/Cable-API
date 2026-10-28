@@ -106,6 +106,7 @@ public class SettlementService(
                     .SetProperty(x => x.TotalPointsDeducted, x => x.TotalPointsDeducted + totalPointsDeducted)
                     .SetProperty(x => x.NetBalance, x =>
                         (x.OfferPaymentAmount + offerPaymentAmount)
+                        + x.PromoCableShareAmount // promo discounts paid by Cable (added by PromoApplicator)
                         - (x.PartnerCommissionAmount + partnerCommissionAmount))
                     .SetProperty(x => x.WalletApplied, x => x.WalletApplied + walletCoveredAmount)
                     .SetProperty(x => x.ModifiedAt, DateTime.UtcNow),

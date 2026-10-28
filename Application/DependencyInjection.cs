@@ -24,6 +24,9 @@ public static class DependencyInjection
         // Shared by RecordPayment and the legacy premium endpoint.
         services.AddScoped<Subscriptions.PaymentRecorder>();
 
+        // Promo codes at partner-scan time (PreviewPartnerCode / ScanPartnerCode).
+        services.AddScoped<Promos.PromoApplicator>();
+
         return services;
     }
 }

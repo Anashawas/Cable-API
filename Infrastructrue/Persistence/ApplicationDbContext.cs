@@ -151,6 +151,15 @@ public partial class ApplicationDbContext(
     public DbSet<UserPriceAlert> UserPriceAlerts { get; set; }
     public DbSet<PriceAlertLog> PriceAlertLogs { get; set; }
 
+    // Sprint 5: Cable gifts + promo codes
+    public DbSet<CableGift> CableGifts { get; set; }
+    public DbSet<GiftOrder> GiftOrders { get; set; }
+    public DbSet<PromoCampaign> PromoCampaigns { get; set; }
+    public DbSet<PromoCode> PromoCodes { get; set; }
+    public DbSet<UserPromo> UserPromos { get; set; }
+    public DbSet<PromoUsage> PromoUsages { get; set; }
+    public DbSet<PromoClaimAttempt> PromoClaimAttempts { get; set; }
+
     #endregion
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

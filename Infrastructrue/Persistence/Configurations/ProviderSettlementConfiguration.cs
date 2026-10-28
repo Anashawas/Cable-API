@@ -57,7 +57,13 @@ public class ProviderSettlementConfiguration : IEntityTypeConfiguration<Provider
             .HasColumnType("decimal(18,3)")
             .HasDefaultValue(0m);
 
-        // Net balance: OfferPaymentAmount - PartnerCommissionAmount
+        // Promo discounts paid by Cable ("discounts paid by Cable" line) — Scripts/Sprint5_GiftsAndPromos.sql
+        builder.Property(e => e.PromoCableShareAmount)
+            .IsRequired()
+            .HasColumnType("decimal(18,3)")
+            .HasDefaultValue(0m);
+
+        // Net balance: OfferPaymentAmount + PromoCableShareAmount - PartnerCommissionAmount
         builder.Property(e => e.NetBalance)
             .IsRequired()
             .HasColumnType("decimal(18,3)")

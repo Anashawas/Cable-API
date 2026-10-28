@@ -14,17 +14,21 @@ public record ScanPartnerCodeResult(
     /// <summary>Always 0: the commission is between Cable and the partner, not the user's business. Kept only so
     /// older app builds still parse the response; remove once the apps no longer read it.</summary>
     decimal CommissionAmount,
-    int PointsAwarded
+    int PointsAwarded,
+    /// <summary>The promo applied to this scan (Sprint 5), null without one.</summary>
+    Application.Promos.ScanPromoDto? Promo = null
 );
 
-public record ScanPartnerCodeCommand(string TransactionCode) : IRequest<ScanPartnerCodeResult>;
+/// <param name="UserPromoId">Optional promo from "My codes" (one per transaction); it becomes Used with the completion.</param>
+public record ScanPartnerCodeCommand(string TransactionCode, int? UserPromoId = null) : IRequest<ScanPartnerCodeResult>;
 
 public class ScanPartnerCodeCommandHandler(
     IApplicationDbContext applicationDbContext,
     ICurrentUserService currentUserService,
     ILoyaltyPointService loyaltyPointService,
     ILoyaltyBoostService loyaltyBoostService,
-    ISettlementService settlementService)
+    ISettlementService settlementService,
+    Application.Promos.PromoApplicator promoApplicator)
     : IRequestHandler<ScanPartnerCodeCommand, ScanPartnerCodeResult>
 {
     public async Task<ScanPartnerCodeResult> Handle(ScanPartnerCodeCommand request,
@@ -144,10 +148,18 @@ public class ScanPartnerCodeCommandHandler(
                     (int)Math.Floor((transaction.BasePoints ?? 0) * boost.Multiplier);
             }
 
+            // Promo code (Sprint 5, optional): points on the final amount, commission on what the partner received,
+            // promo marked Used — before the settlement reads those figures. Null and no change without a promo.
+            var promo = await promoApplicator.ApplyAtScanAsync(transaction, request.UserPromoId, userId,
+                boost?.Multiplier, cancellationToken);
+
             // Auto-update settlement for this transaction
             await settlementService.UpsertSettlementForPartnerTransactionAsync(transaction, cancellationToken);
 
             await applicationDbContext.SaveChanges(cancellationToken);
+
+            // Cable's share of the promo discount → the settlement's "discounts paid by Cable".
+            await promoApplicator.RecordInSettlementAsync(transaction, promo, cancellationToken);
 
             // Award loyalty points inside transaction (rolls back if fails)
             var pointsAwarded = transaction.PointsAwarded ?? 0;
@@ -186,7 +198,8 @@ public class ScanPartnerCodeCommandHandler(
                 transaction.TransactionAmount ?? 0,
                 transaction.CurrencyCode ?? "",
                 0m,
-                pointsAwarded);
+                pointsAwarded,
+                promo?.ToUserDto());
         }
         catch
         {
