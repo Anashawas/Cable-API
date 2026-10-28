@@ -206,6 +206,7 @@ carried into the next one; `Exhausted` = a bundle with 0 scans.
 ### Upgrade requests — `/api/admin/upgrade-requests`
 - `GET ?status=Pending|Fulfilled|Rejected&providerType=&providerId=&page=&pageSize=` — pending first; includes the
   requester's name and phone (E.164) for the follow-up call.
+- `GET /pending-count` → `{ "pendingCount": 3 }` — the badge on the admin menu (leftovers).
 - `POST /{id}/reject` `{ reason }`.
 - `POST /{id}/fulfil` `{ paymentId?, planSubscriptionId? }` — manual; normally automatic: recording a payment
   (existing payments screen, `RecordPaymentDialog` pre-filled with `entityType` / `entityId` / `planMonths`, or
@@ -266,6 +267,31 @@ carried into the next one; `Exhausted` = a bundle with 0 scans.
   `expectedMonthlyScans` above it → `ok: false`.
 - Points cost only (no operating cost, payment fees, campaign or promo points). Recommended scans are floored
   (96.97 → 96). Break-even is never returned to partners.
+
+### Model compare («حاسبة المقارنة», §3.4, leftovers) — admin only
+
+`POST /api/admin/plans/model-compare` `{ "providerType": "ChargingPoint", "providerId": 37, "bundlePlanId": null, "priceOptionId": null }`
+```jsonc
+{ "providerType": "ChargingPoint", "providerId": 37, "providerName": "…", "currentBillingModel": "percentage",
+  "fromUtc": "…", "toUtc": "…", "days": 90, "pointsPerJod": 1000, "pointValueJod": 0.001,
+  "percentage": { "transactions": 120, "totalAmountJod": 1450.5, "averageAmountJod": 12.088, "commissionPercent": 5,
+                  "commissionJod": 72.525, "points": 14505, "pointsCostJod": 14.505, "cableMarginJod": 58.02, "simulatedTransactions": 0 },
+  "bundle": { "planId": 4, "planKey": "loyalty_bundle_400", "planName": "…", "priceOptionId": 9, "priceJod": 40, "scans": 400, "months": null,
+              "bundlesNeeded": 1, "costJod": 40, "pricePerScanJod": 0.1, "effectivePricePerScanJod": 0.339, "scansUsed": 118,
+              "scansLeftOver": 282, "minimumAmountJod": 2, "belowMinimumTransactions": 2, "points": 9800, "pointsCostJod": 9.8, "cableMarginJod": 30.2 },
+  "recommendation": { "model": "bundle", "code": "bundleSavesPartner", "text": "…", "partnerSavingJod": 32.525, "cableMarginDifferenceJod": -27.82 } }
+```
+- Period: the partner's completed partner transactions of the last 90 days. Percentage side = what happened: recorded
+  commission and base points (before boosts / promos); codes that were bundle-billed are priced at the agreement's
+  current commission % and reward % (`simulatedTransactions`).
+- Bundle side = the same scans on the plan: `bundlePlanId` default = the partner's current / latest bundle plan, else
+  the first active Loyalty plan for the provider type; `priceOptionId` default = the partner's own option, else the
+  active option with the lowest cost for the period. Bundles needed = max(scans ÷ bundle scans, periods for a
+  time-limited option); codes under the bundle minimum amount are left out (`belowMinimumTransactions`); points by the
+  plan's rule.
+- `recommendation.model`: `noData` (no transactions), `percentage` + `bundleLosesForCable` (bundle margin < 0) or
+  `percentageCheaperForPartner`, `bundle` + `bundleSavesPartner`. 422 `PLAN_NOT_APPLICABLE` (not a Loyalty plan),
+  `INVALID_PRICE_OPTION`.
 
 ---
 

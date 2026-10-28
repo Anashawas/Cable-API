@@ -140,7 +140,8 @@ public class OrderCableGiftCommandHandler(IApplicationDbContext db, ICurrentUser
                 BalanceAfter = wallet.CurrentBalance,
                 ReferenceType = "GiftOrder",
                 ReferenceId = order.Id,
-                Note = Lang.Pick($"شراء هدية: {gift.NameAr} ({order.OrderCode})", $"Gift purchase: {gift.NameEn} ({order.OrderCode})"),
+                // Stored in the buyer's (request) language; the user's history re-renders it in the reader's language.
+                Note = GiftHistoryTexts.Purchase(GiftHistoryTexts.RequestLanguage, gift.NameAr, gift.NameEn, order.OrderCode),
                 CreatedAt = now,
                 CreatedBy = userId
             };

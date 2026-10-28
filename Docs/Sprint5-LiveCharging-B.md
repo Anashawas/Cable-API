@@ -172,6 +172,8 @@ The owner's single-session view `GET /api/provider/charging-points/{cp}/sessions
 
 The totals cover everything the filters match. `openNow` counts running sessions under the same filters except status and dates. Rejected and orphan sessions are left out of the list.
 
+Each row also has `hasAlerts` (leftovers, §11.2): true when the row carries a cheap alert — started far away (`startDistanceMeters` > 80 % of `Ocpp.AppStart.MaxDistanceMeters`), parked after charging, or stale. The detail lists every alert (below).
+
 ### Other admin session endpoints
 
 | Endpoint | What |
@@ -192,7 +194,18 @@ The detail response has these parts:
 | Stop | `stoppedByName` (who sent the RemoteStop), `stoppedByLimit` |
 | `commands[]` | The session's RemoteStartTransaction calls (failed attempts included) and RemoteStopTransaction calls, with the charger's answers |
 | `issues[]` | The session's complaints |
-| `pointsAwarded` | Always `null`: there is no per-session points column yet |
+| `pointsAwarded` | Automatic points of the session (4.7), null = none / not decided |
+| `alerts[]` | §11.2, leftovers: `{ code, text, textAr, textEn }` (`text` follows Accept-Language), empty when nothing to look at |
+
+Alert codes, in this order:
+
+| Code | When |
+|---|---|
+| `startedFarAway` | App start with `startDistanceMeters` > 80 % of `Ocpp.AppStart.MaxDistanceMeters` (default 300 → over 240 m) |
+| `repeatedFailedStarts` | The same driver had ≥ 2 RemoteStartTransaction calls on any charger of this station in the 30 min before the session that were refused or never answered (not `Answered` + `Accepted`) |
+| `parkedAfterCharging` | The "your car has finished — could you unplug it?" push was sent (`ParkedNotifiedAt`) |
+| `limitStopNotAccepted` | A RemoteStop the server sent because the charge limit was reached was not accepted by the charger (text gives the count) |
+| `stale` | Open more than 24 h without a StopTransaction |
 
 The start location (11.c) belongs to the other change.
 
@@ -265,7 +278,7 @@ The receipt shows:
 - Session: start, end, duration, battery from → to
 - Price lines, e.g. `Off-peak · خارج الذروة   10.200 kWh × 183 fils   1.867 JOD`, and the total
 - The note "Estimated cost — pay the station directly / كلفة تقديرية — الدفع للمحطة مباشرة"
-- A QR to `https://cable-app.com/r/{receiptNo}`. That web page is still to be built: it should call verify below
+- A QR to `https://cable-app.com/r/{receiptNo}`. The landing serves that page (leftovers): the API rewrites `/r/{no}` (and `/ar/r/{no}`, `/en/r/{no}`) to the landing's `r/index.html`, which calls verify below. Sticker links `/c/{code}` work the same way and call `GET /api/charging-points/connectors/resolve?code=` (both endpoints are anonymous)
 
 The same receipt is available to:
 - The owner or managers (ConnectView): `GET /api/provider/charging-points/{cp}/sessions/{id}/receipt`
@@ -283,7 +296,14 @@ The same receipt is available to:
 
 An unknown number gets 404 `RECEIPT_NOT_FOUND`.
 
-**Not done: "email me receipts".** An email service exists, but this needs a per-user setting, a hook on session completion and PDF attachments. That is more than trivial, so it is left out.
+### Email receipts (leftovers, off by default)
+
+```http
+GET /api/users/me/ocpp-settings           → { "emailReceipts": false, "hasEmail": true }
+PUT /api/users/me/ocpp-settings  { "emailReceipts": true }   → the saved settings (null / missing = unchanged)
+```
+
+When a driver's session ends, the "charging finished" job (after pricing and automatic points) emails the receipt PDF to a driver who switched it on and has an email on the account — subject and text in the device language (latest push token; Arabic when unknown). At most one email per session (`dbo.OcppReceiptEmail`, Sent / Failed); an email error is logged and never fails the job. Sessions the charger replays after being offline get no push and so no email. Tables: `Scripts/Sprint5_Leftovers.sql`.
 
 ---
 

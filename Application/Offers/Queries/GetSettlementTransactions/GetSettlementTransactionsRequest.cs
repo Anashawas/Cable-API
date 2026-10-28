@@ -1,6 +1,7 @@
 using System.Globalization;
 using Application.Common.Security;
 using Application.Loyalty.Queries.GetProviderActivity;
+using Application.Promos;
 using Cable.Core;
 using Cable.Core.Emuns;
 using Cable.Core.Exceptions;
@@ -16,8 +17,34 @@ public record SettlementTransactionsDto(
     int PeriodWeek,
     DateTime FromUtc,
     DateTime ToUtc,
-    List<ProviderActivityDto> Items
+    List<SettlementLineItemDto> Items,
+    /// <summary>Sprint 5: Cable's share of the promo discounts in this settlement, owed to the provider (already in NetBalance).</summary>
+    decimal PromoDiscountsPaidByCable = 0
 );
+
+/// <summary>
+/// One line of a settlement: the activity row plus, for a partner scan that used a promo code, the promo
+/// (title in the request language, the discount, Cable's share — owed to the provider — and the provider's own share).
+/// The promo fields are null on lines without a promo.
+/// </summary>
+public record SettlementLineItemDto(
+    string ActivityType,
+    int TransactionId,
+    int? UserId,
+    string? UserName,
+    string? Code,
+    int Status,
+    string StatusName,
+    int Points,
+    decimal? Amount,
+    string? CurrencyCode,
+    DateTime CreatedAt,
+    DateTime? CompletedAt,
+    string? PromoTitle = null,
+    decimal? PromoDiscountJod = null,
+    decimal? PromoCableShareJod = null,
+    decimal? PromoProviderShareJod = null)
+    : ProviderActivityDto(ActivityType, TransactionId, UserId, UserName, Code, Status, StatusName, Points, Amount, CurrencyCode, CreatedAt, CompletedAt);
 
 /// <summary>
 /// C1 — the transaction line-items behind one settlement: every COMPLETED offer
@@ -49,7 +76,7 @@ public class GetSettlementTransactionsRequestHandler(
 
         var (from, toExclusive) = GetWeekWindow(settlement.PeriodYear, settlement.PeriodWeek);
 
-        var items = new List<ProviderActivityDto>();
+        var items = new List<SettlementLineItemDto>();
 
         var offers = await applicationDbContext.OfferTransactions
             .AsNoTracking()
@@ -67,7 +94,7 @@ public class GetSettlementTransactionsRequestHandler(
             })
             .ToListAsync(cancellationToken);
 
-        items.AddRange(offers.Select(t => new ProviderActivityDto(
+        items.AddRange(offers.Select(t => new SettlementLineItemDto(
             "Offer", t.Id, t.UserId, t.UserName, t.OfferCode,
             t.Status, ((OfferTransactionStatus)t.Status).ToString(),
             -t.PointsDeducted, t.MonetaryValue, t.CurrencyCode,
@@ -89,11 +116,19 @@ public class GetSettlementTransactionsRequestHandler(
             })
             .ToListAsync(cancellationToken);
 
-        items.AddRange(partners.Select(t => new ProviderActivityDto(
-            "Partner", t.Id, t.UserId, t.UserName, t.TransactionCode,
-            t.Status, ((PartnerTransactionStatus)t.Status).ToString(),
-            t.PointsAwarded ?? 0, t.TransactionAmount, t.CurrencyCode,
-            t.CreatedAt, t.CompletedAt)));
+        // Sprint 5: the promo used on each partner scan (none → the promo fields stay null).
+        var promos = await PartnerPromoView.ForTransactionsAsync(applicationDbContext, partners.Select(t => t.Id).ToList(), cancellationToken);
+
+        items.AddRange(partners.Select(t =>
+        {
+            var promo = promos.GetValueOrDefault(t.Id);
+            return new SettlementLineItemDto(
+                "Partner", t.Id, t.UserId, t.UserName, t.TransactionCode,
+                t.Status, ((PartnerTransactionStatus)t.Status).ToString(),
+                t.PointsAwarded ?? 0, t.TransactionAmount, t.CurrencyCode,
+                t.CreatedAt, t.CompletedAt,
+                promo?.Title, promo?.DiscountJod, promo?.CableShareJod, promo?.ProviderShareJod);
+        }));
 
         return new SettlementTransactionsDto(
             settlement.Id,
@@ -103,7 +138,8 @@ public class GetSettlementTransactionsRequestHandler(
             settlement.PeriodWeek,
             from,
             toExclusive.AddDays(-1), // inclusive Saturday for display
-            items.OrderByDescending(i => i.CompletedAt ?? i.CreatedAt).ToList());
+            items.OrderByDescending(i => i.CompletedAt ?? i.CreatedAt).ToList(),
+            settlement.PromoCableShareAmount);
     }
 
     /// <summary>

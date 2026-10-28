@@ -136,6 +136,23 @@ public class GetUpgradeRequestsRequestHandler(IApplicationDbContext applicationD
     }
 }
 
+public record UpgradeRequestsPendingCountDto(int PendingCount);
+
+/// <summary>Admin: how many upgrade / renew / bundle requests are waiting — the badge on the admin menu.</summary>
+public record GetUpgradeRequestsPendingCountRequest : IRequest<UpgradeRequestsPendingCountDto>;
+
+public class GetUpgradeRequestsPendingCountRequestHandler(IApplicationDbContext applicationDbContext, ICurrentUserService currentUserService)
+    : IRequestHandler<GetUpgradeRequestsPendingCountRequest, UpgradeRequestsPendingCountDto>
+{
+    public async Task<UpgradeRequestsPendingCountDto> Handle(GetUpgradeRequestsPendingCountRequest request, CancellationToken cancellationToken)
+    {
+        await AdminRoleGuard.EnsureAdminAsync(applicationDbContext, currentUserService, cancellationToken);
+        var count = await applicationDbContext.PlanUpgradeRequests.AsNoTracking()
+            .CountAsync(r => r.Status == UpgradeRequestStatuses.Pending && !r.IsDeleted, cancellationToken);
+        return new UpgradeRequestsPendingCountDto(count);
+    }
+}
+
 public record RejectUpgradeRequestCommand(int Id, string Reason) : IRequest<UpgradeRequestDto>;
 
 public class RejectUpgradeRequestCommandHandler(IApplicationDbContext applicationDbContext, ICurrentUserService currentUserService)

@@ -106,9 +106,8 @@ public class CancelGiftOrderCommandHandler(IApplicationDbContext db, ICurrentUse
                 BalanceAfter = wallet.CurrentBalance,
                 ReferenceType = "GiftOrder",
                 ReferenceId = order.Id,
-                Note = Lang.Pick(language,
-                    $"استرجاع — إلغاء هدية: {order.Gift.NameAr} ({order.OrderCode})",
-                    $"Refund — gift cancelled: {order.Gift.NameEn} ({order.OrderCode})"),
+                // Stored in the user's language (never the admin's); the user's history re-renders it in the reader's language.
+                Note = GiftHistoryTexts.Refund(language, order.Gift.NameAr, order.Gift.NameEn, order.OrderCode),
                 CreatedAt = now,
                 CreatedBy = adminId
             };

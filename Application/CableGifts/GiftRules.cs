@@ -79,6 +79,25 @@ public static class GiftRules
         isBlocked && (!blockedUntil.HasValue || blockedUntil.Value >= nowUtc);
 }
 
+/// <summary>
+/// The points-history lines of a gift order (ReferenceType "GiftOrder"): the purchase (−points) and the refund on
+/// cancel (+points). One wording for both the stored Note and the user's history, which re-renders them in the
+/// reader's language (bilingual at read), so a purchase and its refund never show in two different languages.
+/// </summary>
+public static class GiftHistoryTexts
+{
+    public const string ReferenceType = "GiftOrder";
+
+    public static string Purchase(string? language, string giftNameAr, string giftNameEn, string orderCode) =>
+        Lang.Pick(language, $"شراء هدية: {giftNameAr} ({orderCode})", $"Gift purchase: {giftNameEn} ({orderCode})");
+
+    public static string Refund(string? language, string giftNameAr, string giftNameEn, string orderCode) =>
+        Lang.Pick(language, $"استرجاع — إلغاء هدية: {giftNameAr} ({orderCode})", $"Refund — gift cancelled: {giftNameEn} ({orderCode})");
+
+    /// <summary>The request language as a code for <see cref="Lang.Pick(string?, string, string)"/>.</summary>
+    public static string RequestLanguage => Lang.IsArabic ? "ar" : "en";
+}
+
 /// <summary>Push texts for gift orders, in the device's language.</summary>
 public static class GiftPushTexts
 {

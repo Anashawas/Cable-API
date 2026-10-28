@@ -130,6 +130,16 @@ public static class BillingRoutes
             .WithSummary("Break-even and recommended scans for a price + points rule (points cost only). amountMix manual, or providerId to use that provider's last 90 days")
             .WithOpenApi(op => { op.RequestBody.Required = true; return op; });
 
+        app.MapPost("/model-compare", async (IMediator mediator, ModelCompareCommand body, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(body, ct)))
+            .Produces<ModelCompareResult>()
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity)
+            .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("Admin billing model compare")
+            .WithSummary("Sales tool (§3.4): the partner's last 90 days of completed scans under the percentage model (count, amount, commission, points and their cost at Billing.PointsPerJod, Cable's margin) next to the same period simulated on a scan bundle (bundles needed, cost, price per scan, points by the plan's rule, Cable's margin) + recommendation")
+            .WithDescription("{ providerType, providerId, bundlePlanId?, priceOptionId? }. bundlePlanId default: the partner's current / latest bundle plan, else the first active Loyalty plan; priceOptionId default: the partner's own option, else the one that would have cost least. Codes under the bundle minimum amount are left out of the bundle side (belowMinimumTransactions). 422 PLAN_NOT_APPLICABLE (not a Loyalty plan / none), INVALID_PRICE_OPTION.")
+            .WithOpenApi(op => { op.RequestBody.Required = true; return op; });
+
         return app;
     }
 
@@ -195,6 +205,14 @@ public static class BillingRoutes
             .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesInternalServerError()
             .WithName("Admin list upgrade requests")
             .WithSummary("Partner upgrade / renew / bundle requests, pending first. status: Pending | Fulfilled | Rejected")
+            .WithOpenApi();
+
+        app.MapGet("/pending-count", async (IMediator mediator, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetUpgradeRequestsPendingCountRequest(), ct)))
+            .Produces<UpgradeRequestsPendingCountDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesInternalServerError()
+            .WithName("Admin upgrade requests pending count")
+            .WithSummary("{ pendingCount }: requests still Pending — the badge on the admin menu")
             .WithOpenApi();
 
         app.MapPost("/{id:int}/reject", async (IMediator mediator, [FromRoute] int id, ReasonRequest body, CancellationToken ct) =>

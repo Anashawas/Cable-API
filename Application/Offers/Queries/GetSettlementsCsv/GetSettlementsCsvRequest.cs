@@ -33,7 +33,8 @@ public class GetSettlementsCsvRequestHandler(
         var sb = new StringBuilder();
         sb.AppendLine("SettlementId,ProviderType,ProviderId,ProviderName,OwnerId,OwnerName,PeriodYear,PeriodWeek," +
                       "PartnerTxCount,PartnerTxAmount,PartnerCommission,OfferTxCount,OfferPayment," +
-                      "NetBalance,WalletApplied,Outstanding,WalletBalanceNow,Status,PaidAt,CreatedAt");
+                      "NetBalance,WalletApplied,Outstanding,WalletBalanceNow,Status,PaidAt,CreatedAt," +
+                      "PromoDiscountsPaidByCable");
 
         foreach (var r in rows)
         {
@@ -57,7 +58,9 @@ public class GetSettlementsCsvRequestHandler(
                 r.CurrentWalletBalance?.ToString(CultureInfo.InvariantCulture) ?? "",
                 ((SettlementStatus)r.SettlementStatus).ToString(),
                 r.PaidAt?.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "",
-                r.CreatedAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)));
+                r.CreatedAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture),
+                // Sprint 5: Cable's share of promo discounts, owed to the provider (already inside NetBalance).
+                r.PromoDiscountsPaidByCable.ToString(CultureInfo.InvariantCulture)));
         }
 
         return sb.ToString();

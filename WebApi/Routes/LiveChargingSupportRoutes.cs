@@ -26,6 +26,10 @@ public static class LiveChargingSupportRoutes
             .WithTags("Charging Points")
             .MapDriverIssueAndReceiptRoutes();
 
+        app.MapGroup("/api/users/me/ocpp-settings")
+            .WithTags("Charging Points")
+            .MapDriverOcppSettingsRoutes();
+
         app.MapGroup("/api/receipts")
             .WithTags("Charging Points")
             .MapReceiptVerifyRoutes();
@@ -56,6 +60,7 @@ public static class LiveChargingSupportRoutes
         app.MapGet("/connectors/resolve", async (IMediator mediator, [FromQuery] string? code, CancellationToken ct) =>
                 Results.Ok(await mediator.Send(new ResolveConnectorCodeRequest(code), ct)))
             .Produces<ConnectorCodeResolveDto>()
+            .AllowAnonymous()   // also read by the landing's /c/{code} page (same origin; default CORS policy)
             .ProducesNotFound().ProducesCableValidationProblem(StatusCodes.Status410Gone).ProducesInternalServerError()
             .WithName("Resolve plug sticker code")
             .WithSummary("Driver app, no sign-in: what a scanned / typed CHG- code points at — station, charger (display name), plug, plug type, kW, state and canStartFromApp / cannotStartReason (offline | plugCable | busy | outOfOrder | noSubscription | notShared | blocked). code = the code or the full link https://cable-app.com/c/CHG-…, any case, spaces / dashes ignored. 404 code CODE_NOT_FOUND (not a Cable code), 410 code CODE_REVOKED (sticker replaced). Start with POST /api/users/me/ocpp-sessions/start + connectorCode.")
@@ -113,11 +118,34 @@ public static class LiveChargingSupportRoutes
         return app;
     }
 
+    /// <summary>§13.2: the driver's Cable Connect settings (email receipts).</summary>
+    private static RouteGroupBuilder MapDriverOcppSettingsRoutes(this RouteGroupBuilder app)
+    {
+        app.MapGet("", async (IMediator mediator, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetMyOcppSettingsRequest(), ct)))
+            .Produces<DriverOcppSettingsDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesInternalServerError()
+            .WithName("Get my charging settings")
+            .WithSummary("Driver: { emailReceipts, hasEmail }. emailReceipts (default false) = email the receipt PDF when a session ends; nothing is sent while hasEmail is false.")
+            .WithOpenApi();
+
+        app.MapPut("", async (IMediator mediator, UpdateMyOcppSettingsCommand body, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(body, ct)))
+            .Produces<DriverOcppSettingsDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("Update my charging settings")
+            .WithSummary("Driver: { emailReceipts: true|false } (null / missing = unchanged). Returns the saved settings. The email (subject and text in the device language, receipt PDF attached) goes out once per session, after the \"charging finished\" push.")
+            .WithOpenApi(op => { op.RequestBody.Required = true; return op; });
+
+        return app;
+    }
+
     private static RouteGroupBuilder MapReceiptVerifyRoutes(this RouteGroupBuilder app)
     {
         app.MapGet("/verify/{receiptNo}", async (IMediator mediator, [FromRoute] string receiptNo, CancellationToken ct) =>
                 Results.Ok(await mediator.Send(new VerifySessionReceiptRequest(receiptNo), ct)))
             .Produces<SessionReceiptVerifyDto>()
+            .AllowAnonymous()   // read by the landing's /r/{receiptNo} page (same origin; default CORS policy)
             .ProducesNotFound().ProducesInternalServerError()
             .WithName("Verify a charging receipt")
             .WithSummary("Public, no sign-in: is this receipt genuine — station, plug, times, energy, total and the driver's first name only. 404 code RECEIPT_NOT_FOUND. Read by the page the receipt's QR opens (https://cable-app.com/r/{receiptNo}).")

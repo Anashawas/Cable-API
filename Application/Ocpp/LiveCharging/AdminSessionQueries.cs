@@ -4,6 +4,7 @@ using Application.Common.Security;
 using Application.Ocpp.Commands.ChargeLimits;
 using Application.Ocpp.Queries;
 using Application.Ocpp.Queries.GetSessionLive;
+using Application.Settings;
 using Cable.Core.Constants;
 using Cable.Core.Exceptions;
 using Cable.Core.Utilities;
@@ -76,7 +77,12 @@ public record AdminSessionRowDto(
     /// <summary>Automatic points the driver got (4.7); null = none / not decided.</summary>
     int? PointsAwarded = null,
     /// <summary>App start: how far the phone was from the station, in metres (4.2 / 11.c).</summary>
-    int? StartDistanceMeters = null);
+    int? StartDistanceMeters = null,
+    /// <summary>
+    /// §11.2: the session carries a cheap alert — started far away (over 80% of Ocpp.AppStart.MaxDistanceMeters),
+    /// the car stayed parked after charging, or stale. The detail lists every alert (alerts[]).
+    /// </summary>
+    bool HasAlerts = false);
 
 public record AdminSessionTotalsDto(int Sessions, decimal EnergyKwh, int CostFils, decimal CostJod, int OpenNow);
 
@@ -105,7 +111,73 @@ public record AdminSessionDetailDto(
     List<OcppCommandDto> Commands,
     List<AdminSessionIssueDto> Issues,
     /// <summary>Automatic loyalty points awarded for the session (4.7, Ocpp.AutoPoints.Enabled); null = none / not decided.</summary>
-    int? PointsAwarded = null);
+    int? PointsAwarded = null,
+    /// <summary>§11.2 alerts: startedFarAway, repeatedFailedStarts, parkedAfterCharging, limitStopNotAccepted, stale. Empty = nothing to look at.</summary>
+    List<AdminSessionAlertDto>? Alerts = null);
+
+/// <summary>
+/// §11.2: one thing the admin should look at on a session. <see cref="Code"/> is stable (startedFarAway |
+/// repeatedFailedStarts | parkedAfterCharging | limitStopNotAccepted | stale); <see cref="Text"/> follows
+/// Accept-Language, <see cref="TextAr"/> / <see cref="TextEn"/> carry both.
+/// </summary>
+public record AdminSessionAlertDto(string Code, string Text, string TextAr, string TextEn);
+
+/// <summary>§11.2: the alert codes, their rules and texts.</summary>
+public static class AdminSessionAlerts
+{
+    public const string StartedFarAway = "startedFarAway";
+    public const string RepeatedFailedStarts = "repeatedFailedStarts";
+    public const string ParkedAfterCharging = "parkedAfterCharging";
+    public const string LimitStopNotAccepted = "limitStopNotAccepted";
+    public const string Stale = "stale";
+
+    /// <summary>A start counts as "far away" past this share of Ocpp.AppStart.MaxDistanceMeters.</summary>
+    public const decimal FarAwayShare = 0.8m;
+
+    /// <summary>Failed RemoteStarts by the same driver on the same station in this window before the session raise repeatedFailedStarts.</summary>
+    public static readonly TimeSpan FailedStartsWindow = TimeSpan.FromMinutes(30);
+    public const int FailedStartsThreshold = 2;
+
+    /// <summary>How the limit enforcer (Cable.Ocpp ChargeLimitEnforcer) marks its own RemoteStop in OcppCommand.ErrorDescription.</summary>
+    public const string LimitStopMarker = "Charge limit reached";
+
+    public static bool IsFarAway(int? startDistanceMeters, int maxDistanceMeters) =>
+        startDistanceMeters is int d && maxDistanceMeters > 0 && d > maxDistanceMeters * FarAwayShare;
+
+    /// <summary>The list flag: only what the row already carries (far away, parked, stale).</summary>
+    public static bool HasCheapAlert(int? startDistanceMeters, int maxDistanceMeters, DateTime? parkedNotifiedAt, bool isStale) =>
+        IsFarAway(startDistanceMeters, maxDistanceMeters) || parkedNotifiedAt is not null || isStale;
+
+    private static AdminSessionAlertDto Make(string code, string ar, string en) => new(code, Lang.Pick(ar, en), ar, en);
+
+    public static AdminSessionAlertDto FarAway(int distanceMeters, int maxMeters) => Make(StartedFarAway,
+        $"بدأ الشحن من التطبيق على بعد {distanceMeters} م من المحطة (الحد {maxMeters} م).",
+        $"Started from the app {distanceMeters} m from the station (the limit is {maxMeters} m).");
+
+    public static AdminSessionAlertDto FailedStarts(int count) => Make(RepeatedFailedStarts,
+        $"نفس السائق حاول يبدأ الشحن {count} مرات بدون نجاح على هاي المحطة خلال 30 دقيقة قبل هاي الجلسة.",
+        $"The same driver had {count} failed start attempts on this station in the 30 minutes before this session.");
+
+    public static AdminSessionAlertDto Parked(DateTime notifiedAtUtc)
+    {
+        var at = JordanTime.FromUtc(notifiedAtUtc).ToString("HH:mm", CultureInfo.InvariantCulture);
+        return Make(ParkedAfterCharging,
+            $"السيارة ضلت على المقبس بعد ما خلص الشحن (انبعت للسائق تنبيه الساعة {at}).",
+            $"The car stayed on the plug after charging finished (the driver was alerted at {at}).");
+    }
+
+    public static AdminSessionAlertDto LimitStop(int count) => Make(LimitStopNotAccepted,
+        count == 1
+            ? "الشاحن ما قبل أمر الإيقاف اللي انبعت عند الوصول للحد."
+            : $"الشاحن ما قبل أمر الإيقاف اللي انبعت عند الوصول للحد ({count} مرات).",
+        count == 1
+            ? "The charger did not accept the stop sent when the limit was reached."
+            : $"The charger did not accept the stop sent when the limit was reached ({count} times).");
+
+    public static AdminSessionAlertDto StaleSession() => Make(Stale,
+        "الجلسة مفتوحة أكثر من 24 ساعة بدون إيقاف من الشاحن — بدها تسوية يدوية.",
+        "Open for more than 24 h without a stop from the charger — needs manual reconciliation.");
+}
 
 internal static class AdminSessionQuery
 {
@@ -156,7 +228,8 @@ internal static class AdminSessionQuery
         DateTime StartedAt, DateTime? StoppedAt, bool IsOpen, bool IsStale, string StartSource, string StartMethod, string IdTag, int? StartedByUserId,
         string? UserName, string? UserPhone, string? CardLabel, decimal? EnergyKwh, int? CostFils, int? SocStartPercent, int? SocEndPercent,
         string? ChargeLimitKind, decimal? ChargeLimitValue, DateTime? ChargeLimitSetAt, DateTime? ChargeLimitReachedAt, string? StopReason,
-        string? ReceiptNo, int OpenIssues, bool WasRejected, bool IsOrphan, int? CarId, int? PointsAwarded, int? StartDistanceMeters);
+        string? ReceiptNo, int OpenIssues, bool WasRejected, bool IsOrphan, int? CarId, int? PointsAwarded, int? StartDistanceMeters,
+        DateTime? ParkedNotifiedAt);
 
     private static IQueryable<Raw> Project(IApplicationDbContext db, IQueryable<OcppTransaction> q) =>
         q.Select(t => new Raw(
@@ -170,9 +243,9 @@ internal static class AdminSessionQuery
             t.ReceiptNo,
             db.UserComplaints.Count(c => c.OcppTransactionId == t.Id && !c.IsDeleted
                                          && (c.Status == 0 || c.Status == 3 || c.Status == 4)),
-            t.WasRejected, t.IsOrphan, t.CarId, t.PointsAwarded, t.StartDistanceMeters));
+            t.WasRejected, t.IsOrphan, t.CarId, t.PointsAwarded, t.StartDistanceMeters, t.ParkedNotifiedAt));
 
-    private static AdminSessionRowDto ToRow(Raw r, DateTime now, IReadOnlyDictionary<int, SessionCarDto> cars)
+    private static AdminSessionRowDto ToRow(Raw r, DateTime now, IReadOnlyDictionary<int, SessionCarDto> cars, int maxDistanceMeters)
     {
         var person = r.StartedByUserId is int uid ? new AdminSessionPersonDto(uid, r.UserName, PhoneNumberUtility.ToE164OrOriginal(r.UserPhone)) : null;
         var staff = r.StartSource == OcppStartSource.Operator;
@@ -183,7 +256,8 @@ internal static class AdminSessionQuery
             r.EnergyKwh, r.CostFils, r.CostFils is int f ? f / 1000m : null, r.SocStartPercent, r.SocEndPercent,
             ChargeLimitDto.From(r.ChargeLimitKind, r.ChargeLimitValue, r.ChargeLimitSetAt, r.ChargeLimitReachedAt),
             r.StopReason, stop.En, stop.Ar, r.ReceiptNo, r.OpenIssues, r.WasRejected, r.IsOrphan,
-            r.CarId is int carId ? cars.GetValueOrDefault(carId)?.Name : null, r.PointsAwarded, r.StartDistanceMeters);
+            r.CarId is int carId ? cars.GetValueOrDefault(carId)?.Name : null, r.PointsAwarded, r.StartDistanceMeters,
+            AdminSessionAlerts.HasCheapAlert(r.StartDistanceMeters, maxDistanceMeters, r.ParkedNotifiedAt, r.IsStale));
     }
 
     public static async Task<PagedResult<AdminSessionRowDto>> PageAsync(IApplicationDbContext db, IQueryable<OcppTransaction> q, int? page, int? pageSize, CancellationToken ct)
@@ -191,7 +265,8 @@ internal static class AdminSessionQuery
         var now = DateTime.UtcNow;
         var raw = await Project(db, q.OrderByDescending(t => t.StartedAt).ThenByDescending(t => t.Id)).ToPaginatedAsync(page, pageSize, 20, 200, ct);
         var cars = await SessionCars.LoadAsync(db, raw.Items.Select(r => r.CarId), ct);
-        return raw.As(raw.Items.Select(r => ToRow(r, now, cars)).ToList());
+        var maxDistance = (await AppSettingsProvider.GetOcppAppStartAsync(db, ct)).MaxDistanceMeters;
+        return raw.As(raw.Items.Select(r => ToRow(r, now, cars, maxDistance)).ToList());
     }
 
     public static async Task<List<AdminSessionRowDto>> AllAsync(IApplicationDbContext db, IQueryable<OcppTransaction> q, int max, CancellationToken ct)
@@ -199,7 +274,8 @@ internal static class AdminSessionQuery
         var now = DateTime.UtcNow;
         var raw = await Project(db, q.OrderByDescending(t => t.StartedAt).ThenByDescending(t => t.Id)).Take(max).ToListAsync(ct);
         var cars = await SessionCars.LoadAsync(db, raw.Select(r => r.CarId), ct);
-        return raw.Select(r => ToRow(r, now, cars)).ToList();
+        var maxDistance = (await AppSettingsProvider.GetOcppAppStartAsync(db, ct)).MaxDistanceMeters;
+        return raw.Select(r => ToRow(r, now, cars, maxDistance)).ToList();
     }
 
     public static async Task<AdminSessionTotalsDto> TotalsAsync(IApplicationDbContext db, AdminSessionFilter f, IQueryable<OcppTransaction> q, CancellationToken ct)
@@ -318,6 +394,7 @@ public class GetAdminOcppSessionRequestHandler(IApplicationDbContext db, ICurren
                 t.ChargePoint.ChargingPoint.CityName,
                 t.ReceivedStartAt,
                 t.ChargeLimitSetBy,
+                t.ParkedNotifiedAt,
                 Plug = db.OcppConnectors.Where(k => k.OcppChargePointId == t.OcppChargePointId && k.ConnectorId == t.ConnectorId)
                     .Select(k => new { PlugTypeName = k.PlugType != null ? k.PlugType.Name : null, k.PowerKw }).FirstOrDefault(),
             })
@@ -340,9 +417,54 @@ public class GetAdminOcppSessionRequestHandler(IApplicationDbContext db, ICurren
             .Select(c => new AdminSessionIssueDto(c.Id, c.Reason, c.Note, SessionIssueStatus.Of(c.Status), c.Status, c.Reply, c.CreatedAt))
             .ToList();
 
+        var alerts = await AlertsAsync(row, extra.ReceivedStartAt, extra.ParkedNotifiedAt, commands, cancellationToken);
+
         var address = string.Join(" · ", new[] { extra.Address, extra.CityName }.Where(x => !string.IsNullOrWhiteSpace(x)));
         return new AdminSessionDetailDto(row, live, address.Length == 0 ? null : address, extra.Plug?.PlugTypeName, extra.Plug?.PowerKw,
-            limitSetBy, stoppedByLimit ? null : stopCommand?.RequestedByName, stoppedByLimit, commands, issues, live.PointsAwarded);
+            limitSetBy, stoppedByLimit ? null : stopCommand?.RequestedByName, stoppedByLimit, commands, issues, live.PointsAwarded, alerts);
+    }
+
+    /// <summary>§11.2: every alert on the session, in a fixed order.</summary>
+    private async Task<List<AdminSessionAlertDto>> AlertsAsync(AdminSessionRowDto row, DateTime receivedStartAt, DateTime? parkedNotifiedAt,
+        IReadOnlyList<OcppCommandDto> commands, CancellationToken ct)
+    {
+        var alerts = new List<AdminSessionAlertDto>();
+
+        var maxDistance = (await AppSettingsProvider.GetOcppAppStartAsync(db, ct)).MaxDistanceMeters;
+        if (AdminSessionAlerts.IsFarAway(row.StartDistanceMeters, maxDistance))
+            alerts.Add(AdminSessionAlerts.FarAway(row.StartDistanceMeters!.Value, maxDistance));
+
+        // The same driver's RemoteStarts on any charger of this station in the 30 min before, that the unit
+        // refused or never answered (the one that opened this session was accepted, so it never counts).
+        if (row.Driver?.UserId is int driverId)
+        {
+            var needle = "\"idTag\":\"" + OcppVirtualTag.ForUser(driverId) + "\"";
+            var from = receivedStartAt - AdminSessionAlerts.FailedStartsWindow;
+            var failed = await db.OcppCommands.AsNoTracking()
+                .CountAsync(c => c.ChargePoint.ChargingPointId == row.ChargingPointId && !c.IsDeleted
+                                 && c.Action == "RemoteStartTransaction"
+                                 && c.CreatedAt >= from && c.CreatedAt < receivedStartAt
+                                 && (c.CreatedBy == driverId || c.RequestPayload.Contains(needle))
+                                 && !(c.Status == "Answered" && c.ResultStatus == "Accepted"), ct);
+            if (failed >= AdminSessionAlerts.FailedStartsThreshold)
+                alerts.Add(AdminSessionAlerts.FailedStarts(failed));
+        }
+
+        if (parkedNotifiedAt is DateTime parked)
+            alerts.Add(AdminSessionAlerts.Parked(parked));
+
+        // The limit enforcer audits its own stop with "Charge limit reached…" in the description.
+        var limitStopsRefused = commands.Count(c => c.Action == "RemoteStopTransaction"
+                                                    && c.ErrorDescription != null
+                                                    && c.ErrorDescription.StartsWith(AdminSessionAlerts.LimitStopMarker, StringComparison.Ordinal)
+                                                    && !(c.Status == "Answered" && c.ResultStatus == "Accepted"));
+        if (limitStopsRefused > 0)
+            alerts.Add(AdminSessionAlerts.LimitStop(limitStopsRefused));
+
+        if (row.IsStale)
+            alerts.Add(AdminSessionAlerts.StaleSession());
+
+        return alerts;
     }
 
     /// <summary>

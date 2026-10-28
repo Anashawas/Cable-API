@@ -31,7 +31,8 @@ if (Test-Path $wwwroot) { Remove-Item $wwwroot -Recurse -Force }
 Copy-Item $out $wwwroot -Recurse
 
 # sanity check
-$required = @("index.html", "404.html", "ar\index.html", "en\index.html", "_next")
+# c\ and r\ are the plug-sticker and receipt deep-link pages (LandingPageMiddleware rewrites /c/{code}, /r/{no} to them).
+$required = @("index.html", "404.html", "ar\index.html", "en\index.html", "c\index.html", "r\index.html", "_next")
 $missing = $required | Where-Object { -not (Test-Path (Join-Path $wwwroot $_)) }
 if ($missing) { Write-Error ("Sync incomplete - missing: " + ($missing -join ', ')); exit 1 }
 

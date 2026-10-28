@@ -1,5 +1,6 @@
 using Application.Common.Interfaces;
 using Application.Common.Security;
+using Application.Loyalty;
 using Application.Loyalty.Commands.ManageBoosts;
 using Cable.Core.Enums;
 using Cable.Core.Exceptions;
@@ -48,12 +49,17 @@ public class GetLoyaltyBoostsRequestHandler(
         // separate counter can fall out of step with reality.
         var ids = boosts.Select(b => b.Id).ToList();
 
-        var spend = await applicationDbContext.PartnerTransactions
+        var boosted = applicationDbContext.PartnerTransactions
             .AsNoTracking()
             .Where(t => t.AppliedBoostId != null
                         && ids.Contains(t.AppliedBoostId.Value)
                         && !t.IsDeleted
-                        && t.Status == (int)PartnerTransactionStatus.Completed)
+                        && t.Status == (int)PartnerTransactionStatus.Completed);
+
+        // Points a BonusPoints promo added on a boosted scan are the promo's, not the boost's (same rule as the caps).
+        var promoBonus = await BoostSpend.PromoBonusByBoostAsync(applicationDbContext, boosted, cancellationToken);
+
+        var spend = await boosted
             .GroupBy(t => t.AppliedBoostId!.Value)
             .Select(g => new
             {
@@ -71,7 +77,7 @@ public class GetLoyaltyBoostsRequestHandler(
             b.MaxBonusPointsPerUser, b.MaxTotalBonusPoints,
             b.IsActive, b.CreatedAt,
             b.Providers.Select(p => new BoostProviderDto(p.ProviderType, p.ProviderId)).ToList(),
-            spend.TryGetValue(b.Id, out var s) ? s.Bonus : 0,
+            (spend.TryGetValue(b.Id, out var s) ? s.Bonus : 0) - promoBonus.GetValueOrDefault(b.Id),
             spend.TryGetValue(b.Id, out var c) ? c.Count : 0
         )).ToList();
     }

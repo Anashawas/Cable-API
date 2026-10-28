@@ -28,6 +28,8 @@ public static class DependencyInjection
         services.AddScoped<Ocpp.Points.IOcppSessionPointsService, Ocpp.Points.OcppSessionPointsService>();
         // Sprint 5 live charging (B): pushes run by Hangfire (plug reports, session issues).
         services.AddScoped<Ocpp.LiveCharging.LiveChargingNotifications>();
+        // §13.2: the receipt email after a driver's session ends (opt-in), run by the "finished" Hangfire job.
+        services.AddScoped<Ocpp.LiveCharging.SessionReceiptEmailer>();
         // Partner billing (Sprint 5): plan subscriptions on top of PaymentRecorder, and its Hangfire jobs.
         services.AddScoped<Billing.Subscriptions.PlanSubscriptionService>();
         services.AddScoped<Billing.Jobs.IBillingJobs, Billing.Jobs.BillingJobs>();

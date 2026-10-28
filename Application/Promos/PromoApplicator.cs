@@ -26,9 +26,13 @@ public class PromoApplicator(IApplicationDbContext db, IBackgroundJobClient jobs
     /// Adds eligiblePromos to the preview; with <paramref name="userPromoId"/> also the computed promo, with the
     /// top-level points (basePoints, multiplier, pointsToBeAwarded) recomputed on the final amount. Writes nothing.
     /// </summary>
+    /// <param name="bundleQuotaReached">
+    /// The partner is bundle-billed and its bundle is used up (the preview already shows 0 points, partnerQuotaReached):
+    /// the promo quotes then start from 0 base points too, as the scan will (only a BonusPoints promo still adds its bonus).
+    /// </param>
     public async Task<PreviewPartnerCodeResult> DecoratePreviewAsync(PreviewPartnerCodeResult result,
         PartnerTransaction transaction, int userId, int? userPromoId, double? boostMultiplier,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool bundleQuotaReached = false)
     {
         var now = DateTime.UtcNow;
 
@@ -44,11 +48,14 @@ public class PromoApplicator(IApplicationDbContext db, IBackgroundJobClient jobs
             return result with { EligiblePromos = [] };
 
         var context = await ContextAsync(transaction, cancellationToken);
-        var bundlePoints = await Application.Billing.LoyaltyBundleScans.PointsForAmountAsync(db, transaction, cancellationToken);
+        var bundlePoints = bundleQuotaReached
+            ? _ => 0
+            : await Application.Billing.LoyaltyBundleScans.PointsForAmountAsync(db, transaction, cancellationToken);
+        int? baseline = bundleQuotaReached ? 0 : null;
         var eligible = new List<EligiblePromoDto>();
         foreach (var up in mine)
         {
-            var q = QuoteFor(up.Campaign, transaction, boostMultiplier, bundlePoints);
+            var q = QuoteFor(up.Campaign, transaction, boostMultiplier, bundlePoints, baseline);
             if (PromoRules.WhyNotApplicable(up.Campaign, up.Status, up.ExpiresAt, context, q.CableShareJod, now) is null)
                 eligible.Add(new EligiblePromoDto(up.Id, PromoRules.Title(up.Campaign), up.Campaign.EffectType,
                     up.Campaign.EffectValue, up.Campaign.MaxDiscountJod, up.ExpiresAt, q.DiscountJod, q.FinalAmountJod, q.BonusPoints));
@@ -66,7 +73,7 @@ public class PromoApplicator(IApplicationDbContext db, IBackgroundJobClient jobs
                          .FirstOrDefaultAsync(u => u.Id == userPromoId.Value && u.UserId == userId && !u.IsDeleted, cancellationToken)
                      ?? throw PromoErrorCodes.Error(PromoErrorCodes.NotFound);
 
-        var quote = QuoteFor(chosen.Campaign, transaction, boostMultiplier, bundlePoints);
+        var quote = QuoteFor(chosen.Campaign, transaction, boostMultiplier, bundlePoints, baseline);
         var reason = PromoRules.WhyNotApplicable(chosen.Campaign, chosen.Status, chosen.ExpiresAt, context, quote.CableShareJod, now);
         if (reason == PromoErrorCodes.BudgetExhausted)
             EnqueueBudgetCheck(chosen.PromoCampaignId, quote.CableShareJod);
@@ -217,10 +224,12 @@ public class PromoApplicator(IApplicationDbContext db, IBackgroundJobClient jobs
 
     // ---------------------------------------------------------------- helpers
 
-    public static PromoQuote QuoteFor(PromoCampaign c, PartnerTransaction t, double? boostMultiplier, Func<decimal, int>? pointsForAmount = null) =>
+    /// <param name="baselinePoints">Overrides the code's own base points (e.g. 0 when the partner's bundle is used up at preview).</param>
+    public static PromoQuote QuoteFor(PromoCampaign c, PartnerTransaction t, double? boostMultiplier, Func<decimal, int>? pointsForAmount = null,
+        int? baselinePoints = null) =>
         PromoMath.Quote(c.EffectType, c.EffectValue, c.MaxDiscountJod, c.CableSharePercent,
             t.TransactionAmount ?? 0, t.CommissionAmount ?? 0, t.CommissionPercentage,
-            t.PointsRewardPercentage, t.PointsConversionRate, t.BasePoints ?? t.PointsAwarded ?? 0, boostMultiplier, pointsForAmount);
+            t.PointsRewardPercentage, t.PointsConversionRate, baselinePoints ?? t.BasePoints ?? t.PointsAwarded ?? 0, boostMultiplier, pointsForAmount);
 
     private async Task<PromoTransactionContext> ContextAsync(PartnerTransaction t, CancellationToken ct)
     {
@@ -301,7 +310,7 @@ public class PromoApplicator(IApplicationDbContext db, IBackgroundJobClient jobs
         string? originalReason, decimal? originalMinimum)
     {
         if (quote.FinalPoints > 0) return (null, null);
-        if (originalReason == PointsUnavailableReasons.PartnerInactive) return (originalReason, null);
+        if (originalReason is PointsUnavailableReasons.PartnerInactive or PointsUnavailableReasons.PartnerQuotaReached) return (originalReason, null);
         if (quote.FinalAmountJod <= 0) return (PromoPointsReasons.FullyDiscounted, null);
 
         var pointsPerJod = t.PointsConversionRate * t.PointsRewardPercentage / 100.0;
