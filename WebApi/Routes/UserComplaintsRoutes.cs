@@ -23,6 +23,17 @@ public static class UserComplaintsRoutes
 
     private static RouteGroupBuilder MapRoutes(this RouteGroupBuilder app)
     {
+        app.MapGet("/{id:int}/photo", async (IMediator mediator, [FromRoute] int id, CancellationToken ct) =>
+                {
+                    var f = await mediator.Send(new Application.Ocpp.LiveCharging.GetComplaintPhotoRequest(id), ct);
+                    return Results.File(f.Content, f.ContentType, f.FileName);
+                })
+            .Produces(200, contentType: "image/jpeg")
+            .RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesInternalServerError()
+            .WithName("Get complaint photo")
+            .WithSummary("The photo on a charging-session issue: for the driver who reported it, the station's owner / managers (ViewFeedback) and admins.")
+            .WithOpenApi();
+
         app.MapGet("/GetAllUserComplaints",
                 async (IMediator mediator, [FromQuery] string? kind, CancellationToken cancellationToken) =>
                     Results.Ok(await mediator.Send(new GetAllUserComplaintsRequest(kind), cancellationToken)))

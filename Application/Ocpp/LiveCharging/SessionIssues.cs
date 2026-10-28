@@ -122,7 +122,8 @@ public class ReportMySessionIssueCommandHandler(IApplicationDbContext db, ICurre
             Reason = reason,
             // Note is what the existing complaint screens show: the driver's words, or the reason when they wrote none.
             Note = note ?? $"{SessionIssueReason.DescribeAr(reason)} / {SessionIssueReason.Describe(reason)}",
-            ImageFileName = string.IsNullOrWhiteSpace(request.ImageFileName) ? null : request.ImageFileName.Trim(),
+            // The photo is attached afterwards (POST …/issues/{issueId}/photo), so it can only be this driver's own file.
+            ImageFileName = null,
             Status = (int)ComplaintStatus.New,
         };
         db.UserComplaints.Add(complaint);

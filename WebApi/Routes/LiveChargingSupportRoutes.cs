@@ -75,13 +75,22 @@ public static class LiveChargingSupportRoutes
 
     private static RouteGroupBuilder MapDriverIssueAndReceiptRoutes(this RouteGroupBuilder app)
     {
+        app.MapPost("/{id:int}/issues/{issueId:int}/photo", async (IMediator mediator, [FromRoute] int id, [FromRoute] int issueId, [FromForm] IFormFile? file, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new UploadSessionIssuePhotoCommand(id, issueId, file), ct)))
+            .Produces<SessionIssuePhotoDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("Attach a photo to my session issue")
+            .WithSummary("Driver: multipart, form key 'file', one jpg / png / webp up to 5 MB, attached to their own issue (replaces an earlier photo). The partner and admin view it with GET /api/usercomplaints/{issueId}/photo.")
+            .WithOpenApi()
+            .DisableAntiforgery();
+
         app.MapPost("/{id:int}/issues", async (IMediator mediator, [FromRoute] int id, SessionIssueRequest body, CancellationToken ct) =>
                 Results.Ok(await mediator.Send(new ReportMySessionIssueCommand(id, body.Reason, body.Note, body.ImageFileName), ct)))
             .Produces<SessionIssueCreatedDto>()
             .RequireAuthorization().ProducesUnAuthorized().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
             .ProducesProblem(StatusCodes.Status409Conflict).ProducesProblem(StatusCodes.Status422UnprocessableEntity)
             .WithName("Report a problem with my session")
-            .WithSummary("Driver: \"problem with this session\" — reason WrongCost | StoppedEarly | NoEnergy | CableStuck | PlugBroken | Other, optional note (≤ 450) and imageFileName (upload the photo first). While the session runs or up to 7 days after it ended (422 ISSUE_WINDOW_CLOSED); one open issue per session (409 ISSUE_ALREADY_OPEN). It is a complaint (kind ChargingSession) in the partner's and admin's complaint lists; they get a push, and the driver gets one on every status change.")
+            .WithSummary("Driver: \"problem with this session\" — reason WrongCost | StoppedEarly | NoEnergy | CableStuck | PlugBroken | Other, optional note (≤ 450); attach a photo afterwards with POST /{id}/issues/{issueId}/photo (imageFileName in the body is ignored). While the session runs or up to 7 days after it ended (422 ISSUE_WINDOW_CLOSED); one open issue per session (409 ISSUE_ALREADY_OPEN). It is a complaint (kind ChargingSession) in the partner's and admin's complaint lists; they get a push, and the driver gets one on every status change.")
             .WithOpenApi();
 
         app.MapGet("/{id:int}/issues", async (IMediator mediator, [FromRoute] int id, CancellationToken ct) =>
