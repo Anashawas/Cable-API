@@ -137,7 +137,7 @@ while open), `currentRateFils`, `currentWindowNameAr/En`, `price[]` lines, `char
 | Session finished | 9 `charging_session_completed` | انتهى الشحن ✔ — 12.40 kWh · 2.310 د · 1 س 4 د · البطارية 40% ← 80% / السبب: وصل إلى الحد المطلوب (7 دينار) |
 
 Data: `{ "type": "ocpp_session", "status": "started" | "completed", "sessionId": "74", "chargingPointId": "210" }`
-→ open the session screen. Only sessions the driver started (app, or a card linked to their account): a start by
+→ open the session screen. Only sessions the driver started from the app: a start by
 station staff never notifies anyone, and sessions a charger replays after being offline are not pushed. There is
 no separate "limit reached" push — the finished push follows within seconds and names the limit.
 

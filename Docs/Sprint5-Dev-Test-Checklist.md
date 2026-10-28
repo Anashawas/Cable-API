@@ -7,7 +7,7 @@ tracker postponed). **Dev only — production untouched.** Backend detail per ar
 
 ## Already done on dev
 - SQL applied to `db_ab1977_cable` (Oct 28): `Sprint5_LiveCharging_A.sql`, `Sprint5_LiveCharging_B.sql`,
-  `Sprint5_PartnerBilling.sql`, `Sprint5_GiftsAndPromos.sql` — all clean (18 sticker codes, 5 plans, 3 subscriptions
+  `Sprint5_PartnerBilling.sql`, `Sprint5_GiftsAndPromos.sql`, `Sprint5_Leftovers.sql` — all clean (18 sticker codes, 5 plans, 3 subscriptions
   migrated, old rows untouched).
 - Backend smoke-tested on a local API against dev (live charging, billing, gifts, promos, scan pipeline, app start
   rules with the simulator).
@@ -35,18 +35,23 @@ tracker postponed). **Dev only — production untouched.** Backend detail per ar
 - [ ] Second running session → 409 `sessionAlreadyOpen`
 - [ ] Session details with chart, cost so far, station tariff (when set), receipt PDF + verify page
 - [ ] Pushes: started, finished, "car finished, unplug"
-- [ ] Monthly summary
+- [ ] Monthly summary; history `?month=`
+- [ ] Email receipts: `PUT /api/users/me/ocpp-settings { emailReceipts: true }` → one email with the PDF per session
+- [ ] Public pages: `dev.cable-app.com/c/CHG-…` (plug page + open-app button) and `/r/CHS-…` (receipt check)
 - [ ] "Problem with this session" (7 days, one open per session); "plug didn't work" report → owner push
 
 ### Admin web (`dev.cable-app.com/admin`)
-- [ ] Charging sessions list (filters, search by phone / #id, CSV) and detail
+- [ ] Charging sessions list (filters, search by phone / #id, CSV, alert icon) and detail (alerts, start distance)
 - [ ] User profile → Charging tab (sessions), promos (revoke)
 - [ ] Station: own tariff (set / remove), sticker codes (renew, PDF), plug reports (resolve)
 - [ ] Live charging settings (max distance, require location)
 - [ ] Cable Gifts: create (image), order list, fulfil with voucher code, cancel → points back, CSV, dashboard count
 - [ ] Promo campaigns: create (scope rules), codes + CSV, assign, report with Cable vs partner split and budget
 - [ ] Plans: edit price / points rule (tier validation), margin calculator, history, feature matrix
-- [ ] Upgrade requests: record payment from a request (fulfils it), reject
+- [ ] Upgrade requests: record payment from a request (fulfils it), reject; dashboard pending count
+- [ ] Partner agreement → loyalty billing → Compare models (percentage vs bundle)
+- [ ] Settlements: "discounts paid by Cable" and promo lines; a non-admin gets 403
+- [ ] Record a Cable Connect payment (old screen) → the station's Premium is extended to the same date
 - [ ] Partner profile: subscriptions history, new / trial / cancel / upgrade; agreement billing model + sell bundle
 
 ### Partner web (`dev.cable-app.com/partner`)
@@ -62,6 +67,11 @@ tracker postponed). **Dev only — production untouched.** Backend detail per ar
 - [ ] Percentage partners (everyone today) see no billing-model change
 - [ ] Existing subscriptions / receipts in admin still work
 - [ ] Cable Connect live page, limits and SignalR updates as before
+
+## Decisions (confirmed Oct 28)
+- Point value: 50 points = 1 JOD (from the DB rate). **Fix the seeded loyalty plans' tiers** in admin → Plans (20/50/100 points per scan lose money; ~2–4 points per scan for 400 scans / 40 JOD).
+- No automatic charging points (switch removed). No driver card linking (cards belong to stations).
+- A Cable Connect payment also extends Premium.
 
 ## Decisions taken from the documents' defaults (change if needed)
 - Automatic points: same rules as a QR scan at that station (reward %, rate, commission to the station wallet),
