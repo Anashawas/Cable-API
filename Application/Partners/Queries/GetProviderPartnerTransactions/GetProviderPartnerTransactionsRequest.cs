@@ -22,7 +22,9 @@ public record ProviderPartnerTransactionDto(
     /// the one-rating-per-transaction rule would otherwise surface as an error
     /// after the fact.
     /// </summary>
-    bool IsRated
+    bool IsRated,
+    /// <summary>Sprint 5: the promo applied by the customer — discount, what to collect, what Cable pays. Null without one.</summary>
+    Application.Promos.PartnerTransactionPromoDto? Promo = null
 );
 
 public record GetProviderPartnerTransactionsRequest(
@@ -54,14 +56,21 @@ public class GetProviderPartnerTransactionsRequestHandler(
             query = query.Where(x => x.CreatedAt >= startDate && x.CreatedAt < endDate);
         }
 
-        return await query
+        var paged = await query
             .OrderByDescending(x => x.CreatedAt)
             .Select(x => new ProviderPartnerTransactionDto(
                 x.Id, x.UserId, x.User != null ? x.User.Name : null, x.TransactionCode,
                 x.Status, x.TransactionAmount, x.CurrencyCode,
                 x.CommissionAmount, x.PointsAwarded,
                 x.CodeExpiresAt, x.CompletedAt, x.CreatedAt,
-                applicationDbContext.UserRates.Any(r => r.PartnerTransactionId == x.Id && !r.IsDeleted)))
+                applicationDbContext.UserRates.Any(r => r.PartnerTransactionId == x.Id && !r.IsDeleted),
+                null))
             .ToOptionallyPaginatedAsync(request.Page, request.PageSize, cancellationToken: cancellationToken);
+
+        var promos = await Application.Promos.PartnerPromoView.ForTransactionsAsync(
+            applicationDbContext, paged.Items.Select(x => x.Id).ToList(), cancellationToken);
+        return promos.Count == 0
+            ? paged
+            : paged.As(paged.Items.Select(x => x with { Promo = promos.GetValueOrDefault(x.Id) }).ToList());
     }
 }

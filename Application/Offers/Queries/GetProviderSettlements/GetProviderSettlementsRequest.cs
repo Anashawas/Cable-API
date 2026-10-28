@@ -105,7 +105,8 @@ public class GetProviderSettlementsRequestHandler(
             x.WalletApplied,
             x.PartnerCommissionAmount - x.WalletApplied, // OutstandingAmount
             x.SettlementStatus, x.PaidAt,
-            x.AdminNote, x.CreatedAt
+            x.AdminNote, x.CreatedAt,
+            PromoDiscountsPaidByCable: x.PromoCableShareAmount
         )).ToList());
     }
 }

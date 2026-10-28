@@ -133,7 +133,8 @@ public static class SettlementQueryHelper
                 x.PartnerCommissionAmount - x.WalletApplied, // OutstandingAmount
                 x.SettlementStatus, x.PaidAt,
                 x.AdminNote, x.CreatedAt,
-                walletBalance
+                walletBalance,
+                PromoDiscountsPaidByCable: x.PromoCableShareAmount
             );
         }).ToList();
     }

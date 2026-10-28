@@ -46,5 +46,7 @@ public record ProviderSettlementDto(
     DateTime? PaidAt,
     string? AdminNote,
     DateTime CreatedAt,
-    decimal? CurrentWalletBalance = null
+    decimal? CurrentWalletBalance = null,
+    /// <summary>Sprint 5 line "discounts paid by Cable": Cable's share of promo discounts, owed to the provider (already in NetBalance).</summary>
+    decimal PromoDiscountsPaidByCable = 0
 );

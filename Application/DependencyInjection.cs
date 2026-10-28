@@ -31,6 +31,8 @@ public static class DependencyInjection
         // Partner billing (Sprint 5): plan subscriptions on top of PaymentRecorder, and its Hangfire jobs.
         services.AddScoped<Billing.Subscriptions.PlanSubscriptionService>();
         services.AddScoped<Billing.Jobs.IBillingJobs, Billing.Jobs.BillingJobs>();
+        // Promo codes at partner-scan time (PreviewPartnerCode / ScanPartnerCode).
+        services.AddScoped<Promos.PromoApplicator>();
 
         return services;
     }

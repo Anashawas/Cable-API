@@ -32,6 +32,8 @@ public class GetProviderPartnerTransactionByIdRequestHandler(
             x.Id, x.UserId, x.User?.Name, x.TransactionCode,
             x.Status, x.TransactionAmount, x.CurrencyCode,
             x.CommissionAmount, x.PointsAwarded,
-            x.CodeExpiresAt, x.CompletedAt, x.CreatedAt, isRated);
+            x.CodeExpiresAt, x.CompletedAt, x.CreatedAt, isRated,
+            (await Application.Promos.PartnerPromoView.ForTransactionsAsync(applicationDbContext, [x.Id], cancellationToken))
+                .GetValueOrDefault(x.Id));
     }
 }

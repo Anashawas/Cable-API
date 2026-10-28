@@ -275,6 +275,12 @@ RecurringJob.AddOrUpdate<IBackgroundJobService>(
     service => service.MarkStaleOcppTransactionsAsync(CancellationToken.None),
     "15 * * * *"); // Hourly
 
+// Promo codes: mark expired "My codes" and push "expires within two days" once (daily 06:00 UTC = 09:00 Amman).
+RecurringJob.AddOrUpdate<IGiftsAndPromosJobs>(
+    "promo-expiry",
+    service => service.RunPromoExpiryAsync(CancellationToken.None),
+    "0 6 * * *");
+
 RecurringJob.AddOrUpdate<IBackgroundJobService>(
     "purge-ocpp-raw-messages",
     service => service.PurgeOcppRawMessagesAsync(CancellationToken.None),
@@ -340,7 +346,9 @@ app.MapUserRoutes()
     .MapHealthRoutes()
     .MapOcppLiveRoutes()
     .MapLiveChargingRoutes()   // Sprint 5 live charging (A)
-    .MapBillingRoutes();       // Sprint 5 partner billing
+    .MapBillingRoutes()       // Sprint 5 partner billing
+    .MapCableGiftRoutes()
+    .MapPromoRoutes();
 
 // Unknown non-API URLs get the landing 404 page; API-ish paths keep JSON-style 404s.
 app.MapLandingPageFallback();

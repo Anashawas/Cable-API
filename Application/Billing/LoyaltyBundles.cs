@@ -286,6 +286,24 @@ public static class LoyaltyBundleScans
         return new BundleTerms(bundle.Id, PointsRuleCalculator.PointsFor(rule, transactionAmount), rule);
     }
 
+    /// <summary>
+    /// For a promo discount on a bundle-billed code: the points the bundle's rule gives on the lower final amount,
+    /// and 0 once the code completed with no scan left. Null for percentage-billed codes (the promo then uses the
+    /// agreement's percentage, as before). Tracked query on purpose: inside the scan the mark was just updated.
+    /// </summary>
+    public static async Task<Func<decimal, int>?> PointsForAmountAsync(IApplicationDbContext db, PartnerTransaction transaction, CancellationToken ct)
+    {
+        var mark = await db.PartnerTransactionBundleScans.FirstOrDefaultAsync(x => x.PartnerTransactionId == transaction.Id, ct);
+        if (mark is null) return null;
+        if (mark.QuotaReached) return _ => 0;
+
+        var recordId = mark.ConsumedPlanSubscriptionId ?? mark.PlanSubscriptionId;
+        var snapshot = recordId is null ? null
+            : await db.PlanSubscriptions.AsNoTracking().Where(r => r.Id == recordId).Select(r => r.PointsRuleSnapshot).FirstOrDefaultAsync(ct);
+        var rule = BillingJson.ReadRule(snapshot);
+        return rule is null ? _ => 0 : amount => PointsRuleCalculator.PointsFor(rule, amount);
+    }
+
     /// <summary>Marks the new transaction as bundle-billed (saved with it).</summary>
     public static void Track(IApplicationDbContext db, PartnerTransaction transaction, BundleTerms terms) =>
         db.PartnerTransactionBundleScans.Add(new PartnerTransactionBundleScan
