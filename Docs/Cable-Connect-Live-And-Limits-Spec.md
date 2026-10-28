@@ -105,7 +105,49 @@ partner app):
 - Body `{ "kind": "Kwh", "value": 20 }`; `{ "kind": null, "value": null }` clears it.
   Returns the new `chargeLimit` (or null).
 
-## 4. Test on dev
+## 4. Driver app — charging from the app (added Oct 27)
+
+Backend for `LIVE_CHARGING_SESSION.md` items 4.1, 4.3, 4.5 and 4.6. Tested on dev.
+
+**Can this plug be started from the app?** `GET /api/charging-points/{id}/live` → each plug now has:
+
+| Field | Values |
+|---|---|
+| `canStartFromApp` | `true` when the car is connected and nothing is running → show "Start" |
+| `cannotStartReason` | `offline` · `plugCable` (connect the car to the plug first) · `busy` · `outOfOrder` |
+
+A start into an empty plug times out on the charger, so "Start" appears once the car is plugged in (the plug
+shows `Preparing`). Station-level reasons (no subscription, not shared) stay in `unavailableReason`.
+
+**Second session** → `POST /api/users/me/ocpp-sessions/start` returns **409** with
+`{ "code": "sessionAlreadyOpen", "detail": "<ready text in the request language>" }` → show "You have a
+running session — view it".
+
+**Session details with the curve** → `GET /api/users/me/ocpp-sessions/{id}` (the driver's own sessions only, 404
+otherwise). Same shape as the partner's live session: `stationName`, `chargerName`, `energyKwh`, `powerW`,
+`currentA`, `voltageV`, `temperatureC`, `socStartPercent` / `socPercent` / `socEndPercent`, `costJod` (so far
+while open), `currentRateFils`, `currentWindowNameAr/En`, `price[]` lines, `chargeLimit`, `stopReasonTextAr`, and
+`series[]` (up to 120 points: `at, powerW, socPercent, energyKwh, currentA, voltageV, temperatureC`) for the chart.
+
+**Pushes to the driver** (Cable app only, in the token's language; also saved in the inbox):
+
+| When | Inbox type | Example (ar) |
+|---|---|---|
+| Session started | 8 `charging_session_started` | بدأ الشحن ⚡ — محطة الرشدان · الشاحن الأيمن · المقبس 1 · يتوقف عند 7 دينار |
+| Session finished | 9 `charging_session_completed` | انتهى الشحن ✔ — 12.40 kWh · 2.310 د · 1 س 4 د · البطارية 40% ← 80% / السبب: وصل إلى الحد المطلوب (7 دينار) |
+
+Data: `{ "type": "ocpp_session", "status": "started" | "completed", "sessionId": "74", "chargingPointId": "210" }`
+→ open the session screen. Only sessions the driver started (app, or a card linked to their account): a start by
+station staff never notifies anyone, and sessions a charger replays after being offline are not pushed. There is
+no separate "limit reached" push — the finished push follows within seconds and names the limit.
+
+**Partner code preview** (`GET /api/partners/PreviewPartnerCode`, from `PARTNER_BILLING.md` C and D):
+`commissionAmount` / `commissionPercentage` in the user app responses are now always 0 (stop reading them; they
+will be removed). New: `pointsAvailable`, `pointsUnavailableReason` (`belowMinimumAmount` · `partnerInactive` ·
+`partnerQuotaReached` reserved for scan bundles) and `minimumAmountForPoints` for "the minimum for points here is
+0.4 JOD".
+
+## 5. Test on dev
 
 Dev charger simulator (Cable.Ocpp.TestClient, demo mode) sends power, amps, voltage, battery % and
 temperature every 5 s, so all the new tiles and the limit stop can be tried without a real car.

@@ -588,6 +588,81 @@ public class BackgroundJobService(
         return total;
     }
 
+    public async Task NotifyOcppDriverSessionAsync(int transactionId, string kind, CancellationToken cancellationToken = default)
+    {
+        var tx = await applicationDbContext.OcppTransactions
+            .Where(t => t.Id == transactionId)
+            .Select(t => new
+            {
+                Row = t,
+                t.ChargePoint.ChargingPointId,
+                StationName = t.ChargePoint.ChargingPoint.Name,
+                ChargerName = t.ChargePoint.DisplayName,
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (tx is null || tx.Row.StartedByUserId is not int userId || tx.Row.WasRejected || tx.Row.IsOrphan
+            || tx.Row.StartSource == OcppStartSource.Operator)
+            return;
+
+        // Cable.Ocpp prices the session on its Stop; if that failed, price it now so the push carries the cost.
+        if (kind == Application.Ocpp.DriverSessionMessages.Completed && tx.Row.CostFils is null)
+        {
+            try
+            {
+                if (await SessionPricingService.PriceAsync(applicationDbContext, tx.Row, null, cancellationToken))
+                    await applicationDbContext.SaveChanges(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "NotifyOcppDriverSession: could not price session {TransactionId}; sending without the cost", transactionId);
+            }
+        }
+
+        var t = tx.Row;
+        var session = new Application.Ocpp.DriverSessionMessages.Session(tx.StationName, tx.ChargerName, t.ConnectorId,
+            t.StartedAt, t.StoppedAt, t.EnergyKwh, t.CostFils, t.SocStartPercent, t.SocEndPercent, t.StopReason,
+            t.ChargeLimitKind, t.ChargeLimitValue, t.ChargeLimitReachedAt);
+
+        var tokens = await applicationDbContext.NotificationTokens.AsNoTracking()
+            .Where(n => n.UserId == userId && n.AppType == FirebaseAppType.UserApp)
+            .Select(n => new { n.Token, n.Language })
+            .ToListAsync(cancellationToken);
+
+        var data = new Dictionary<string, string>
+        {
+            ["type"] = Application.Ocpp.DriverSessionMessages.DataType,
+            ["status"] = kind,
+            ["sessionId"] = transactionId.ToString(),
+            ["chargingPointId"] = tx.ChargingPointId.ToString(),
+        };
+
+        foreach (var group in tokens.GroupBy(n => string.Equals(n.Language, "en", StringComparison.OrdinalIgnoreCase) ? "en" : "ar"))
+        {
+            var (pushTitle, pushBody) = Application.Ocpp.DriverSessionMessages.Compose(kind, session, group.Key);
+            try
+            {
+                await notificationService.SendMessagesAsync(group.Select(n => n.Token).Distinct().ToList(), pushTitle, pushBody, FirebaseAppType.UserApp, data);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "NotifyOcppDriverSession: FCM send failed for session {TransactionId} ({Lang})", transactionId, group.Key);
+            }
+        }
+
+        // The inbox keeps it after the push is swiped away — in the device's language (Arabic when unknown).
+        var (title, body) = Application.Ocpp.DriverSessionMessages.Compose(kind, session, tokens.FirstOrDefault()?.Language);
+        var typeName = kind == Application.Ocpp.DriverSessionMessages.Completed ? "charging_session_completed" : "charging_session_started";
+        var typeId = await applicationDbContext.NotificationTypes.AsNoTracking()
+            .Where(n => n.Name == typeName)
+            .Select(n => (int?)n.Id)
+            .FirstOrDefaultAsync(cancellationToken) ?? 1;
+        await NotificationInboxHelper.CreateNotificationInboxRecordsAsync(
+            applicationDbContext, [userId], typeId, title, body, null, JsonSerializer.Serialize(data), cancellationToken);
+
+        logger.LogInformation("NotifyOcppDriverSession: session {TransactionId} {Kind} → user {UserId}, {Devices} device(s)",
+            transactionId, kind, userId, tokens.Count);
+    }
+
     public async Task NotifyOcppFaultAsync(int ocppConnectorId, string errorCode, string? info, CancellationToken cancellationToken = default)
     {
         var connector = await applicationDbContext.OcppConnectors.AsNoTracking()

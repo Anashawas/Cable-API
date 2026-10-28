@@ -45,6 +45,12 @@ public interface IBackgroundJobService
     Task NotifyOcppFaultAsync(int ocppConnectorId, string errorCode, string? info, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Enqueued by Cable.Ocpp when a driver's session starts or ends (app start, or a card linked to their account —
+    /// never a staff start): push to their Cable app in its language + inbox. kind = DriverSessionMessages.Started | Completed.
+    /// </summary>
+    Task NotifyOcppDriverSessionAsync(int transactionId, string kind, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Pushes the station's allowed cards into its chargers (SendLocalList Full + ClearCache) so they
     /// authorize offline. Enqueued after every card change and by Cable.Ocpp when a Pending unit boots.
     /// <paramref name="ocppChargePointId"/> limits the push to one charger (manual "sync now").

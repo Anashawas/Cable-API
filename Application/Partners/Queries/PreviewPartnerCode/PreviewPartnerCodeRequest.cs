@@ -13,6 +13,8 @@ public record PreviewPartnerCodeResult(
     int ProviderId,
     decimal TransactionAmount,
     string CurrencyCode,
+    /// <summary>Always 0: the commission is between Cable and the partner, not the user's business. Kept only so
+    /// older app builds still parse the response; remove once the apps no longer read it.</summary>
     decimal CommissionAmount,
     /// <summary>Final points, multiplier already applied. Matches what the scan awards.</summary>
     int PointsToBeAwarded,
@@ -25,8 +27,28 @@ public record PreviewPartnerCodeResult(
     /// <summary>Null when no multiplier applies. 2.0 = double points.</summary>
     double? Multiplier,
     /// <summary>True when the multiplier is the once-ever first-charge welcome bonus.</summary>
-    bool IsWelcomeBonus
+    bool IsWelcomeBonus,
+    /// <summary>False when this transaction earns no points; the app then shows <see cref="PointsUnavailableReason"/>.</summary>
+    bool PointsAvailable = true,
+    /// <summary>Null when points are available, else a <see cref="PointsUnavailableReasons"/> code the app translates.
+    /// Deliberately vague towards the customer: the partner's commercial terms are not shown.</summary>
+    string? PointsUnavailableReason = null,
+    /// <summary>With belowMinimumAmount: the smallest amount that earns points at this partner (for "minimum is 2 JOD").</summary>
+    decimal? MinimumAmountForPoints = null
 );
+
+/// <summary>Why a partner transaction earns no points (PreviewPartnerCode.PointsUnavailableReason).</summary>
+public static class PointsUnavailableReasons
+{
+    /// <summary>The partner's loyalty quota is used up. Reserved for scan bundles; not produced yet.</summary>
+    public const string PartnerQuotaReached = "partnerQuotaReached";
+
+    /// <summary>The partner gives no points right now (0% reward or no points rate configured).</summary>
+    public const string PartnerInactive = "partnerInactive";
+
+    /// <summary>The amount is too small to earn a single point at this partner.</summary>
+    public const string BelowMinimumAmount = "belowMinimumAmount";
+}
 
 public record PreviewPartnerCodeRequest(string TransactionCode) : IRequest<PreviewPartnerCodeResult>;
 
@@ -90,6 +112,7 @@ public class PreviewPartnerCodeRequestHandler(
         // hit the failure inside the award step, which would roll the whole
         // scan back after they had already committed to it.
         var blockReason = await GetLoyaltyBlockReason(userId, pointsToBeAwarded, cancellationToken);
+        var (pointsUnavailableReason, minimumAmountForPoints) = WhyNoPoints(transaction, pointsToBeAwarded);
 
         string? providerName = null;
         if (transaction.ProviderType == "ChargingPoint")
@@ -120,7 +143,7 @@ public class PreviewPartnerCodeRequestHandler(
             transaction.ProviderId,
             transaction.TransactionAmount ?? 0,
             transaction.CurrencyCode ?? "",
-            transaction.CommissionAmount ?? 0,
+            0m,
             pointsToBeAwarded,
             transaction.CodeExpiresAt,
             expiresInSeconds,
@@ -128,7 +151,28 @@ public class PreviewPartnerCodeRequestHandler(
             blockReason,
             basePoints,
             boost?.Multiplier,
-            boost?.IsWelcomeBonus ?? false);
+            boost?.IsWelcomeBonus ?? false,
+            pointsUnavailableReason is null,
+            pointsUnavailableReason,
+            minimumAmountForPoints);
+    }
+
+    /// <summary>
+    /// Explains a code worth no points from the reward % and points rate stored on the transaction when the
+    /// partner created it — the same figures the scan awards from, so the preview never contradicts it.
+    /// </summary>
+    private static (string? Reason, decimal? MinimumAmount) WhyNoPoints(Domain.Enitites.PartnerTransaction transaction, int pointsToBeAwarded)
+    {
+        if (pointsToBeAwarded > 0)
+            return (null, null);
+
+        var pointsPerJod = transaction.PointsConversionRate * transaction.PointsRewardPercentage / 100.0;
+        if (pointsPerJod <= 0)
+            return (PointsUnavailableReasons.PartnerInactive, null);
+
+        // Smallest amount (to the fils) whose points floor to at least 1.
+        var minimum = Math.Ceiling((decimal)(1.0 / pointsPerJod) * 1000m) / 1000m;
+        return (PointsUnavailableReasons.BelowMinimumAmount, minimum);
     }
 
     /// <summary>

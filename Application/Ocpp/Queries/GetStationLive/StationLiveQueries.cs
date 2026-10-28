@@ -38,6 +38,34 @@ public static class PlugLiveState
     }
 }
 
+/// <summary>
+/// Whether a driver can start this plug from the app right now, mirroring the start command's own checks
+/// (OcppRemoteStart.EnsureCanStartAsync): the car must already be connected (Preparing) — a start into an empty
+/// plug times out on the charger. Reasons: offline | plugCable (connect the car first) | busy | outOfOrder.
+/// The station-level gates (subscription, sharing) are StationLiveDto.UnavailableReason; one running session
+/// per driver is answered by the start itself (409 sessionAlreadyOpen).
+/// </summary>
+public static class PlugStartability
+{
+    public const string Offline = "offline";
+    public const string PlugCable = "plugCable";
+    public const string Busy = "busy";
+    public const string OutOfOrder = "outOfOrder";
+
+    public static string? BlockedReason(string? ocppStatus, string? errorCode, bool chargerOnline, bool hasOpenSession)
+    {
+        if (!chargerOnline) return Offline;
+        if (errorCode is not (null or "NoError") || ocppStatus is OcppConnectorStatus.Faulted or OcppConnectorStatus.Unavailable) return OutOfOrder;
+        if (hasOpenSession) return Busy;
+        return ocppStatus switch
+        {
+            OcppConnectorStatus.Preparing => null,
+            OcppConnectorStatus.Available => PlugCable,
+            _ => Busy,
+        };
+    }
+}
+
 /// <summary>Why a station shows nothing live: NoSubscription | NotShared | Blocked | NoChargers | Offline.</summary>
 public static class LiveUnavailableReason
 {
@@ -50,8 +78,10 @@ public static class LiveUnavailableReason
 
 /// <param name="OcppStatus">The raw OCPP status (Available, Preparing, Charging, Finishing…) — Preparing means a car is connected and waiting, which is when a session may be started.</param>
 /// <param name="OpenSessionId">Owner / admin only: the running session on this plug (for Stop); null for drivers.</param>
+/// <param name="CanStartFromApp">True when a driver can start this plug from the app now (car connected, nothing running).</param>
+/// <param name="CannotStartReason">Why not, when false: offline | plugCable | busy | outOfOrder (<see cref="PlugStartability"/>).</param>
 public record PlugLiveDto(int ConnectorId, string State, int? PlugTypeId, string? PlugTypeName, string? PlugTypeFamily, decimal? PowerKw,
-    string? OcppStatus = null, int? OpenSessionId = null);
+    string? OcppStatus = null, int? OpenSessionId = null, bool CanStartFromApp = false, string? CannotStartReason = null);
 
 /// <summary>One cabinet. DisplayName is what the owner named it; null = the app shows its own default ("Charger {Ordinal}"). The OCPP id is never exposed to drivers.</summary>
 public record ChargerLiveDto(int Id, int Ordinal, string? DisplayName, bool Online, DateTime? UpdatedAt, List<PlugLiveDto> Plugs);
@@ -110,7 +140,7 @@ internal static class StationLiveBuilder
                 Plugs = c.Connectors.Where(k => k.ConnectorId > 0).OrderBy(k => k.ConnectorId)
                     .Select(k => new
                     {
-                        k.ConnectorId, k.Status, k.PlugTypeId, PlugTypeName = k.PlugType != null ? k.PlugType.Name : null, PlugTypeFamily = k.PlugType != null ? k.PlugType.PlugTypeFamily : null, k.PowerKw,
+                        k.ConnectorId, k.Status, k.ErrorCode, k.PlugTypeId, PlugTypeName = k.PlugType != null ? k.PlugType.Name : null, PlugTypeFamily = k.PlugType != null ? k.PlugType.PlugTypeFamily : null, k.PowerKw,
                         OpenSessionId = db.OcppTransactions.Where(t => t.OcppChargePointId == c.Id && t.ConnectorId == k.ConnectorId && t.IsOpen && !t.WasRejected && !t.IsStale)
                             .OrderByDescending(t => t.Id).Select(t => (int?)t.Id).FirstOrDefault(),
                     })
@@ -127,8 +157,12 @@ internal static class StationLiveBuilder
         {
             ordinal++;
             var online = OcppLiveness.StateOf(c.IsConnected, c.LastMessageAt, c.DisconnectedAt, c.HeartbeatInterval, now) == OcppLiveness.Online;
-            var plugs = c.Plugs.Select(p => new PlugLiveDto(p.ConnectorId, PlugLiveState.Of(p.Status, online), p.PlugTypeId, p.PlugTypeName, p.PlugTypeFamily, p.PowerKw,
-                online ? p.Status : null, enforceGates ? null : p.OpenSessionId)).ToList();
+            var plugs = c.Plugs.Select(p =>
+            {
+                var blocked = PlugStartability.BlockedReason(p.Status, p.ErrorCode, online, p.OpenSessionId != null);
+                return new PlugLiveDto(p.ConnectorId, PlugLiveState.Of(p.Status, online), p.PlugTypeId, p.PlugTypeName, p.PlugTypeFamily, p.PowerKw,
+                    online ? p.Status : null, enforceGates ? null : p.OpenSessionId, blocked is null, blocked);
+            }).ToList();
             chargerDtos.Add(new ChargerLiveDto(c.Id, ordinal, string.IsNullOrWhiteSpace(c.DisplayName) ? null : c.DisplayName, online, c.LastMessageAt, plugs));
         }
 

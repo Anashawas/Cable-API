@@ -11,6 +11,8 @@ public record ScanPartnerCodeResult(
     string ProviderName,
     decimal TransactionAmount,
     string CurrencyCode,
+    /// <summary>Always 0: the commission is between Cable and the partner, not the user's business. Kept only so
+    /// older app builds still parse the response; remove once the apps no longer read it.</summary>
     decimal CommissionAmount,
     int PointsAwarded
 );
@@ -183,7 +185,7 @@ public class ScanPartnerCodeCommandHandler(
                 providerName ?? "Unknown",
                 transaction.TransactionAmount ?? 0,
                 transaction.CurrencyCode ?? "",
-                transaction.CommissionAmount ?? 0,
+                0m,
                 pointsAwarded);
         }
         catch

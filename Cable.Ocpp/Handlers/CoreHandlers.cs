@@ -139,7 +139,7 @@ public sealed class AuthorizeHandler(TagAuthorizer authorizer) : IOcppHandler
 }
 
 /// <summary>Opens the session; the row's identity is the transactionId the charger will quote from now on.</summary>
-public sealed class StartTransactionHandler(IApplicationDbContext db, TagAuthorizer authorizer, CommandConfirmer confirmer, LiveEventPublisher live) : IOcppHandler
+public sealed class StartTransactionHandler(IApplicationDbContext db, TagAuthorizer authorizer, CommandConfirmer confirmer, LiveEventPublisher live, DriverSessionNotifier drivers) : IOcppHandler
 {
     public async Task<object> HandleAsync(OcppSession session, JsonElement payload, CancellationToken cancellationToken)
     {
@@ -206,6 +206,7 @@ public sealed class StartTransactionHandler(IApplicationDbContext db, TagAuthori
         db.OcppTransactions.Add(tx);
         await db.SaveChanges(cancellationToken);
         live.Publish(new OcppLiveEvent(OcppLiveEventTypes.Session, session.ChargingPointId, session.OcppChargePointId, tx.ConnectorId, tx.Id, "started", now));
+        drivers.Started(tx, now);
 
         // A RemoteStartTransaction we sent is confirmed by the session actually opening.
         if (!tx.WasRejected && source != OcppStartSource.Card)
@@ -246,7 +247,7 @@ public sealed class MeterValuesHandler(IApplicationDbContext db, CommandConfirme
 }
 
 /// <summary>Closes the session whenever the Stop arrives (R6); an unknown id becomes an orphan row, not a lost message.</summary>
-public sealed class StopTransactionHandler(IApplicationDbContext db, CommandConfirmer confirmer, LiveEventPublisher live, ILogger<StopTransactionHandler> log) : IOcppHandler
+public sealed class StopTransactionHandler(IApplicationDbContext db, CommandConfirmer confirmer, LiveEventPublisher live, DriverSessionNotifier drivers, ILogger<StopTransactionHandler> log) : IOcppHandler
 {
     public async Task<object> HandleAsync(OcppSession session, JsonElement payload, CancellationToken cancellationToken)
     {
@@ -336,6 +337,7 @@ public sealed class StopTransactionHandler(IApplicationDbContext db, CommandConf
         {
             await MeterValueWriter.UpdateSocAsync(db, tx.Id, cancellationToken);
             live.Publish(new OcppLiveEvent(OcppLiveEventTypes.Session, session.ChargingPointId, session.OcppChargePointId, tx.ConnectorId, tx.Id, "stopped", now));
+            drivers.Completed(tx, now);
         }
 
         return new { idTagInfo = new { status = OcppAuthorizationStatus.Accepted } };

@@ -10,6 +10,8 @@ public record PartnerDetailDto(
     string ProviderType,
     int ProviderId,
     string? ProviderName,
+    /// <summary>Always 0: the commission is between Cable and the partner, not the user's business. Kept only so
+    /// older app builds still parse the response; remove once the apps no longer read it.</summary>
     double CommissionPercentage,
     double PointsRewardPercentage,
     int? PointsConversionRateId,
@@ -54,7 +56,7 @@ public class GetPartnerByIdRequestHandler(
             agreement.ProviderType,
             agreement.ProviderId,
             providerName,
-            agreement.CommissionPercentage,
+            0,
             agreement.PointsRewardPercentage,
             agreement.PointsConversionRateId,
             agreement.ConversionRate?.Name,

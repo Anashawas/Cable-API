@@ -43,6 +43,7 @@ builder.Services.AddHttpClient(LiveEventPublisher.HttpClientName, c => c.Timeout
 builder.Services.AddSingleton<LiveEventPublisher>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<LiveEventPublisher>());
 builder.Services.AddSingleton<ChargeLimitEnforcer>();
+builder.Services.AddSingleton<DriverSessionNotifier>();
 builder.Services.AddHttpClient(nameof(KeepAliveSelfPing));
 builder.Services.AddHostedService<KeepAliveSelfPing>();
 builder.Services.AddScoped<TagAuthorizer>();

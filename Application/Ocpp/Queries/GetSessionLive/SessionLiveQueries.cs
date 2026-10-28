@@ -58,7 +58,8 @@ public record SessionLiveDto(
     int? SocStartPercent = null,
     int? SocEndPercent = null,
     /// <summary>"Stop at …" — null when none.</summary>
-    Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto? ChargeLimit = null);
+    Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto? ChargeLimit = null,
+    string? StationName = null);
 
 internal static class SessionLiveBuilder
 {
@@ -71,7 +72,7 @@ internal static class SessionLiveBuilder
             .Where(t => t.Id == transactionId && (chargingPointId == null || t.ChargePoint.ChargingPointId == chargingPointId))
             .Select(t => new
             {
-                t.Id, t.OcppChargePointId, t.ChargePoint.ChargingPointId, t.ChargePoint.DisplayName, t.ConnectorId, t.StartedAt, t.StoppedAt, t.IsOpen,
+                t.Id, t.OcppChargePointId, t.ChargePoint.ChargingPointId, StationName = t.ChargePoint.ChargingPoint.Name, t.ChargePoint.DisplayName, t.ConnectorId, t.StartedAt, t.StoppedAt, t.IsOpen,
                 t.StartSource, t.StopReason, t.MeterStartWh, t.MeterStopWh, t.EnergyKwh, t.CostFils, t.CostBreakdownJson, t.WasRejected, t.IsOrphan,
                 t.SocStartPercent, t.SocEndPercent, t.ChargeLimitKind, t.ChargeLimitValue, t.ChargeLimitSetAt, t.ChargeLimitReachedAt,
             })
@@ -150,7 +151,8 @@ internal static class SessionLiveBuilder
             cost, cost is int c ? c / 1000m : null, rate, windowEn, windowAr, lines, series,
             samples.LastOrDefault(s => s.TemperatureC != null)?.TemperatureC,
             tx.SocStartPercent, tx.SocEndPercent,
-            Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto.From(tx.ChargeLimitKind, tx.ChargeLimitValue, tx.ChargeLimitSetAt, tx.ChargeLimitReachedAt));
+            Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto.From(tx.ChargeLimitKind, tx.ChargeLimitValue, tx.ChargeLimitSetAt, tx.ChargeLimitReachedAt),
+            tx.StationName);
     }
 }
 

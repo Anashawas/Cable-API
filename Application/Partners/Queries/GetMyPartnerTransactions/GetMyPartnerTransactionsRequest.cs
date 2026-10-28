@@ -14,6 +14,8 @@ public record PartnerTransactionDto(
     int ProviderId,
     decimal? TransactionAmount,
     string? CurrencyCode,
+    /// <summary>Always 0 / null: the commission is between Cable and the partner. Kept only so older app builds
+    /// still parse the response; remove once the apps no longer read them.</summary>
     double CommissionPercentage,
     decimal? CommissionAmount,
     int? PointsAwarded,
@@ -61,8 +63,8 @@ public class GetMyPartnerTransactionsRequestHandler(
             t.Id, t.PartnerAgreementId,
             t.ProviderType == "ChargingPoint" ? cpNames.GetValueOrDefault(t.ProviderId) : spNames.GetValueOrDefault(t.ProviderId),
             t.TransactionCode, t.Status, t.ProviderType, t.ProviderId,
-            t.TransactionAmount, t.CurrencyCode, t.CommissionPercentage,
-            t.CommissionAmount, t.PointsAwarded,
+            t.TransactionAmount, t.CurrencyCode, 0,
+            null, t.PointsAwarded,
             t.CodeExpiresAt, t.CompletedAt, t.CreatedAt)).ToList());
     }
 }

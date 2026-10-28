@@ -43,8 +43,8 @@ public class GetMyPartnerTransactionByIdRequestHandler(
         return new PartnerTransactionDto(
             t.Id, t.PartnerAgreementId, providerName, t.TransactionCode,
             t.Status, t.ProviderType, t.ProviderId,
-            t.TransactionAmount, t.CurrencyCode, t.CommissionPercentage,
-            t.CommissionAmount, t.PointsAwarded,
+            t.TransactionAmount, t.CurrencyCode, 0,
+            null, t.PointsAwarded,
             t.CodeExpiresAt, t.CompletedAt, t.CreatedAt);
     }
 }

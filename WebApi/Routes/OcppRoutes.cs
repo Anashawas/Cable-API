@@ -90,8 +90,9 @@ public static class OcppRoutes
                 Results.Ok(await mediator.Send(new StartMyOcppSessionCommand(body.ChargingPointId, body.ChargerId, body.ConnectorId, body.ChargeLimitKind, body.ChargeLimitValue), ct)))
             .Produces<OcppSessionStartDto>()
             .RequireAuthorization().ProducesUnAuthorized().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .WithName("Start my charging session")
-            .WithSummary("Driver: start charging on a plug (chargerId = ChargerLiveDto.Id, connectorId = PlugLiveDto.ConnectorId from GET /api/charging-points/{id}/live) without a card. accepted=true means the charger took the request; poll /current until the session appears (a few seconds). 400 with a message when the station does not offer app charging, the plug is busy / out of order, the charger is offline, or you already have a running session.")
+            .WithSummary("Driver: start charging on a plug (chargerId = ChargerLiveDto.Id, connectorId = PlugLiveDto.ConnectorId from GET /api/charging-points/{id}/live) without a card. accepted=true means the charger took the request; poll /current until the session appears (a few seconds). 400 with a message when the station does not offer app charging, the plug is busy / out of order, or the charger is offline. 409 with code sessionAlreadyOpen when you already have a running session. Check PlugLiveDto.canStartFromApp first to show or hide the button.")
             .WithOpenApi();
 
         app.MapPut("/{id:int}/limit", async (IMediator mediator, [FromRoute] int id, ChargeLimitRequest body, CancellationToken ct) =>
@@ -120,6 +121,14 @@ public static class OcppRoutes
             .RequireAuthorization().ProducesUnAuthorized().ProducesInternalServerError()
             .WithName("Get my current charging session")
             .WithSummary("Driver: the session running now (null when none) with power, battery level, energy so far and the latest sample time. Poll every 10 s while charging.")
+            .WithOpenApi();
+
+        app.MapGet("/{id:int}", async (IMediator mediator, [FromRoute] int id, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetMyOcppSessionRequest(id), ct)))
+            .Produces<SessionLiveDto>()
+            .RequireAuthorization().ProducesUnAuthorized().ProducesNotFound().ProducesInternalServerError()
+            .WithName("Get my charging session")
+            .WithSummary("Driver: one of their own sessions in detail — readings curve (series: power, battery, kWh, A, V, °C), cost so far and price lines while open, battery start → end, limit and stop reason. For the session screen and the history details.")
             .WithOpenApi();
 
         app.MapGet("/", async (IMediator mediator, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken ct) =>

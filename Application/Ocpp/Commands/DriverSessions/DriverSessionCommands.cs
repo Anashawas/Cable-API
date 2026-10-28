@@ -2,6 +2,7 @@ using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Ocpp.Commands.ControlOcppChargePoint;
 using Application.Ocpp.Queries;
+using Application.Ocpp.Queries.GetSessionLive;
 using Application.Pricing;
 using Cable.Core;
 using Cable.Core.Constants;
@@ -114,7 +115,10 @@ public class StartMyOcppSessionCommandHandler(IApplicationDbContext db, ICurrent
         var mine = await db.OcppTransactions.AsNoTracking()
             .CountAsync(t => t.StartedByUserId == userId && t.IsOpen && !t.WasRejected, cancellationToken);
         if (mine >= OcppLimits.OpenSessionsPerDriver)
-            throw new DataValidationException("ChargerId", "You already have a running session. Stop it before starting another.");
+            throw new ConflictException("sessionAlreadyOpen",
+                System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ar"
+                    ? "عندك شحن شغّال. أوقفه قبل ما تبدأ شحن ثاني."
+                    : "You already have a running session. Stop it before starting another.");
 
         var idTag = await EnsureUserTagAsync(db, userId, cancellationToken);
         await OcppRemoteStart.SetPendingLimitAsync(db, target.ChargePoint.Id, request.ConnectorId, request.ChargeLimitKind, request.ChargeLimitValue, userId, cancellationToken);
@@ -265,6 +269,26 @@ public class GetMyCurrentOcppSessionRequestHandler(IApplicationDbContext db, ICu
             PowerW = sample.PowerW, SocPercent = sample.SocPercent, LastSampleAt = sample.MeasuredAt, EnergyKwh = soFar,
             CurrentA = sample.CurrentA, VoltageV = sample.VoltageV, TemperatureC = sample.TemperatureC,
         };
+    }
+}
+
+/// <summary>
+/// Driver: one of their own sessions in detail — the same view the station owner gets (readings curve, cost so far
+/// and price lines while open, battery start → end, limit). Only sessions the driver started (app, or a card linked
+/// to their account); anything else is "not found".
+/// </summary>
+public record GetMyOcppSessionRequest(int TransactionId) : IRequest<SessionLiveDto>;
+
+public class GetMyOcppSessionRequestHandler(IApplicationDbContext db, ICurrentUserService currentUser)
+    : IRequestHandler<GetMyOcppSessionRequest, SessionLiveDto>
+{
+    public async Task<SessionLiveDto> Handle(GetMyOcppSessionRequest request, CancellationToken cancellationToken)
+    {
+        var userId = currentUser.UserId ?? throw new NotAuthorizedAccessException("User not authenticated");
+        var mine = await db.OcppTransactions.AsNoTracking()
+            .AnyAsync(t => t.Id == request.TransactionId && t.StartedByUserId == userId && !t.WasRejected && !t.IsOrphan, cancellationToken);
+        if (!mine) throw new NotFoundException("cannot find your session " + request.TransactionId);
+        return await SessionLiveBuilder.BuildAsync(db, request.TransactionId, null, cancellationToken);
     }
 }
 

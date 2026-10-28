@@ -8,6 +8,8 @@ public record PartnerDto(
     string ProviderType,
     int ProviderId,
     string? ProviderName,
+    /// <summary>Always 0: the commission is between Cable and the partner, not the user's business. Kept only so
+    /// older app builds still parse the response; remove once the apps no longer read it.</summary>
     double CommissionPercentage,
     double PointsRewardPercentage,
     int CodeExpirySeconds,
@@ -47,7 +49,7 @@ public class GetActivePartnersRequestHandler(
         return paged.As(agreements.Select(a => new PartnerDto(
             a.Id, a.ProviderType, a.ProviderId,
             a.ProviderType == "ChargingPoint" ? cpNames.GetValueOrDefault(a.ProviderId) : spNames.GetValueOrDefault(a.ProviderId),
-            a.CommissionPercentage, a.PointsRewardPercentage,
+            0, a.PointsRewardPercentage,
             a.CodeExpirySeconds, a.MinimumTransactionAmount, a.Note)).ToList());
     }
 }

@@ -35,7 +35,8 @@ internal sealed class ExceptionHandlerMiddleware
             { typeof(DataValidationException), HandleValidationException },
             { typeof(NotFoundException), HandleNotFoundException },
             { typeof(NotAuthorizedAccessException), HandleUnauthorizedAccessException },
-            { typeof(ForbiddenAccessException), HandleForbiddenAccessException }
+            { typeof(ForbiddenAccessException), HandleForbiddenAccessException },
+            { typeof(ConflictException), HandleConflictException }
         };
     }
 
@@ -118,6 +119,21 @@ internal sealed class ExceptionHandlerMiddleware
         await WriteExceptionDetails(problemDetails, httpContext, (int)problemDetails.Status);
     }
 
+
+    private async Task HandleConflictException(HttpContext httpContext, Exception ex)
+    {
+        var exception = (ConflictException)ex;
+        var problemDetails = new CableProblemDetails
+        {
+            Type = "https://tools.ietf.org/html/rfc7231#section-6.5.8",
+            Status = StatusCodes.Status409Conflict,
+            Detail = exception.Message,
+            Instance = httpContext?.Request?.Path
+        };
+        problemDetails.Extensions["code"] = exception.Code;
+
+        await WriteExceptionDetails(problemDetails, httpContext, (int)HttpStatusCode.Conflict);
+    }
 
     private async Task HandleException(HttpContext httpContext, Exception ex)
     {
