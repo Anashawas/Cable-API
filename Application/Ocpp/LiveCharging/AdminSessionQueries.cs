@@ -70,7 +70,13 @@ public record AdminSessionRowDto(
     /// <summary>"Problem with this session" complaints still open.</summary>
     int OpenIssues,
     bool WasRejected = false,
-    bool IsOrphan = false);
+    bool IsOrphan = false,
+    /// <summary>The driver's car on an app start (13.4).</summary>
+    string? CarName = null,
+    /// <summary>Automatic points the driver got (4.7); null = none / not decided.</summary>
+    int? PointsAwarded = null,
+    /// <summary>App start: how far the phone was from the station, in metres (4.2 / 11.c).</summary>
+    int? StartDistanceMeters = null);
 
 public record AdminSessionTotalsDto(int Sessions, decimal EnergyKwh, int CostFils, decimal CostJod, int OpenNow);
 
@@ -150,7 +156,7 @@ internal static class AdminSessionQuery
         DateTime StartedAt, DateTime? StoppedAt, bool IsOpen, bool IsStale, string StartSource, string StartMethod, string IdTag, int? StartedByUserId,
         string? UserName, string? UserPhone, string? CardLabel, decimal? EnergyKwh, int? CostFils, int? SocStartPercent, int? SocEndPercent,
         string? ChargeLimitKind, decimal? ChargeLimitValue, DateTime? ChargeLimitSetAt, DateTime? ChargeLimitReachedAt, string? StopReason,
-        string? ReceiptNo, int OpenIssues, bool WasRejected, bool IsOrphan);
+        string? ReceiptNo, int OpenIssues, bool WasRejected, bool IsOrphan, int? CarId, int? PointsAwarded, int? StartDistanceMeters);
 
     private static IQueryable<Raw> Project(IApplicationDbContext db, IQueryable<OcppTransaction> q) =>
         q.Select(t => new Raw(
@@ -164,9 +170,9 @@ internal static class AdminSessionQuery
             t.ReceiptNo,
             db.UserComplaints.Count(c => c.OcppTransactionId == t.Id && !c.IsDeleted
                                          && (c.Status == 0 || c.Status == 3 || c.Status == 4)),
-            t.WasRejected, t.IsOrphan));
+            t.WasRejected, t.IsOrphan, t.CarId, t.PointsAwarded, t.StartDistanceMeters));
 
-    private static AdminSessionRowDto ToRow(Raw r, DateTime now)
+    private static AdminSessionRowDto ToRow(Raw r, DateTime now, IReadOnlyDictionary<int, SessionCarDto> cars)
     {
         var person = r.StartedByUserId is int uid ? new AdminSessionPersonDto(uid, r.UserName, PhoneNumberUtility.ToE164OrOriginal(r.UserPhone)) : null;
         var staff = r.StartSource == OcppStartSource.Operator;
@@ -176,21 +182,24 @@ internal static class AdminSessionQuery
             staff ? null : person, staff ? person : null, r.StartSource == OcppStartSource.Card ? r.CardLabel : null,
             r.EnergyKwh, r.CostFils, r.CostFils is int f ? f / 1000m : null, r.SocStartPercent, r.SocEndPercent,
             ChargeLimitDto.From(r.ChargeLimitKind, r.ChargeLimitValue, r.ChargeLimitSetAt, r.ChargeLimitReachedAt),
-            r.StopReason, stop.En, stop.Ar, r.ReceiptNo, r.OpenIssues, r.WasRejected, r.IsOrphan);
+            r.StopReason, stop.En, stop.Ar, r.ReceiptNo, r.OpenIssues, r.WasRejected, r.IsOrphan,
+            r.CarId is int carId ? cars.GetValueOrDefault(carId)?.Name : null, r.PointsAwarded, r.StartDistanceMeters);
     }
 
     public static async Task<PagedResult<AdminSessionRowDto>> PageAsync(IApplicationDbContext db, IQueryable<OcppTransaction> q, int? page, int? pageSize, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
         var raw = await Project(db, q.OrderByDescending(t => t.StartedAt).ThenByDescending(t => t.Id)).ToPaginatedAsync(page, pageSize, 20, 200, ct);
-        return raw.As(raw.Items.Select(r => ToRow(r, now)).ToList());
+        var cars = await SessionCars.LoadAsync(db, raw.Items.Select(r => r.CarId), ct);
+        return raw.As(raw.Items.Select(r => ToRow(r, now, cars)).ToList());
     }
 
     public static async Task<List<AdminSessionRowDto>> AllAsync(IApplicationDbContext db, IQueryable<OcppTransaction> q, int max, CancellationToken ct)
     {
         var now = DateTime.UtcNow;
         var raw = await Project(db, q.OrderByDescending(t => t.StartedAt).ThenByDescending(t => t.Id)).Take(max).ToListAsync(ct);
-        return raw.Select(r => ToRow(r, now)).ToList();
+        var cars = await SessionCars.LoadAsync(db, raw.Select(r => r.CarId), ct);
+        return raw.Select(r => ToRow(r, now, cars)).ToList();
     }
 
     public static async Task<AdminSessionTotalsDto> TotalsAsync(IApplicationDbContext db, AdminSessionFilter f, IQueryable<OcppTransaction> q, CancellationToken ct)
