@@ -66,6 +66,9 @@ public class VoidPaymentCommandHandler(
             await SubscriptionEntitySync.ApplyAsync(applicationDbContext, sub, on: !sub.IsSwitchedOff, now, cancellationToken);
         }
 
+        // Partner billing: the subscription record this payment opened is cancelled with it.
+        await Billing.PlanSubscriptionLedger.OnPaymentVoidedAsync(applicationDbContext, payment.Id, payment.VoidReason!, currentUserService.UserId, cancellationToken);
+
         await applicationDbContext.SaveChanges(cancellationToken);
     }
 }

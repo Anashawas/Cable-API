@@ -138,5 +138,14 @@ public interface IApplicationDbContext
     DbSet<UserPriceAlert> UserPriceAlerts { get; set; }
     DbSet<PriceAlertLog> PriceAlertLogs { get; set; }
 
+    // Partner billing (Sprint 5): plans, subscription records, upgrade requests, scan bundles
+    DbSet<BillingPlan> BillingPlans { get; set; }
+    DbSet<BillingPlanPriceOption> BillingPlanPriceOptions { get; set; }
+    DbSet<BillingPlanChangeLog> BillingPlanChangeLogs { get; set; }
+    DbSet<PlanSubscription> PlanSubscriptions { get; set; }
+    DbSet<PlanUpgradeRequest> PlanUpgradeRequests { get; set; }
+    DbSet<BillingEvent> BillingEvents { get; set; }
+    DbSet<PartnerTransactionBundleScan> PartnerTransactionBundleScans { get; set; }
+
     Task<int> SaveChanges(CancellationToken cancellationToken = default);
 }

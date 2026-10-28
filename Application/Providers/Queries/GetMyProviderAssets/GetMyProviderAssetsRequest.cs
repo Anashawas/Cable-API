@@ -14,7 +14,9 @@ public record ProviderAccessDto(string ProviderType, int ProviderId, bool IsOwne
 public record ProviderAssetsDto(
     List<GetAllChargingPointsDto> ChargingPoints,
     List<ServiceProviderDto> ServiceProviders,
-    List<ProviderAccessDto> Access
+    List<ProviderAccessDto> Access,
+    /// <summary>Scan bundle counter per partner asset (Sprint 5); only assets with an agreement or a bundle are listed.</summary>
+    List<Application.Billing.ProviderLoyaltyBundleDto>? LoyaltyBundles = null
 );
 
 public class GetMyProviderAssetsRequestHandler(
@@ -132,6 +134,9 @@ public class GetMyProviderAssetsRequestHandler(
             access.Add(new ProviderAccessDto("ServiceProvider", sp.Id, owner, owner || w is null ? Cable.Core.Constants.WorkerPrivileges.All : Cable.Core.Constants.WorkerPrivileges.Parse(w.Privileges)));
         }
 
-        return new ProviderAssetsDto(chargingPoints, serviceProviderDtos, access);
+        var loyaltyBundles = await Application.Billing.LoyaltyBundleService.GetForProvidersAsync(applicationDbContext,
+            access.Select(a => (a.ProviderType, a.ProviderId)).ToList(), cancellationToken);
+
+        return new ProviderAssetsDto(chargingPoints, serviceProviderDtos, access, loyaltyBundles);
     }
 }

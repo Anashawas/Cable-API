@@ -24,6 +24,10 @@ public static class DependencyInjection
         // Shared by RecordPayment and the legacy premium endpoint.
         services.AddScoped<Subscriptions.PaymentRecorder>();
 
+        // Partner billing (Sprint 5): plan subscriptions on top of PaymentRecorder, and its Hangfire jobs.
+        services.AddScoped<Billing.Subscriptions.PlanSubscriptionService>();
+        services.AddScoped<Billing.Jobs.IBillingJobs, Billing.Jobs.BillingJobs>();
+
         return services;
     }
 }

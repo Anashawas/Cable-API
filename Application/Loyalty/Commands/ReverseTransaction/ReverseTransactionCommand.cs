@@ -118,6 +118,10 @@ public class ReverseTransactionCommandHandler(
                         .SetProperty(r => r.CurrentRedemptions, r => r.CurrentRedemptions - 1), cancellationToken);
             }
 
+            // Scan bundles (Sprint 5): reversing a completed bundle-billed transaction gives its scan back.
+            if (request.ActivityType == "Partner")
+                await Application.Billing.LoyaltyBundleScans.RefundScanAsync(applicationDbContext, request.TransactionId, cancellationToken);
+
             await applicationDbContext.SaveChanges(cancellationToken);
             await dbTransaction.CommitAsync(cancellationToken);
 

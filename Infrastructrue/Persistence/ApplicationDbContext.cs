@@ -151,6 +151,15 @@ public partial class ApplicationDbContext(
     public DbSet<UserPriceAlert> UserPriceAlerts { get; set; }
     public DbSet<PriceAlertLog> PriceAlertLogs { get; set; }
 
+    // Partner billing (Sprint 5): plans, subscription records, upgrade requests, scan bundles
+    public DbSet<BillingPlan> BillingPlans { get; set; }
+    public DbSet<BillingPlanPriceOption> BillingPlanPriceOptions { get; set; }
+    public DbSet<BillingPlanChangeLog> BillingPlanChangeLogs { get; set; }
+    public DbSet<PlanSubscription> PlanSubscriptions { get; set; }
+    public DbSet<PlanUpgradeRequest> PlanUpgradeRequests { get; set; }
+    public DbSet<BillingEvent> BillingEvents { get; set; }
+    public DbSet<PartnerTransactionBundleScan> PartnerTransactionBundleScans { get; set; }
+
     #endregion
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
