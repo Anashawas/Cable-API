@@ -65,7 +65,12 @@ public record SessionLiveDto(
     /// <summary>13.4: the driver's car on an app start.</summary>
     Application.Ocpp.LiveCharging.SessionCarDto? Car = null,
     /// <summary>4.4: station = priced with the station's own tariff; national = the national tariff.</summary>
-    string? TariffSource = null);
+    string? TariffSource = null,
+    // §11.a — owner / manager view only (null elsewhere): who charged, masked; card label; staff member; App | Sticker | Card | Operator.
+    Application.Ocpp.LiveCharging.SessionDriverDto? Driver = null,
+    string? CardLabel = null,
+    string? StartedByUserName = null,
+    string? StartMethod = null);
 
 internal static class SessionLiveBuilder
 {
@@ -179,7 +184,8 @@ public class GetMySessionLiveRequestHandler(IApplicationDbContext db, ICurrentUs
     public async Task<SessionLiveDto> Handle(GetMySessionLiveRequest request, CancellationToken cancellationToken)
     {
         await ProviderAccessGuard.EnsureCanActForProviderAsync(db, currentUser, ProviderAccessGuard.ChargingPoint, request.ChargingPointId, cancellationToken, requiredPrivilege: Cable.Core.Constants.WorkerPrivileges.ConnectView);
-        return await SessionLiveBuilder.BuildAsync(db, request.TransactionId, request.ChargingPointId, cancellationToken);
+        var dto = await SessionLiveBuilder.BuildAsync(db, request.TransactionId, request.ChargingPointId, cancellationToken);
+        return await Application.Ocpp.LiveCharging.PartnerSessionFilters.WithPeopleAsync(db, dto, cancellationToken);
     }
 }
 

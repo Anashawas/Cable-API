@@ -37,7 +37,9 @@ internal sealed class ExceptionHandlerMiddleware
             { typeof(NotAuthorizedAccessException), HandleUnauthorizedAccessException },
             { typeof(ForbiddenAccessException), HandleForbiddenAccessException },
             { typeof(ConflictException), HandleConflictException },
-            { typeof(UnprocessableException), HandleUnprocessableException }
+            { typeof(UnprocessableException), HandleUnprocessableException },
+            { typeof(CodedNotFoundException), HandleCodedNotFoundException },
+            { typeof(GoneException), HandleGoneException }
         };
     }
 
@@ -152,6 +154,37 @@ internal sealed class ExceptionHandlerMiddleware
                 problemDetails.Extensions[key] = value;
 
         await WriteExceptionDetails(problemDetails, httpContext, StatusCodes.Status422UnprocessableEntity);
+    }
+
+    private async Task HandleCodedNotFoundException(HttpContext httpContext, Exception ex)
+    {
+        var exception = (CodedNotFoundException)ex;
+        var problemDetails = new CableProblemDetails
+        {
+            Type = "https://tools.ietf.org/html/rfc7231#section-6.5.4",
+            Status = StatusCodes.Status404NotFound,
+            Title = Resources.NotFound,
+            Detail = exception.Message,
+            Instance = httpContext?.Request?.Path
+        };
+        problemDetails.Extensions["code"] = exception.Code;
+
+        await WriteExceptionDetails(problemDetails, httpContext, StatusCodes.Status404NotFound);
+    }
+
+    private async Task HandleGoneException(HttpContext httpContext, Exception ex)
+    {
+        var exception = (GoneException)ex;
+        var problemDetails = new CableProblemDetails
+        {
+            Type = "https://tools.ietf.org/html/rfc7231#section-6.5.9",
+            Status = StatusCodes.Status410Gone,
+            Detail = exception.Message,
+            Instance = httpContext?.Request?.Path
+        };
+        problemDetails.Extensions["code"] = exception.Code;
+
+        await WriteExceptionDetails(problemDetails, httpContext, StatusCodes.Status410Gone);
     }
 
     private async Task HandleException(HttpContext httpContext, Exception ex)

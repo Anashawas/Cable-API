@@ -93,7 +93,11 @@ public record OcppSessionStartDto(
 /// <param name="AccuracyMeters">The fix's accuracy radius; up to 100 m of it is credited.</param>
 /// <param name="CarId">13.4: one of the driver's cars (UserCar id); none = their only car, if they have exactly one.</param>
 public record StartMyOcppSessionCommand(int ChargingPointId, int ChargerId, int ConnectorId, string? ChargeLimitKind = null, decimal? ChargeLimitValue = null,
-    double? Lat = null, double? Lng = null, double? AccuracyMeters = null, int? CarId = null) : IRequest<OcppSessionStartDto>;
+    double? Lat = null, double? Lng = null, double? AccuracyMeters = null, int? CarId = null) : IRequest<OcppSessionStartDto>
+{
+    /// <summary>Optional §11.d: the plug's CHG- sticker code (or its link) when the start came from a scan; it must be this plug's code. The session is then recorded with startMethod Sticker.</summary>
+    public string? ConnectorCode { get; init; }
+}
 
 public class StartMyOcppSessionCommandValidator : AbstractValidator<StartMyOcppSessionCommand>
 {
@@ -126,6 +130,10 @@ public class StartMyOcppSessionCommandHandler(IApplicationDbContext db, ICurrent
         // 4.2: the driver must be at the station (server-side; the app's own check is only a convenience).
         var proximity = await AppStartProximity.EnsureNearAsync(db, request.ChargingPointId, request.Lat, request.Lng, request.AccuracyMeters, cancellationToken);
 
+        // A scanned sticker must be this plug's (404 CODE_NOT_FOUND · 410 CODE_REVOKED · 422 CODE_MISMATCH).
+        if (!string.IsNullOrWhiteSpace(request.ConnectorCode))
+            await Application.Ocpp.LiveCharging.ConnectorCodeService.EnsureMatchesAsync(db, request.ConnectorCode, request.ChargerId, request.ConnectorId, cancellationToken);
+
         var target = await OcppRemoteStart.EnsureCanStartAsync(db, request.ChargerId, request.ConnectorId, cancellationToken);
         if (target.ChargePoint.ChargingPointId != request.ChargingPointId)
             throw new NotFoundException("cannot find charger " + request.ChargerId + " at this station");
@@ -146,6 +154,9 @@ public class StartMyOcppSessionCommandHandler(IApplicationDbContext db, ICurrent
         await Application.Ocpp.LiveCharging.OcppPendingStart.SetAsync(db, target.ChargePoint.Id, request.ConnectorId,
             new Application.Ocpp.LiveCharging.OcppPendingStart.Context(userId, request.Lat, request.Lng,
                 request.AccuracyMeters is double acc ? (int)Math.Round(acc) : null, proximity.DistanceMeters, carId), cancellationToken);
+        // §11.d: "Sticker" when the start came from a scanned plug code.
+        await Application.Ocpp.LiveCharging.StartMethodParking.ParkAsync(db, target.ChargePoint.Id, request.ConnectorId,
+            string.IsNullOrWhiteSpace(request.ConnectorCode) ? null : OcppStartMethod.Sticker, cancellationToken);
         var result = await OcppCommandRunner.RunAsync(db, currentUser, client, target.ChargePoint.Id, "RemoteStartTransaction",
             OcppRemoteStart.Payload(request.ConnectorId, idTag), cancellationToken, skipAccessGuard: true);
 

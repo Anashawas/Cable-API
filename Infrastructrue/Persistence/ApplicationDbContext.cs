@@ -145,6 +145,10 @@ public partial class ApplicationDbContext(
     public DbSet<OcppAlert> OcppAlerts { get; set; }
     public DbSet<OcppUserIdTag> OcppUserIdTags { get; set; }
 
+    // Sprint 5 live charging (B): plug sticker codes, "plug didn't work" reports
+    public DbSet<OcppConnectorCode> OcppConnectorCodes { get; set; }
+    public DbSet<OcppConnectorReport> OcppConnectorReports { get; set; }
+
     // Time-of-use tariff + price alerts
     public DbSet<TouTariff> TouTariffs { get; set; }
     public DbSet<TouTariffWindow> TouTariffWindows { get; set; }

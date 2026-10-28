@@ -14,13 +14,13 @@ public class GetComplaintsByUserRequestHandler(
 {
     public async Task<List<GetUserComplaintsDto>> Handle(GetComplaintsByUserRequest request, CancellationToken cancellationToken)
     {
-        return mapper.Map<List<UserComplaint>, List<GetUserComplaintsDto>>(
+        return await UserComplaintSessions.WithSessionsAsync(applicationDbContext, mapper.Map<List<UserComplaint>, List<GetUserComplaintsDto>>(
             await applicationDbContext.UserComplaints.AsNoTracking()
                 .Include(x => x.User)
                 .Include(x => x.ChargingPoint)
                 .Where(x => x.UserId == currentUserService.UserId && !x.IsDeleted)
                 .OrderByDescending(x => x.CreatedAt)
                 .ToListAsync(cancellationToken)
-        );
+        ), cancellationToken);
     }
 }

@@ -98,6 +98,15 @@ public class OcppTransaction : BaseEntity
     /// <summary>When the driver was told "your car has finished — could you unplug it?" (once per session).</summary>
     public DateTime? ParkedNotifiedAt { get; set; }
 
+    // --- Sprint 5 live charging (B): start method + receipt -------------------------------
+
+    /// <summary>App | Sticker | Card | Operator (OcppStartMethod). Sticker = an app start from a CHG- plug code. Null on rows written before the column: read as StartSource.</summary>
+    public string? StartMethod { get; set; }
+
+    /// <summary>CHS-YYYY-NNNNNN, assigned the first time a receipt is asked for. Null = no receipt issued yet.</summary>
+    public string? ReceiptNo { get; set; }
+    public DateTime? ReceiptIssuedAt { get; set; }
+
     public virtual OcppChargePoint ChargePoint { get; set; } = null!;
     public virtual ICollection<OcppMeterValue> MeterValues { get; set; } = new List<OcppMeterValue>();
 }

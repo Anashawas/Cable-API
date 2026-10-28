@@ -9,5 +9,6 @@ public class UpdateUserComplaintStatusCommandValidator : AbstractValidator<Updat
     {
         RuleFor(x => x.Id).NotEmpty();
         RuleFor(x => x.Status).IsInEnum();
+        RuleFor(x => x.Reply).MaximumLength(1000);
     }
 }

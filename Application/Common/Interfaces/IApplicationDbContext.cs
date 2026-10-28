@@ -132,6 +132,10 @@ public interface IApplicationDbContext
     DbSet<OcppAlert> OcppAlerts { get; set; }
     DbSet<OcppUserIdTag> OcppUserIdTags { get; set; }
 
+    // Sprint 5 live charging (B): plug sticker codes, "plug didn't work" reports
+    DbSet<OcppConnectorCode> OcppConnectorCodes { get; set; }
+    DbSet<OcppConnectorReport> OcppConnectorReports { get; set; }
+
     // Time-of-use tariff + price alerts
     DbSet<TouTariff> TouTariffs { get; set; }
     DbSet<TouTariffWindow> TouTariffWindows { get; set; }

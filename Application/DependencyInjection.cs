@@ -26,6 +26,8 @@ public static class DependencyInjection
 
         // Sprint 5 live charging (A): automatic points when a driver's session ends (Hangfire job, run by the API).
         services.AddScoped<Ocpp.Points.IOcppSessionPointsService, Ocpp.Points.OcppSessionPointsService>();
+        // Sprint 5 live charging (B): pushes run by Hangfire (plug reports, session issues).
+        services.AddScoped<Ocpp.LiveCharging.LiveChargingNotifications>();
 
         return services;
     }

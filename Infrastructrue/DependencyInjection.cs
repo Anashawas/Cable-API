@@ -120,6 +120,8 @@ public static class DependencyInjection
         services.Configure<UploadFileOptions>(uploadFileOptionsSection);
         services.AddScoped<IUploadFileService, UploadFileService>();
         services.AddScoped<IReceiptPdfService, Services.ReceiptPdfService>();
+        // Sprint 5 live charging (B): session receipt + plug sticker sheet.
+        services.AddScoped<Application.Ocpp.LiveCharging.ILiveChargingPdfService, Services.LiveChargingPdfService>();
         return services;
     }
 

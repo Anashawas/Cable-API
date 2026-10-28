@@ -50,6 +50,13 @@ public class OcppConnector : BaseEntity
     public int? PendingStartDistanceMeters { get; set; }
     public int? PendingCarId { get; set; }
 
+    /// <summary>
+    /// How the pending remote start was made when it is not the plain source (today only "Sticker": the driver scanned
+    /// the plug's CHG- code). Taken by the next App StartTransaction on this plug within RemoteStartAuthorizeWindow.
+    /// </summary>
+    public string? PendingStartMethod { get; set; }
+    public DateTime? PendingStartMethodAt { get; set; }
+
     public virtual OcppChargePoint ChargePoint { get; set; } = null!;
     public virtual PlugType? PlugType { get; set; }
 }

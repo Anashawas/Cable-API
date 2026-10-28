@@ -139,10 +139,29 @@ public record OwnerSessionDto(
     /// <summary>Battery % at the start of the session and at the latest / final reading.</summary>
     int? SocStartPercent = null,
     int? SocEndPercent = null,
-    Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto? ChargeLimit = null);
+    Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto? ChargeLimit = null,
+    // §11.a (Sprint 5 live charging B) — who charged, as the partner may see it (never the full phone or user id).
+    /// <summary>App / sticker starts and cards linked to a driver: name + masked phone (079****967).</summary>
+    Application.Ocpp.LiveCharging.SessionDriverDto? Driver = null,
+    /// <summary>Card sessions: the label the station gave the card.</summary>
+    string? CardLabel = null,
+    /// <summary>Operator starts: the staff member who started it.</summary>
+    string? StartedByUserName = null,
+    /// <summary>App | Sticker | Card | Operator.</summary>
+    string? StartMethod = null,
+    /// <summary>CHS-YYYY-NNNNNN once a receipt was issued.</summary>
+    string? ReceiptNo = null,
+    /// <summary>The driver's car on an app start (13.4), e.g. "Hyundai Ioniq 5".</summary>
+    string? CarName = null,
+    /// <summary>Automatic points the driver got for this session (4.7); null = none / not decided.</summary>
+    int? PointsAwarded = null);
 
 /// <summary>Owner / manager: sessions at their station, newest first; optional charger and date filters (UTC).</summary>
-public record GetMyStationSessionsRequest(int ChargingPointId, int? OcppChargePointId = null, DateTime? From = null, DateTime? To = null, int? Page = null, int? PageSize = null)
+/// <param name="StartMethod">App | Sticker | Card | Operator.</param>
+/// <param name="Status">open | closed.</param>
+/// <param name="Q">Driver / staff name or card label contains.</param>
+public record GetMyStationSessionsRequest(int ChargingPointId, int? OcppChargePointId = null, DateTime? From = null, DateTime? To = null, int? Page = null, int? PageSize = null,
+        int? ConnectorId = null, string? StartMethod = null, string? Status = null, string? Q = null)
     : IRequest<PagedResult<OwnerSessionDto>>;
 
 public class GetMyStationSessionsRequestHandler(IApplicationDbContext db, ICurrentUserService currentUser)
@@ -158,6 +177,7 @@ public class GetMyStationSessionsRequestHandler(IApplicationDbContext db, ICurre
         if (request.OcppChargePointId is int cp) q = q.Where(t => t.OcppChargePointId == cp);
         if (request.From is DateTime from) q = q.Where(t => t.StartedAt >= from);
         if (request.To is DateTime to) q = q.Where(t => t.StartedAt < to);
+        q = Application.Ocpp.LiveCharging.PartnerSessionFilters.Apply(db, q, request.ChargingPointId, request.ConnectorId, request.StartMethod, request.Status, request.Q);
 
         var page = await q.OrderByDescending(t => t.StartedAt)
             .Select(t => new OwnerSessionDto(
@@ -165,8 +185,14 @@ public class GetMyStationSessionsRequestHandler(IApplicationDbContext db, ICurre
                 null, t.EnergyKwh, t.StopReason, t.IsOpen, t.StartSource, null, t.CostFils, t.CostFils == null ? null : t.CostFils / 1000m,
                 t.SocStartPercent, t.SocEndPercent,
                 t.ChargeLimitKind == null ? null : new Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto(
-                    t.ChargeLimitKind, t.ChargeLimitValue, null, null, t.ChargeLimitSetAt, t.ChargeLimitReachedAt)))
+                    t.ChargeLimitKind, t.ChargeLimitValue, null, null, t.ChargeLimitSetAt, t.ChargeLimitReachedAt),
+                null, null, null, t.StartMethod ?? t.StartSource, t.ReceiptNo, null, t.PointsAwarded))
             .ToPaginatedAsync(request.Page, request.PageSize, 20, 200, cancellationToken);
+        var people = await Application.Ocpp.LiveCharging.PartnerSessionFilters.PeopleAsync(db, request.ChargingPointId, page.Items.Select(i => i.Id).ToList(), cancellationToken);
+        var pageIds = page.Items.Select(i => i.Id).ToList();
+        var carIds = await db.OcppTransactions.AsNoTracking().Where(t => pageIds.Contains(t.Id) && t.CarId != null)
+            .ToDictionaryAsync(t => t.Id, t => t.CarId, cancellationToken);
+        var cars = await Application.Ocpp.LiveCharging.SessionCars.LoadAsync(db, carIds.Values, cancellationToken);
 
         // Duration computed in memory: the SQL date-diff helper lives in the SqlServer provider, which Application does not reference.
         return page.As(page.Items.Select(d => d with
@@ -174,6 +200,10 @@ public class GetMyStationSessionsRequestHandler(IApplicationDbContext db, ICurre
             DurationSec = (int)((d.StoppedAt ?? now) - d.StartedAt).TotalSeconds,
             StopReasonText = Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto.StopText(d.StopReason, d.ChargeLimit?.Kind, d.ChargeLimit?.Value, d.ChargeLimit?.ReachedAt).En,
             ChargeLimit = d.ChargeLimit is null ? null : Application.Ocpp.Commands.ChargeLimits.ChargeLimitDto.From(d.ChargeLimit.Kind, d.ChargeLimit.Value, d.ChargeLimit.SetAt, d.ChargeLimit.ReachedAt),
+            Driver = people.GetValueOrDefault(d.Id)?.Driver,
+            CardLabel = people.GetValueOrDefault(d.Id)?.CardLabel,
+            StartedByUserName = people.GetValueOrDefault(d.Id)?.StartedByUserName,
+            CarName = carIds.GetValueOrDefault(d.Id) is int carId ? cars.GetValueOrDefault(carId)?.Name : null,
         }).ToList());
     }
 }
