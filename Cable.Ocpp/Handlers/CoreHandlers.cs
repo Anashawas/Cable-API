@@ -95,6 +95,8 @@ public sealed class StatusNotificationHandler(IApplicationDbContext db, FaultNot
         {
             connector = new OcppConnector { OcppChargePointId = session.OcppChargePointId, ConnectorId = connectorId };
             db.OcppConnectors.Add(connector);
+            // §10: every new plug gets its CHG- sticker code with the row.
+            await Application.Ocpp.LiveCharging.ConnectorCodeService.AttachToNewConnectorAsync(db, connector, cancellationToken);
         }
 
         connector.Status = status;
@@ -202,6 +204,9 @@ public sealed class StartTransactionHandler(IApplicationDbContext db, TagAuthori
                 plug.PendingLimitSetAt = null;
             }
         }
+
+        // §11.d: App | Sticker | Card | Operator ("Sticker" was parked on the plug by the API's start).
+        await Application.Ocpp.LiveCharging.StartMethodParking.ApplyAsync(db, tx, now, cancellationToken);
 
         db.OcppTransactions.Add(tx);
         await db.SaveChanges(cancellationToken);

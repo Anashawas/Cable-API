@@ -48,7 +48,11 @@ public static class OcppRoutes
     public record RemoteStopRequest(int TransactionId);
     /// <summary>ChargeLimitKind Jod | Kwh | Soc + ChargeLimitValue: optional "stop at …" for the session this start opens.</summary>
     public record RemoteStartRequest(int ConnectorId, string? ChargeLimitKind = null, decimal? ChargeLimitValue = null);
-    public record StartMySessionRequest(int ChargingPointId, int ChargerId, int ConnectorId, string? ChargeLimitKind = null, decimal? ChargeLimitValue = null);
+    public record StartMySessionRequest(int ChargingPointId, int ChargerId, int ConnectorId, string? ChargeLimitKind = null, decimal? ChargeLimitValue = null)
+    {
+        /// <summary>Optional: the scanned CHG- sticker code / link of this plug (startMethod Sticker).</summary>
+        public string? ConnectorCode { get; init; }
+    }
     public record ShareLiveStatusRequest(bool Share);
     public record AlertThresholdsRequest(int? OfflineMinutes, int? FaultedMinutes, int? LongSessionMinutes, int? ParkedMinutes);
     public record LiveStatusBlockRequest(bool Blocked, string? Reason);
@@ -87,7 +91,8 @@ public static class OcppRoutes
     private static RouteGroupBuilder MapDriverSessionRoutes(this RouteGroupBuilder app)
     {
         app.MapPost("/start", async (IMediator mediator, StartMySessionRequest body, CancellationToken ct) =>
-                Results.Ok(await mediator.Send(new StartMyOcppSessionCommand(body.ChargingPointId, body.ChargerId, body.ConnectorId, body.ChargeLimitKind, body.ChargeLimitValue), ct)))
+                Results.Ok(await mediator.Send(new StartMyOcppSessionCommand(body.ChargingPointId, body.ChargerId, body.ConnectorId, body.ChargeLimitKind, body.ChargeLimitValue)
+                    { ConnectorCode = body.ConnectorCode }, ct)))
             .Produces<OcppSessionStartDto>()
             .RequireAuthorization().ProducesUnAuthorized().ProducesNotFound().ProducesValidationProblem().ProducesInternalServerError()
             .ProducesProblem(StatusCodes.Status409Conflict)
@@ -219,10 +224,11 @@ public static class OcppRoutes
             .Produces<SessionLiveDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesInternalServerError()
             .WithName("Provider: session live").WithSummary("Owner / manager: one session in detail — while it runs: power now, energy so far, battery, cost so far at the current tariff rate, seconds since the last reading; once closed: the final figures and price. Includes the sampled curve (≤ 120 points) for a chart. Poll every 5 s while open.").WithOpenApi();
 
-        app.MapGet("/{chargingPointId:int}/sessions", async (IMediator mediator, [FromRoute] int chargingPointId, [FromQuery] int? chargerId, [FromQuery] DateTime? from, [FromQuery] DateTime? to, [FromQuery] int? page, [FromQuery] int? pageSize, CancellationToken ct) =>
-                Results.Ok(await mediator.Send(new GetMyStationSessionsRequest(chargingPointId, chargerId, from, to, page, pageSize), ct)))
+        app.MapGet("/{chargingPointId:int}/sessions", async (IMediator mediator, [FromRoute] int chargingPointId, [FromQuery] int? chargerId, [FromQuery] DateTime? from, [FromQuery] DateTime? to, [FromQuery] int? page, [FromQuery] int? pageSize,
+                    [FromQuery] int? connectorId, [FromQuery] string? startMethod, [FromQuery] string? status, [FromQuery] string? q, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetMyStationSessionsRequest(chargingPointId, chargerId, from, to, page, pageSize, connectorId, startMethod, status, q), ct)))
             .Produces<PagedResult<OwnerSessionDto>>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesInternalServerError()
-            .WithName("Provider: station sessions").WithSummary("Owner / manager: charging sessions at the station, newest first (chargerId, from, to in UTC; page / pageSize, default 20).").WithOpenApi();
+            .WithName("Provider: station sessions").WithSummary("Owner / manager: charging sessions at the station, newest first (chargerId, connectorId, startMethod App | Sticker | Card | Operator, status open | closed, q = driver / staff name or card label, from, to in UTC; page / pageSize, default 20). Each row: driver { displayName, phoneMasked } for app / sticker starts and linked cards, cardLabel for cards, startedByUserName for staff starts, startMethod, receiptNo.").WithOpenApi();
 
         return app;
     }

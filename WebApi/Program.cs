@@ -322,6 +322,7 @@ app.MapUserRoutes()
     .MapChargerBrandRoutes()
     .MapSubscriptionRoutes()
     .MapOcppRoutes()
+    .MapLiveChargingRoutes()
     .MapPricingRoutes()
     .MapHealthRoutes()
     .MapOcppLiveRoutes();

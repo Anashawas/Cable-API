@@ -29,6 +29,10 @@ public class OcppTransactionConfiguration : IEntityTypeConfiguration<OcppTransac
         builder.Property(e => e.ChargeLimitValue).HasColumnType("decimal(10,3)");
         builder.Property(e => e.ChargeLimitSetAt).HasColumnType("datetime2(0)");
         builder.Property(e => e.ChargeLimitReachedAt).HasColumnType("datetime2(0)");
+        // Sprint 5 live charging (B)
+        builder.Property(e => e.StartMethod).HasMaxLength(10);
+        builder.Property(e => e.ReceiptNo).HasMaxLength(20);
+        builder.Property(e => e.ReceiptIssuedAt).HasColumnType("datetime2(0)");
 
         builder.HasOne(e => e.ChargePoint)
             .WithMany(c => c.Transactions)
@@ -45,6 +49,12 @@ public class OcppTransactionConfiguration : IEntityTypeConfiguration<OcppTransac
         builder.HasIndex(e => new { e.StartedByUserId, e.StartedAt })
             .HasDatabaseName("IX_OcppTransaction_StartedBy_StartedAt")
             .HasFilter("[StartedByUserId] IS NOT NULL");
+
+        // Receipt verification (GET /api/receipts/verify/{receiptNo}).
+        builder.HasIndex(e => e.ReceiptNo)
+            .IsUnique()
+            .HasDatabaseName("UX_OcppTransaction_ReceiptNo")
+            .HasFilter("[ReceiptNo] IS NOT NULL");
 
         // The stale-session job and "current session" lookups.
         builder.HasIndex(e => e.IsOpen)

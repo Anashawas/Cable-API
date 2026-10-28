@@ -84,7 +84,11 @@ public record OcppSessionStartDto(
 
 /// <summary>Driver: start charging on a plug of a charger at a station that shares its live status.</summary>
 /// <param name="ChargeLimitKind">Optional: stop automatically at Jod | Kwh | Soc = ChargeLimitValue.</param>
-public record StartMyOcppSessionCommand(int ChargingPointId, int ChargerId, int ConnectorId, string? ChargeLimitKind = null, decimal? ChargeLimitValue = null) : IRequest<OcppSessionStartDto>;
+public record StartMyOcppSessionCommand(int ChargingPointId, int ChargerId, int ConnectorId, string? ChargeLimitKind = null, decimal? ChargeLimitValue = null) : IRequest<OcppSessionStartDto>
+{
+    /// <summary>Optional §11.d: the plug's CHG- sticker code (or its link) when the start came from a scan; it must be this plug's code. The session is then recorded with startMethod Sticker.</summary>
+    public string? ConnectorCode { get; init; }
+}
 
 public class StartMyOcppSessionCommandValidator : AbstractValidator<StartMyOcppSessionCommand>
 {
@@ -108,6 +112,10 @@ public class StartMyOcppSessionCommandHandler(IApplicationDbContext db, ICurrent
         if (!visibility.VisibleToDrivers)
             throw new DataValidationException("ChargingPointId", "This station does not offer app charging.");
 
+        // A scanned sticker must be this plug's (404 CODE_NOT_FOUND · 410 CODE_REVOKED · 422 CODE_MISMATCH).
+        if (!string.IsNullOrWhiteSpace(request.ConnectorCode))
+            await Application.Ocpp.LiveCharging.ConnectorCodeService.EnsureMatchesAsync(db, request.ConnectorCode, request.ChargerId, request.ConnectorId, cancellationToken);
+
         var target = await OcppRemoteStart.EnsureCanStartAsync(db, request.ChargerId, request.ConnectorId, cancellationToken);
         if (target.ChargePoint.ChargingPointId != request.ChargingPointId)
             throw new NotFoundException("cannot find charger " + request.ChargerId + " at this station");
@@ -122,6 +130,8 @@ public class StartMyOcppSessionCommandHandler(IApplicationDbContext db, ICurrent
 
         var idTag = await EnsureUserTagAsync(db, userId, cancellationToken);
         await OcppRemoteStart.SetPendingLimitAsync(db, target.ChargePoint.Id, request.ConnectorId, request.ChargeLimitKind, request.ChargeLimitValue, userId, cancellationToken);
+        await Application.Ocpp.LiveCharging.StartMethodParking.ParkAsync(db, target.ChargePoint.Id, request.ConnectorId,
+            string.IsNullOrWhiteSpace(request.ConnectorCode) ? null : OcppStartMethod.Sticker, cancellationToken);
         var result = await OcppCommandRunner.RunAsync(db, currentUser, client, target.ChargePoint.Id, "RemoteStartTransaction",
             OcppRemoteStart.Payload(request.ConnectorId, idTag), cancellationToken, skipAccessGuard: true);
 

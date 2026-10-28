@@ -24,8 +24,8 @@ public static class UserComplaintsRoutes
     private static RouteGroupBuilder MapRoutes(this RouteGroupBuilder app)
     {
         app.MapGet("/GetAllUserComplaints",
-                async (IMediator mediator, CancellationToken cancellationToken) =>
-                    Results.Ok(await mediator.Send(new GetAllUserComplaintsRequest(), cancellationToken)))
+                async (IMediator mediator, [FromQuery] string? kind, CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new GetAllUserComplaintsRequest(kind), cancellationToken)))
             .Produces<List<GetUserComplaintsDto>>()
             .ProducesInternalServerError()
             .WithSummary("Get all user complaints")
@@ -103,7 +103,7 @@ public static class UserComplaintsRoutes
                         [FromBody] UpdateUserComplaintStatusRequest request,
                         CancellationToken cancellationToken) =>
                 {
-                    await mediator.Send(new UpdateUserComplaintStatusCommand(id, request.Status), cancellationToken);
+                    await mediator.Send(new UpdateUserComplaintStatusCommand(id, request.Status, request.Reply), cancellationToken);
                     return Results.Ok();
                 })
             .Produces(200)

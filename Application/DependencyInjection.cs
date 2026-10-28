@@ -24,6 +24,9 @@ public static class DependencyInjection
         // Shared by RecordPayment and the legacy premium endpoint.
         services.AddScoped<Subscriptions.PaymentRecorder>();
 
+        // Sprint 5 live charging (B): pushes run by Hangfire (plug reports, session issues).
+        services.AddScoped<Ocpp.LiveCharging.LiveChargingNotifications>();
+
         return services;
     }
 }

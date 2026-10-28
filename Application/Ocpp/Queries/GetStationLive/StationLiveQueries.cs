@@ -80,8 +80,11 @@ public static class LiveUnavailableReason
 /// <param name="OpenSessionId">Owner / admin only: the running session on this plug (for Stop); null for drivers.</param>
 /// <param name="CanStartFromApp">True when a driver can start this plug from the app now (car connected, nothing running).</param>
 /// <param name="CannotStartReason">Why not, when false: offline | plugCable | busy | outOfOrder (<see cref="PlugStartability"/>).</param>
+/// <param name="SuspectedIssue">§13.3: drivers reported this plug 3 times within an hour and nobody resolved it / no session succeeded since — a warning, the plug stays startable.</param>
+/// <param name="OpenReports">§13.3: unresolved "plug didn't work" reports on this plug.</param>
 public record PlugLiveDto(int ConnectorId, string State, int? PlugTypeId, string? PlugTypeName, string? PlugTypeFamily, decimal? PowerKw,
-    string? OcppStatus = null, int? OpenSessionId = null, bool CanStartFromApp = false, string? CannotStartReason = null);
+    string? OcppStatus = null, int? OpenSessionId = null, bool CanStartFromApp = false, string? CannotStartReason = null,
+    bool SuspectedIssue = false, int OpenReports = 0);
 
 /// <summary>One cabinet. DisplayName is what the owner named it; null = the app shows its own default ("Charger {Ordinal}"). The OCPP id is never exposed to drivers.</summary>
 public record ChargerLiveDto(int Id, int Ordinal, string? DisplayName, bool Online, DateTime? UpdatedAt, List<PlugLiveDto> Plugs);
@@ -151,6 +154,7 @@ internal static class StationLiveBuilder
         if (chargers.Count == 0)
             return new StationLiveDto(chargingPointId, false, LiveUnavailableReason.NoChargers, null, [], []);
 
+        var reports = await Application.Ocpp.LiveCharging.ConnectorReportStats.LoadAsync(db, chargers.Select(c => c.Id).ToList(), now, ct);
         var chargerDtos = new List<ChargerLiveDto>();
         var ordinal = 0;
         foreach (var c in chargers)
@@ -160,8 +164,10 @@ internal static class StationLiveBuilder
             var plugs = c.Plugs.Select(p =>
             {
                 var blocked = PlugStartability.BlockedReason(p.Status, p.ErrorCode, online, p.OpenSessionId != null);
+                var report = reports.GetValueOrDefault((c.Id, p.ConnectorId));
                 return new PlugLiveDto(p.ConnectorId, PlugLiveState.Of(p.Status, online), p.PlugTypeId, p.PlugTypeName, p.PlugTypeFamily, p.PowerKw,
-                    online ? p.Status : null, enforceGates ? null : p.OpenSessionId, blocked is null, blocked);
+                    online ? p.Status : null, enforceGates ? null : p.OpenSessionId, blocked is null, blocked,
+                    report?.SuspectedIssue ?? false, report?.OpenReports ?? 0);
             }).ToList();
             chargerDtos.Add(new ChargerLiveDto(c.Id, ordinal, string.IsNullOrWhiteSpace(c.DisplayName) ? null : c.DisplayName, online, c.LastMessageAt, plugs));
         }
