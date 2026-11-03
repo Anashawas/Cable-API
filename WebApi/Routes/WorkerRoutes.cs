@@ -1,4 +1,6 @@
+using Application.Workers;
 using Application.Workers.Commands.ResetWorkerTempPassword;
+using Application.Workers.Commands.WorkerAssignment;
 using Application.Workers.WorkerAuth;
 using Application.Workers.Commands.CreateWorker;
 using Application.Workers.Commands.DeleteWorker;
@@ -16,6 +18,7 @@ public static class WorkerRoutes
 {
     public record WorkerPrivilegesRequest(List<string> Privileges);
     public record WorkerTempPasswordRequest(string? TempPassword);
+    public record WorkerPhoneRequest(string Phone);
 
     public static IEndpointRouteBuilder MapWorkerRoutes(this IEndpointRouteBuilder app)
     {
@@ -24,7 +27,7 @@ public static class WorkerRoutes
             .MapRoutes()
             .MapCredentialRoutes();
 
-        // Admin support (WORKER_TRACKER §6.4): the same two actions for Cable's team.
+        // Admin support (WORKER_TRACKER §6.4): read-only list plus the support actions for Cable's team.
         app.MapGroup("/api/admin/workers")
             .WithTags("Workers (admin)")
             .MapCredentialRoutes(" (admin)");
@@ -34,6 +37,42 @@ public static class WorkerRoutes
 
     private static RouteGroupBuilder MapCredentialRoutes(this RouteGroupBuilder app, string nameSuffix = "")
     {
+        if (nameSuffix.Length > 0)
+        {
+            app.MapGet("/", async (
+                    IMediator mediator,
+                    [FromQuery] string providerType,
+                    [FromQuery] int providerId,
+                    CancellationToken cancellationToken) =>
+                    Results.Ok(await mediator.Send(new GetWorkersByProviderRequest(providerType, providerId), cancellationToken)))
+                .Produces<List<WorkerDto>>()
+                .RequireAuthorization()
+                .ProducesUnAuthorized()
+                .ProducesForbidden()
+                .ProducesInternalServerError()
+                .WithName("List Workers" + nameSuffix)
+                .WithSummary("Admin: the workers of a provider with login state, status and effective privileges (read-only).")
+                .WithOpenApi();
+        }
+
+        app.MapPatch("/{providerManagerId:int}/phone", async (
+                IMediator mediator,
+                [FromRoute] int providerManagerId,
+                WorkerPhoneRequest body,
+                CancellationToken cancellationToken) =>
+                Results.Ok(await mediator.Send(new ChangeWorkerPhoneCommand(providerManagerId, body.Phone), cancellationToken)))
+            .Produces<WorkerDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesInternalServerError()
+            .WithName("Change Worker Phone" + nameSuffix)
+            .WithSummary("Owner or admin: change the worker's phone. 409 PHONE_IN_USE when another account has it. Ends the worker's partner sessions; the next login (on the new phone) needs an OTP, which verifies it.")
+            .WithOpenApi();
+
         app.MapPost("/{providerManagerId:int}/reset-temp-password", async (
                 IMediator mediator,
                 [FromRoute] int providerManagerId,
@@ -74,27 +113,74 @@ public static class WorkerRoutes
 
     private static RouteGroupBuilder MapRoutes(this RouteGroupBuilder app)
     {
-        // Get the worker assigned to a provider (owner / provider app).
+        // The workers of a provider (owner; admins too).
         app.MapGet("/", async (
                 IMediator mediator,
                 [FromQuery] string providerType,
                 [FromQuery] int    providerId,
                 CancellationToken  cancellationToken) =>
                 Results.Ok(await mediator.Send(
-                    new GetWorkerByProviderRequest(providerType, providerId),
+                    new GetWorkersByProviderRequest(providerType, providerId),
                     cancellationToken)))
-            .Produces<WorkerDto>()
+            .Produces<List<WorkerDto>>()
             .RequireAuthorization()
             .ProducesUnAuthorized()
+            .ProducesForbidden()
             .ProducesInternalServerError()
-            .WithName("Get Worker By Provider")
-            .WithSummary("Get the worker assigned to a ServiceProvider or ChargingPoint")
+            .WithName("List Workers")
+            .WithSummary("Owner: the workers of a ServiceProvider or ChargingPoint — a LIST now ([] when none), oldest first. Each row: privileges (granted), effectivePrivileges (granted ∩ plan), status active | suspended | suspendedByPlan, loginStatus pendingFirstLogin | active | locked, keepOnFree.")
             .WithOpenApi(op =>
             {
                 op.Parameters[0].Description = "ProviderType: 'ServiceProvider' or 'ChargingPoint'";
                 op.Parameters[1].Description = "Id of the ServiceProvider or ChargingPoint";
                 return op;
             });
+
+        // The worker's own station and effective privileges (polled by the partner app).
+        app.MapGet("/me", async (IMediator mediator, CancellationToken cancellationToken) =>
+                Results.Ok(await mediator.Send(new GetMyWorkerAssignmentRequest(), cancellationToken)))
+            .Produces<WorkerSelfDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesNotFound()
+            .ProducesInternalServerError()
+            .WithName("My Worker Assignment")
+            .WithSummary("Worker: my station, status (active | suspended | suspendedByPlan) and the privileges I can actually use (granted ∩ the station's plan) plus the granted ones the plan locks. 404 NOT_A_WORKER for anyone else. Poll it every minute as the app does today.")
+            .WithOpenApi();
+
+        // The wizard's step 1.
+        app.MapGet("/check-phone", async (
+                IMediator mediator,
+                [FromQuery] string providerType,
+                [FromQuery] int providerId,
+                [FromQuery] string phone,
+                CancellationToken cancellationToken) =>
+                Results.Ok(await mediator.Send(new CheckWorkerPhoneRequest(providerType, providerId, phone), cancellationToken)))
+            .Produces<WorkerPhoneCheckDto>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesInternalServerError()
+            .WithName("Check Worker Phone")
+            .WithSummary("Owner: can this phone be added here? { canAdd, reason, message } — reason WORKER_LIMIT_REACHED | PHONE_ALREADY_A_WORKER | OWNER_CANNOT_BE_WORKER | ACCOUNT_NOT_ELIGIBLE | INVALID_PHONE. Says nothing about whether the phone has a Cable account.")
+            .WithOpenApi();
+
+        // Decision 38: who stays when the plan drops to one worker.
+        app.MapPut("/{providerManagerId:int}/keep-on-free", async (
+                IMediator mediator,
+                [FromRoute] int providerManagerId,
+                CancellationToken cancellationToken) =>
+                Results.Ok(await mediator.Send(new SetKeepOnFreeCommand(providerManagerId), cancellationToken)))
+            .Produces<List<WorkerDto>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesProblem(StatusCodes.Status409Conflict)
+            .ProducesInternalServerError()
+            .WithName("Keep Worker On Free")
+            .WithSummary("Owner: this worker is the one who stays active when the station's plan allows only one (default: the oldest active). Applies at once and returns the list.")
+            .WithOpenApi();
 
         // Owner creates + assigns a worker account.
         app.MapPost("/", async (
@@ -136,7 +222,7 @@ public static class WorkerRoutes
             .ProducesNotFound()
             .ProducesInternalServerError()
             .WithName("Set Worker Active")
-            .WithSummary("Owner: activate or deactivate the worker (also toggles login)")
+            .WithSummary("Owner: suspend or resume the worker's assignment. Suspending ends their partner-app sessions at once (next request → 401); the account itself — and the Cable app, if they are a driver — is untouched.")
             .WithOpenApi(op =>
             {
                 op.Parameters[0].Description = "The ProviderManager (worker assignment) Id";
@@ -159,13 +245,23 @@ public static class WorkerRoutes
             .ProducesValidationProblem()
             .ProducesInternalServerError()
             .WithName("Set Worker Privileges")
-            .WithSummary("Owner: what the worker may see and do in the partner app. Keys: " + string.Join(", ", WorkerPrivileges.All) + ". Empty list = station details only; all keys = everything (including privileges added later).")
+            .WithSummary("Owner: what the worker may see and do in the partner app. Keys: " + string.Join(", ", WorkerPrivileges.All) + ". Empty list = station details only. Always stored explicitly (a key added later is never on by itself). The answer's effectivePrivileges = granted ∩ the station's plan.")
             .WithOpenApi();
 
-        app.MapGet("/privileges", () => Results.Ok(WorkerPrivileges.All))
-            .Produces<string[]>()
+        app.MapGet("/privileges", async (
+                IMediator mediator,
+                [FromQuery] string? providerType,
+                [FromQuery] int? providerId,
+                CancellationToken cancellationToken) =>
+                providerType is not null && providerId is int id
+                    ? Results.Ok<object>(await mediator.Send(new GetWorkerPrivilegeCatalogRequest(providerType, id), cancellationToken))
+                    : Results.Ok<object>(WorkerPrivileges.All))
+            .Produces<List<WorkerPrivilegeOption>>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
             .WithName("List Worker Privileges")
-            .WithSummary("The privilege keys an owner can grant a worker.")
+            .WithSummary("With providerType + providerId (owner or admin): every key with locked and reason (needsPremium | needsConnect | needsLoyalty) for this station's plan — the owner's switches. Without them: the plain key list.")
             .WithOpenApi();
 
         // Owner deletes the worker (frees the provider for a new one).
@@ -184,7 +280,7 @@ public static class WorkerRoutes
             .ProducesNotFound()
             .ProducesInternalServerError()
             .WithName("Delete Worker")
-            .WithSummary("Owner: remove the worker and deactivate its account");
+            .WithSummary("Owner: remove the worker — the assignment and partner credential are removed and their partner sessions end. A driver's account is untouched; a wizard-created account is deactivated and comes back if the phone is added again.");
 
         return app;
     }

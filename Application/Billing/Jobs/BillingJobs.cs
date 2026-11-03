@@ -114,6 +114,8 @@ public sealed class BillingJobs(
         count += await SendActivationsAsync(cancellationToken);
         count += await SendBundleThresholdsAsync(cancellationToken);
         count += await CheckUnlimitedPlansAsync(cancellationToken);
+        // Worker tracker decision 38: a plan that stopped allowing several workers keeps one; renewal brings the rest back.
+        count += await Application.Workers.WorkerPlanSync.ApplyAllAsync(db, logger, cancellationToken);
         logger.LogInformation("Billing watch: {Count} event(s)", count);
         return count;
     }

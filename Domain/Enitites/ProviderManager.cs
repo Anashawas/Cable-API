@@ -9,9 +9,10 @@ namespace Domain.Enitites;
 /// <see cref="ProviderId"/> — mirrors the existing ProviderOffer pattern.
 ///
 /// Rules:
-///  - At most ONE active worker per provider (enforced by a filtered unique index).
+///  - Several workers per provider; the station's plan sets the limit (1 on free, unlimited with the
+///    "workers" feature). One station per worker (one row per user).
 ///  - The owner stays in CP/SP.OwnerId and is never a ProviderManager row.
-///  - All workers have identical access (no access levels).
+///  - A worker is usable when IsActive (the owner's switch) and SuspendedByPlanAt is null (the plan's).
 /// </summary>
 public class ProviderManager : BaseAuditableEntity
 {
@@ -27,8 +28,17 @@ public class ProviderManager : BaseAuditableEntity
     /// <summary>Owner can pause/resume the worker without removing the record.</summary>
     public bool   IsActive     { get; set; } = true;
 
-    /// <summary>Comma-separated WorkerPrivileges keys the owner granted; null = everything, "" = station details only.</summary>
+    /// <summary>Comma-separated WorkerPrivileges keys the owner granted (always explicit); null = the legacy set, "" = station details only.</summary>
     public string? Privileges  { get; set; }
+
+    /// <summary>
+    /// UTC. Set by the plan sync when the station's plan allows fewer workers than are active (decision 38):
+    /// the worker cannot sign in until the plan allows them again. Distinct from the owner's IsActive.
+    /// </summary>
+    public DateTime? SuspendedByPlanAt { get; set; }
+
+    /// <summary>The owner's choice of which worker stays when the plan drops to one (default: the oldest active).</summary>
+    public bool KeepOnFree { get; set; }
 
     public virtual UserAccount User { get; set; } = null!;
 }

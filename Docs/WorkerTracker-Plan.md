@@ -20,7 +20,7 @@ Branch: `worker-tracker` (off `sprint5`). Dev only until the whole feature is te
 | D7 | §3.2.3 step 4 — the app shows the forced password-change screen | **Also enforced on the server:** a partner-app token of a worker who still holds the temporary password gets `403 PASSWORD_CHANGE_REQUIRED` on everything except change-password, refresh, logout and `/api/workers/me`. |
 | D8 | §2 — privileges stored as `null` meant "everything, including keys added later" | **Always the explicit list.** New privileges (Attendance, BiometricLogin, …) are never switched on by themselves. Existing workers keep what they have today. |
 | D9 | Roles | **Nothing changes the role.** Owners stay `Provider`, wizard-created workers are `Worker`, a driver who becomes a worker stays `User`. The partner app decides access from ownership and `ProviderManager` rows, never from `RoleId`; the Cable app ignores roles. |
-| D10 | §3.3 — suspend / delete a worker ends their sessions | Unchanged in step 1 (still account-level). Step 2 makes it assignment-level so a driver-worker keeps the Cable app. |
+| D10 | §3.3 — suspend / delete a worker ends their sessions | **Per assignment** (step 2): sessions end at once, the account — and the Cable app for a driver-worker — is untouched. |
 
 Defaults kept from the document (all are `AppSetting` rows, optional): temp password **72 h** (`Workers.TempPasswordHours`), **5** wrong passwords → **15 min** lock (`Workers.MaxFailedLogins`, `Workers.LockMinutes`), trusted device **90 days** (`Workers.TrustedDeviceDays`), OTP rate limit = the existing OTP service's.
 
@@ -139,15 +139,77 @@ Test data removed afterwards.
 
 ---
 
-## 2. Next steps (in order)
+## 2. Step 2 — several workers per station (done, on the branch)
+
+SQL: `Scripts/WorkerTracker_2_Workers.sql` (idempotent). Applied to dev 2026-11-03: the one-worker index is gone,
+`ProviderManager.SuspendedByPlanAt` / `KeepOnFree` added, existing workers' privileges written out explicitly, the free
+plan has `complaints`.
+
+### 2.1 Rules
+
+- **Limit from the plan:** 1 worker when the station's plan has no `workers` feature (free), unlimited with it
+  (premium and above). Same feature calculation as `GET /api/provider/subscription`.
+- **Effective privileges = granted ∩ allowed by the plan** (mapping confirmed 2026-11-03):
+
+  | Privilege | Needs | Lock reason |
+  |---|---|---|
+  | `ManageStation`, `ViewFeedback` | nothing | — |
+  | `PointOfSale` | an active loyalty agreement or a usable scan bundle | `needsLoyalty` |
+  | `ViewWallet`, `ManageOffers`, `SendAnnouncements`, `ViewStatistics`, `Attendance`, `ViewAttendance`, `ApproveLeave`, `ManageAttendance` | `workers` | `needsPremium` |
+  | `ConnectView`, `ConnectControl` | `connect` | `needsConnect` |
+  | `BiometricLogin` | `biometrics` | `needsPremium` |
+
+  Enforced in the API (`ProviderAccessGuard`): a granted-but-locked privilege answers 403 "not in the station's plan".
+  That is the whole backend of biometric login (§3.4) — the app shows the option when `BiometricLogin` is effective.
+- **Privileges are always stored as the explicit list.** A new key is never on by itself. Keys: the 9 existing +
+  `Attendance`, `BiometricLogin`, `ViewAttendance`, `ApproveLeave`, `ManageAttendance`.
+- **Suspend / delete are per assignment** (D10 closed): suspending ends the worker's partner sessions at once (the
+  next request answers 401, `worker-login` answers `403 WORKER_INACTIVE`); the account — and the Cable app for a
+  driver — is untouched. Delete removes the assignment and the partner credential; a wizard-created account is
+  deactivated and comes back if the phone is added again (`existingAccount: true`).
+- **Plan drops to one worker (decision 38):** `WorkerPlanSync` (run by the `billing-watch` job every 10 min and after
+  every owner action on workers) keeps the `KeepOnFree` worker — else the oldest active — and sets `SuspendedByPlanAt`
+  on the rest (sessions ended, `worker-login` → `403 WORKER_INACTIVE`). When the plan allows them again they come
+  back by themselves. Owner suspensions are never touched. Records are kept.
+
+### 2.2 Endpoints
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| GET | `/api/workers?providerType=&providerId=` | owner, admin | **A list now** (`[]` when none), oldest first. Each row: the step-1 fields + `status` (`active` \| `suspended` \| `suspendedByPlan`), `privileges` (granted), `effectivePrivileges`, `suspendedByPlanAt`, `keepOnFree` |
+| GET | `/api/workers/me` | worker | `{ providerManagerId, providerType, providerId, providerName, status, privileges (effective), lockedPrivileges, mustChangePassword }`; `404 NOT_A_WORKER` otherwise. The app's one-minute poll |
+| GET | `/api/workers/privileges?providerType=&providerId=` | owner, admin | `[{ key, locked, reason }]` — the owner's switches. Without the query: the plain key list |
+| GET | `/api/workers/check-phone?providerType=&providerId=&phone=` | owner | `{ canAdd, reason, message }`; reasons `WORKER_LIMIT_REACHED` \| `PHONE_ALREADY_A_WORKER` \| `OWNER_CANNOT_BE_WORKER` \| `ACCOUNT_NOT_ELIGIBLE` \| `INVALID_PHONE`. Never says whether the phone has a Cable account |
+| POST | `/api/workers` | owner | as step 1; the limit is plan-based; the answer adds `lockedPrivileges` |
+| PUT | `/api/workers/{id}/privileges` | owner | answer carries `effectivePrivileges` |
+| PATCH | `/api/workers/{id}/active?isActive=` | owner | per assignment (above) |
+| DELETE | `/api/workers/{id}` | owner | per assignment (above) |
+| PUT | `/api/workers/{id}/keep-on-free` | owner | who stays on a one-worker plan; applies at once; returns the list. `409 WORKER_INACTIVE` on a suspended worker |
+| PATCH | `/api/workers/{id}/phone` `{ phone }` | owner, admin (`/api/admin/workers/{id}/phone`) | `409 PHONE_IN_USE`; ends sessions; the next login's OTP goes to the new phone |
+| GET | `/api/admin/workers?providerType=&providerId=` | admin | read-only list, same shape |
+
+`GET /api/provider/my-assets` → `access[].privileges` is now the effective list, and plan-suspended assignments are
+left out.
+
+### 2.3 Tested on dev (2026-11-03)
+
+38 checks: list shape · catalog with lock reasons · check-phone cases · 2nd and 3rd worker on a `connect` station ·
+worker `me` and `my-assets` with effective privileges · a worker cannot list workers · suspend → next request 401 and
+`worker-login` 403 `WORKER_INACTIVE`, account untouched · resume · change phone (409 in use; sessions end; login on
+the new phone) · delete and re-add (same account back) · plan switched off: `keep-on-free` keeps one, the others
+`suspendedByPlan` and cannot log in, adding refused · free station: effective = ManageStation + ViewFeedback, catalog
+reasons, 2nd worker 409, a Connect endpoint 403 for the worker · plan back on: everyone active again.
+Test data removed afterwards.
+
+---
+
+## 3. Next steps (in order)
 
 | Step | Scope | Status |
 |---|---|---|
-| 2 | Several workers per station (plan limit: 1 on free, unlimited with `workers`), assignment-level suspend / delete, worker `GET /api/workers/me`, effective privileges (granted ∩ plan), new privilege keys, plan-expiry rule | next |
 | 3 | Shifts (weekly schedule, cross-midnight, grace, earliest punch), public holidays (admin), punch zones, punch in / out with server verdict, who-is-in | |
 | 4 | Attendance days, manual entry, corrections with history, rejected attempts, CSV export, the 5-minute attendance job (auto-close, absent, reminders, grouped owner pushes), daily summary, 90-day coordinate scrub | |
 | 5 | Leave: balances computed from approved leaves, requests, approvals, sick attachment (owner-only, 1-year delete), retroactive sick | |
-| — | Biometric login: only the `BiometricLogin` key + plan gating (mobile does the rest) | with step 2 |
 
 Open before launch (not code): labour-law and data-protection review of the defaults; `cable-app.com/partner/login`
 must exist on production; iOS location-permission text (mobile).

@@ -61,20 +61,30 @@ public static class ProviderAccessGuard
         if (ownerId == callerUserId)
             return;
 
+        // A usable worker: the owner's switch on and not suspended by the plan (decision 38).
         var worker = await db.ProviderManagers
             .AsNoTracking()
             .Where(x => x.ProviderType == providerType
                         && x.ProviderId == providerId
                         && x.UserId == callerUserId
                         && x.IsActive
+                        && x.SuspendedByPlanAt == null
                         && !x.IsDeleted)
             .Select(x => new { x.Privileges })
             .FirstOrDefaultAsync(cancellationToken);
 
         if (worker is not null)
         {
-            if (requiredPrivilege is null || Cable.Core.Constants.WorkerPrivileges.Has(worker.Privileges, requiredPrivilege))
+            if (requiredPrivilege is null)
                 return;
+            // Granted by the owner AND allowed by the station's plan (granted ∩ plan).
+            if (Cable.Core.Constants.WorkerPrivileges.Has(worker.Privileges, requiredPrivilege))
+            {
+                var context = await Application.Workers.WorkerAccess.ContextAsync(db, providerType, providerId, cancellationToken);
+                if (context.LockReason(requiredPrivilege) is null)
+                    return;
+                throw new ForbiddenAccessException("This feature is not in the station's plan.");
+            }
             throw new ForbiddenAccessException("Your account does not have this permission. Ask the station owner.");
         }
 

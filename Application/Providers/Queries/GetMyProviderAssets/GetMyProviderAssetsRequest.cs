@@ -114,24 +114,29 @@ public class GetMyProviderAssetsRequestHandler(
         )).ToList();
 
         // What the caller may do on each asset: owners everything, workers what the owner granted.
+        // Workers: usable assignments only (owner's switch on, not suspended by the plan), with granted ∩ plan.
         var workerRows = await applicationDbContext.ProviderManagers.AsNoTracking()
-            .Where(pm => pm.UserId == userId && pm.IsActive && !pm.IsDeleted)
+            .Where(pm => pm.UserId == userId && pm.IsActive && pm.SuspendedByPlanAt == null && !pm.IsDeleted)
             .Select(pm => new { pm.ProviderType, pm.ProviderId, pm.Privileges })
             .ToListAsync(cancellationToken);
         var ownedCps = await applicationDbContext.ChargingPoints.AsNoTracking()
             .Where(c => c.OwnerId == userId && !c.IsDeleted).Select(c => c.Id).ToListAsync(cancellationToken);
         var access = new List<ProviderAccessDto>();
+        async Task<IReadOnlyList<string>> EffectiveAsync(string providerType, int providerId, string? stored) =>
+            (await Application.Workers.WorkerAccess.ContextAsync(applicationDbContext, providerType, providerId, cancellationToken)).Effective(stored);
         foreach (var cp in chargingPoints)
         {
             var w = workerRows.FirstOrDefault(r => r.ProviderType == "ChargingPoint" && r.ProviderId == cp.Id);
             var owner = ownedCps.Contains(cp.Id);
-            access.Add(new ProviderAccessDto("ChargingPoint", cp.Id, owner, owner || w is null ? Cable.Core.Constants.WorkerPrivileges.All : Cable.Core.Constants.WorkerPrivileges.Parse(w.Privileges)));
+            access.Add(new ProviderAccessDto("ChargingPoint", cp.Id, owner,
+                owner || w is null ? Cable.Core.Constants.WorkerPrivileges.All : await EffectiveAsync("ChargingPoint", cp.Id, w.Privileges)));
         }
         foreach (var sp in serviceProviders)
         {
             var w = workerRows.FirstOrDefault(r => r.ProviderType == "ServiceProvider" && r.ProviderId == sp.Id);
             var owner = sp.OwnerId == userId;
-            access.Add(new ProviderAccessDto("ServiceProvider", sp.Id, owner, owner || w is null ? Cable.Core.Constants.WorkerPrivileges.All : Cable.Core.Constants.WorkerPrivileges.Parse(w.Privileges)));
+            access.Add(new ProviderAccessDto("ServiceProvider", sp.Id, owner,
+                owner || w is null ? Cable.Core.Constants.WorkerPrivileges.All : await EffectiveAsync("ServiceProvider", sp.Id, w.Privileges)));
         }
 
         var loyaltyBundles = await Application.Billing.LoyaltyBundleService.GetForProvidersAsync(applicationDbContext,

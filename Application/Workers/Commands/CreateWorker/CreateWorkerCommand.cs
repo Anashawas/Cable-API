@@ -1,11 +1,11 @@
-using Cable.Core;
-using Cable.Security.Encryption.Interfaces;
-using Microsoft.EntityFrameworkCore;
-using Application.Common.Security;
+using Application.Common.Interfaces;
 using Application.Workers.WorkerAuth;
+using Cable.Core;
 using Cable.Core.Constants;
 using Cable.Core.Exceptions;
 using Cable.Core.Utilities;
+using Cable.Security.Encryption.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace Application.Workers.Commands.CreateWorker;
 
@@ -13,7 +13,7 @@ namespace Application.Workers.Commands.CreateWorker;
 /// Owner adds a worker (WORKER_TRACKER §3.2.1, one request for the whole wizard). The worker logs in to the partner
 /// app by phone with a temporary password the owner shares (§3.2.2); the server keeps only its hash.
 /// One UserAccount per phone: a driver who becomes a worker keeps their account, cars, points and driver password —
-/// only a partner credential and the assignment are added.
+/// only a partner credential and the assignment are added. The station's plan sets the worker limit.
 /// </summary>
 public record CreateWorkerCommand(
     string ProviderType,
@@ -34,7 +34,9 @@ public record CreateWorkerResult(
     DateTime TempPasswordExpiresAt,
     string ShareMessage,
     /// <summary>True when the phone already had a Cable account (a driver): nothing of theirs was changed.</summary>
-    bool ExistingAccount);
+    bool ExistingAccount,
+    /// <summary>Granted keys the station's plan does not allow right now (shown locked to the owner).</summary>
+    IReadOnlyList<string> LockedPrivileges);
 
 public class CreateWorkerCommandHandler(
     IApplicationDbContext db,
@@ -42,11 +44,6 @@ public class CreateWorkerCommandHandler(
     IPasswordHasher passwordHasher)
     : IRequestHandler<CreateWorkerCommand, CreateWorkerResult>
 {
-    public const string WorkerLimitReached = "WORKER_LIMIT_REACHED";
-    public const string PhoneAlreadyAWorker = "PHONE_ALREADY_A_WORKER";
-    public const string OwnerCannotBeWorker = "OWNER_CANNOT_BE_WORKER";
-    public const string AccountNotEligible = "ACCOUNT_NOT_ELIGIBLE";
-
     public async Task<CreateWorkerResult> Handle(CreateWorkerCommand request, CancellationToken cancellationToken)
     {
         var callerId = currentUserService.UserId
@@ -55,53 +52,29 @@ public class CreateWorkerCommandHandler(
         // Only the provider owner may add its worker.
         await WorkerOwnershipHelper.EnsureCallerOwnsProviderAsync(db, request.ProviderType, request.ProviderId, callerId, cancellationToken);
 
-        // One worker per provider (the plan-based limit comes with the multi-worker step).
-        var alreadyHasWorker = await db.ProviderManagers
-            .AnyAsync(pm => pm.ProviderType == request.ProviderType && pm.ProviderId == request.ProviderId && !pm.IsDeleted, cancellationToken);
-        if (alreadyHasWorker)
-            throw new ConflictException(WorkerLimitReached,
-                Lang.Pick("هاي المحطة عندها موظف — احذفه قبل ما تضيف غيره", "This provider already has a worker. Remove the current one before adding a new one."));
-
-        var normalizedPhone = WorkerPhones.Normalize(request.Phone)
-                              ?? throw new DataValidationException("Phone", Lang.Pick("رقم الموبايل غير صحيح", "Invalid phone number format."));
+        var context = await WorkerAccess.ContextAsync(db, request.ProviderType, request.ProviderId, cancellationToken);
+        if (await WorkerEligibility.LimitReasonAsync(db, request.ProviderType, request.ProviderId, cancellationToken, context) is { } limit)
+            throw new ConflictException(limit.Code, limit.Message);
 
         var privileges = request.Privileges ?? [];
         var unknown = privileges.Where(p => !WorkerPrivileges.IsKnown(p)).ToList();
         if (unknown.Count > 0)
             throw new DataValidationException("Privileges", Lang.Pick("صلاحيات غير معروفة: ", "Unknown privileges: ") + string.Join(", ", unknown));
 
-        var settings = await WorkerAuthSettings.ReadAsync(db, cancellationToken);
-
-        // The phone's account, if any. One account per phone — never a second one.
-        var worker = await db.UserAccounts.FirstOrDefaultAsync(u => u.Phone == normalizedPhone && !u.IsDeleted, cancellationToken);
+        var (phoneReason, worker) = await WorkerEligibility.PhoneReasonAndAccountAsync(db, request.Phone, cancellationToken);
+        if (phoneReason is { } reason)
+        {
+            if (reason.Code == WorkerEligibility.InvalidPhone) throw new DataValidationException("Phone", reason.Message);
+            throw new ConflictException(reason.Code, reason.Message);
+        }
+        var normalizedPhone = WorkerPhones.Normalize(request.Phone)!;
         var existingAccount = worker is not null;
+
+        var settings = await WorkerAuthSettings.ReadAsync(db, cancellationToken);
 
         if (worker is not null)
         {
-            if (worker.RoleId == AdminRoleGuard.AdminRoleId)
-                throw new ConflictException(AccountNotEligible, Lang.Pick("هذا الرقم ما بينفع يكون موظف", "This phone number cannot be added as a worker."));
-
-            var isOwner = await db.ChargingPoints.AnyAsync(c => c.OwnerId == worker.Id && !c.IsDeleted, cancellationToken)
-                          || await db.ServiceProviders.AnyAsync(s => s.OwnerId == worker.Id && !s.IsDeleted, cancellationToken);
-            if (isOwner)
-                throw new ConflictException(OwnerCannotBeWorker,
-                    Lang.Pick("هذا الرقم صاحب محطة أو مزوّد خدمة على كيبل، وما بيقدر يكون موظف", "This phone number belongs to a station or provider owner on Cable and cannot be a worker."));
-
-            // One station per worker (decision: no multi-station in v1).
-            var isWorkerElsewhere = await db.ProviderManagers.AnyAsync(pm => pm.UserId == worker.Id && !pm.IsDeleted, cancellationToken);
-            if (isWorkerElsewhere)
-                throw new ConflictException(PhoneAlreadyAWorker,
-                    Lang.Pick("هذا الرقم موظف عند شريك ثاني — تواصل مع دعم كيبل", "This phone number is already a worker at another partner — contact Cable support."));
-
-            if (!worker.IsActive)
-            {
-                // A worker account we created earlier and then removed comes back; a driver the admin deactivated does not.
-                var workerRoleId = await WorkerRoleIdAsync(cancellationToken);
-                if (worker.RoleId != workerRoleId)
-                    throw new ConflictException(AccountNotEligible, Lang.Pick("هذا الحساب موقوف — تواصل مع دعم كيبل", "This account is deactivated — contact Cable support."));
-                worker.IsActive = true;
-            }
-
+            worker.IsActive = true;   // a removed wizard-created worker comes back (eligibility refused other inactive accounts)
             if (string.IsNullOrWhiteSpace(worker.Name)) worker.Name = request.Name.Trim();
         }
         else
@@ -139,17 +112,20 @@ public class CreateWorkerCommandHandler(
             UserId       = worker.Id,
             IsActive     = true,
             // Always the explicit list: a key added later is never switched on by itself (§2, decision 16b).
-            Privileges   = string.Join(",", WorkerPrivileges.All.Where(privileges.Contains))
+            Privileges   = WorkerPrivileges.Format(privileges)
         };
         db.ProviderManagers.Add(providerManager);
         await db.SaveChanges(cancellationToken);
 
+        var effective = context.Effective(providerManager.Privileges);
+        var locked = WorkerPrivileges.Parse(providerManager.Privileges).Where(k => !effective.Contains(k, StringComparer.Ordinal)).ToList();
+
         var (ownerName, providerName) = await WorkerCredentials.NamesAsync(db, request.ProviderType, request.ProviderId, cancellationToken);
         var message = WorkerShareMessage.Build(Lang.IsArabic ? "ar" : "en", worker.Name ?? request.Name, ownerName, providerName,
             WorkerPhones.ToLocal(normalizedPhone), tempPassword, expiresAt, settings.TempPasswordHours, settings.PartnerLoginUrl,
-            hasBiometricLogin: false);
+            hasBiometricLogin: effective.Contains(WorkerPrivileges.BiometricLogin, StringComparer.Ordinal));
 
-        return new CreateWorkerResult(worker.Id, providerManager.Id, tempPassword, expiresAt, message, existingAccount);
+        return new CreateWorkerResult(worker.Id, providerManager.Id, tempPassword, expiresAt, message, existingAccount, locked);
     }
 
     private async Task<int> WorkerRoleIdAsync(CancellationToken ct)

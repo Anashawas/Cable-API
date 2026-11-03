@@ -26,6 +26,7 @@ public class ProviderManagerConfiguration : IEntityTypeConfiguration<ProviderMan
             .HasDefaultValue(true);
 
         builder.Property(e => e.Privileges).HasMaxLength(500);
+        builder.Property(e => e.KeepOnFree).IsRequired().HasDefaultValue(false);
 
         builder.Property(e => e.IsDeleted)
             .IsRequired()
@@ -40,10 +41,9 @@ public class ProviderManagerConfiguration : IEntityTypeConfiguration<ProviderMan
             .OnDelete(DeleteBehavior.Restrict)
             .HasConstraintName("FK_ProviderManager_User");
 
-        // One active worker per provider.
+        // The workers of a provider (several since the worker tracker; the plan sets the limit).
         builder.HasIndex(e => new { e.ProviderType, e.ProviderId })
-            .IsUnique()
-            .HasDatabaseName("UX_ProviderManager_OneWorker")
+            .HasDatabaseName("IX_ProviderManager_Provider")
             .HasFilter("[IsDeleted] = 0");
 
         // Fast "providers this user works for".

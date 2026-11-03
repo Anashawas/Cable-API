@@ -22,6 +22,7 @@ public partial class AuthenticationService
     public const string InvalidCredentialsCode = "INVALID_CREDENTIALS";
     public const string LockedCode = "LOCKED";
     public const string TempPasswordExpiredCode = "TEMP_PASSWORD_EXPIRED";
+    public const string WorkerInactiveCode = "WORKER_INACTIVE";
 
     public async Task<WorkerLoginResult> LoginWorkerByPhoneAsync(string phone, string password, string deviceId, string? deviceToken,
         string app, CancellationToken cancellationToken = default)
@@ -59,8 +60,15 @@ public partial class AuthenticationService
         // The password matched: now the account state, the assignment and the temp-password expiry
         // (after the password check, so an outsider cannot probe which phones are workers).
         if (!user.IsActive) throw new NotAuthorizedAccessException(Resources.DeactivatedUser);
-        var isWorker = await _applicationDbContext.ProviderManagers.AnyAsync(pm => pm.UserId == user.Id && !pm.IsDeleted, cancellationToken);
-        if (!isWorker) throw InvalidCredentials();
+        var assignment = await _applicationDbContext.ProviderManagers.AsNoTracking()
+            .Where(pm => pm.UserId == user.Id && !pm.IsDeleted)
+            .Select(pm => new { pm.IsActive, pm.SuspendedByPlanAt })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (assignment is null) throw InvalidCredentials();
+        if (!assignment.IsActive || assignment.SuspendedByPlanAt is not null)
+            throw new CodedHttpException(403, WorkerInactiveCode, assignment.IsActive
+                ? Lang.Pick("باقة المحطة ما بتسمح بدخولك حالياً — تواصل مع صاحب المحطة", "The station's plan does not allow your login right now — contact the station owner")
+                : Lang.Pick("أوقف صاحب المحطة حسابك", "The station owner has suspended your account"));
 
         if (credential.TempPasswordExpiresAt is DateTime expiresAt && expiresAt < now)
             throw new CodedHttpException(410, TempPasswordExpiredCode,

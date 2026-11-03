@@ -37,16 +37,9 @@ public class SetWorkerPrivilegesCommandHandler(IApplicationDbContext db, ICurren
 
         await WorkerOwnershipHelper.EnsureCallerOwnsProviderAsync(db, pm.ProviderType, pm.ProviderId, callerId, cancellationToken);
 
-        pm.Privileges = string.Join(",", WorkerPrivileges.All.Where(request.Privileges.Contains));
+        pm.Privileges = WorkerPrivileges.Format(request.Privileges);
         await db.SaveChanges(cancellationToken);
 
-        return (await db.ProviderManagers.AsNoTracking()
-            .Where(x => x.Id == pm.Id)
-            .Select(x => new WorkerDto(x.Id, x.UserId, x.User.Name, x.User.Phone, x.User.Email, x.IsActive, x.CreatedAt, x.Privileges,
-                db.PartnerCredentials.Where(c => c.UserId == x.UserId && !c.IsDeleted).Select(c => c.FirstLoginAt).FirstOrDefault(),
-                db.PartnerCredentials.Where(c => c.UserId == x.UserId && !c.IsDeleted).Select(c => c.MustChangePassword).FirstOrDefault(),
-                db.PartnerCredentials.Where(c => c.UserId == x.UserId && !c.IsDeleted).Select(c => c.TempPasswordExpiresAt).FirstOrDefault(),
-                db.PartnerCredentials.Where(c => c.UserId == x.UserId && !c.IsDeleted).Select(c => c.LockedUntil).FirstOrDefault()))
-            .FirstAsync(cancellationToken));
+        return await WorkerDtoQuery.OneAsync(db, pm.Id, cancellationToken);
     }
 }
