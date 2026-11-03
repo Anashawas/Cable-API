@@ -10,8 +10,8 @@ namespace Application.Workers.Commands.SetWorkerPrivileges;
 
 /// <summary>
 /// Owner chooses what the worker may see and do in the partner app. An empty list
-/// leaves the worker with station details only; selecting everything stores null
-/// so privileges added later apply automatically.
+/// leaves the worker with station details only. Always stored as the explicit list:
+/// a privilege added later is never switched on by itself (WORKER_TRACKER decision 16b).
 /// </summary>
 public record SetWorkerPrivilegesCommand(int ProviderManagerId, List<string> Privileges) : IRequest<WorkerDto>;
 
@@ -37,12 +37,16 @@ public class SetWorkerPrivilegesCommandHandler(IApplicationDbContext db, ICurren
 
         await WorkerOwnershipHelper.EnsureCallerOwnsProviderAsync(db, pm.ProviderType, pm.ProviderId, callerId, cancellationToken);
 
-        pm.Privileges = request.Privileges.Count == 0 ? "" : WorkerPrivileges.Format(request.Privileges);
+        pm.Privileges = string.Join(",", WorkerPrivileges.All.Where(request.Privileges.Contains));
         await db.SaveChanges(cancellationToken);
 
         return (await db.ProviderManagers.AsNoTracking()
             .Where(x => x.Id == pm.Id)
-            .Select(x => new WorkerDto(x.Id, x.UserId, x.User.Name, x.User.Phone, x.User.Email, x.IsActive, x.CreatedAt, x.Privileges))
+            .Select(x => new WorkerDto(x.Id, x.UserId, x.User.Name, x.User.Phone, x.User.Email, x.IsActive, x.CreatedAt, x.Privileges,
+                db.PartnerCredentials.Where(c => c.UserId == x.UserId && !c.IsDeleted).Select(c => c.FirstLoginAt).FirstOrDefault(),
+                db.PartnerCredentials.Where(c => c.UserId == x.UserId && !c.IsDeleted).Select(c => c.MustChangePassword).FirstOrDefault(),
+                db.PartnerCredentials.Where(c => c.UserId == x.UserId && !c.IsDeleted).Select(c => c.TempPasswordExpiresAt).FirstOrDefault(),
+                db.PartnerCredentials.Where(c => c.UserId == x.UserId && !c.IsDeleted).Select(c => c.LockedUntil).FirstOrDefault()))
             .FirstAsync(cancellationToken));
     }
 }

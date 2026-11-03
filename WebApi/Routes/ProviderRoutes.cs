@@ -1,3 +1,4 @@
+using Application.Workers.Commands.WorkerPasswordReset;
 using Application.ChargingPoints.Commands.AddUpdateRequestAttachments;
 using Application.ChargingPoints.Commands.ApproveUpdateRequest;
 using Application.ChargingPoints.Commands.CancelUpdateRequest;
@@ -37,6 +38,10 @@ namespace Cable.Routes;
 
 public static class ProviderRoutes
 {
+    public record WorkerLoginRequest(string Phone, string Password, string DeviceId, string? DeviceToken = null);
+    public record WorkerForgotPasswordRequest(string Phone);
+    public record WorkerResetPasswordRequest(string Phone, string Otp, string NewPassword);
+
     public static IEndpointRouteBuilder MapProviderRoutes(this IEndpointRouteBuilder app)
     {
         app.MapGroup("/api/provider")
@@ -132,6 +137,54 @@ public static class ProviderRoutes
                 op.Responses["200"].Description = "OTP verified successfully. JWT tokens returned.";
                 return op;
             });
+
+        // Worker login by phone (WORKER_TRACKER §3.2.3). Same OTP steps as the owner login afterwards.
+        app.MapPost("/worker-login", async (
+                WorkerLoginRequest request,
+                IAuthenticationService authenticationService,
+                HttpContext httpContext,
+                CancellationToken cancellationToken) =>
+                Results.Ok(await authenticationService.LoginWorkerByPhoneAsync(
+                    request.Phone, request.Password, request.DeviceId, request.DeviceToken,
+                    AuthApps.ResolveProviderApp(httpContext.Request.Headers[AuthApps.ClientHeader]),
+                    cancellationToken)))
+            .Produces<WorkerLoginResult>()
+            .ProducesValidationProblem()
+            .ProducesUnAuthorized()
+            .ProducesProblem(StatusCodes.Status410Gone)
+            .ProducesProblem(StatusCodes.Status423Locked)
+            .ProducesInternalServerError()
+            .WithName("Worker Login By Phone")
+            .WithSummary("Worker: phone + partner password + deviceId (+ deviceToken from an earlier OTP login). otpRequired=true → the OTP was sent; continue with /verify-otp (its answer carries mustChangePassword and a deviceToken to keep). otpRequired=false → login holds the tokens. 401 INVALID_CREDENTIALS (also for unknown phones), 423 LOCKED (until, retryAfterMinutes), 410 TEMP_PASSWORD_EXPIRED.")
+            .WithOpenApi(op => { op.RequestBody.Required = true; return op; });
+
+        app.MapPost("/worker-login/forgot", async (
+                WorkerForgotPasswordRequest request,
+                IMediator mediator,
+                CancellationToken cancellationToken) =>
+                Results.Ok(await mediator.Send(new RequestWorkerPasswordResetCommand(request.Phone), cancellationToken)))
+            .Produces<WorkerPasswordResetRequested>()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Worker Forgot Password")
+            .WithSummary("Worker: sends an OTP to the phone when it belongs to a worker (the answer is the same either way). Then /worker-login/reset.")
+            .WithOpenApi(op => { op.RequestBody.Required = true; return op; });
+
+        app.MapPost("/worker-login/reset", async (
+                WorkerResetPasswordRequest request,
+                IMediator mediator,
+                CancellationToken cancellationToken) =>
+            {
+                await mediator.Send(new ResetWorkerPasswordCommand(request.Phone, request.Otp, request.NewPassword), cancellationToken);
+                return Results.Ok();
+            })
+            .Produces(200)
+            .ProducesValidationProblem()
+            .ProducesUnAuthorized()
+            .ProducesInternalServerError()
+            .WithName("Worker Reset Password")
+            .WithSummary("Worker: OTP + new partner password (8+ characters, not the phone). Ends the worker's partner sessions; the next login needs an OTP again.")
+            .WithOpenApi(op => { op.RequestBody.Required = true; return op; });
 
         app.MapPost("/logout", async (IAuthenticationService authenticationService,
                     ICurrentUserService currentUserService, CancellationToken cancellationToken) =>

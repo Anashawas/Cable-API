@@ -72,6 +72,8 @@ public interface IApplicationDbContext
 
     // Provider managers (workers)
     DbSet<ProviderManager> ProviderManagers { get; set; }
+    DbSet<PartnerCredential> PartnerCredentials { get; set; }
+    DbSet<TrustedDevice> TrustedDevices { get; set; }
 
     // Offers & Transactions DbSets
     DbSet<PointsConversionRate> PointsConversionRates { get; set; }

@@ -1,3 +1,5 @@
+using Application.Workers.Commands.ResetWorkerTempPassword;
+using Application.Workers.WorkerAuth;
 using Application.Workers.Commands.CreateWorker;
 using Application.Workers.Commands.DeleteWorker;
 using Application.Workers.Commands.SetWorkerActive;
@@ -13,12 +15,59 @@ namespace Cable.Routes;
 public static class WorkerRoutes
 {
     public record WorkerPrivilegesRequest(List<string> Privileges);
+    public record WorkerTempPasswordRequest(string? TempPassword);
 
     public static IEndpointRouteBuilder MapWorkerRoutes(this IEndpointRouteBuilder app)
     {
         app.MapGroup("/api/workers")
             .WithTags("Workers")
-            .MapRoutes();
+            .MapRoutes()
+            .MapCredentialRoutes();
+
+        // Admin support (WORKER_TRACKER §6.4): the same two actions for Cable's team.
+        app.MapGroup("/api/admin/workers")
+            .WithTags("Workers (admin)")
+            .MapCredentialRoutes(" (admin)");
+
+        return app;
+    }
+
+    private static RouteGroupBuilder MapCredentialRoutes(this RouteGroupBuilder app, string nameSuffix = "")
+    {
+        app.MapPost("/{providerManagerId:int}/reset-temp-password", async (
+                IMediator mediator,
+                [FromRoute] int providerManagerId,
+                [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] WorkerTempPasswordRequest? body,
+                CancellationToken cancellationToken) =>
+                Results.Ok(await mediator.Send(new ResetWorkerTempPasswordCommand(providerManagerId, body?.TempPassword), cancellationToken)))
+            .Produces<WorkerTempPasswordResult>()
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesValidationProblem()
+            .ProducesInternalServerError()
+            .WithName("Reset Worker Temp Password" + nameSuffix)
+            .WithSummary("Owner or admin: \"share the details again\" — a new temporary password (optionally your own, 8+ characters) replaces the old one, the forced change comes back, trusted devices are forgotten and the worker's partner sessions end. Returns the password once plus the ready share message.")
+            .WithOpenApi();
+
+        app.MapPost("/{providerManagerId:int}/unlock", async (
+                IMediator mediator,
+                [FromRoute] int providerManagerId,
+                CancellationToken cancellationToken) =>
+            {
+                await mediator.Send(new UnlockWorkerLoginCommand(providerManagerId), cancellationToken);
+                return Results.Ok();
+            })
+            .Produces(200)
+            .RequireAuthorization()
+            .ProducesUnAuthorized()
+            .ProducesForbidden()
+            .ProducesNotFound()
+            .ProducesInternalServerError()
+            .WithName("Unlock Worker Login" + nameSuffix)
+            .WithSummary("Owner or admin: clears the 15-minute login lock and the failed-attempt counter.")
+            .WithOpenApi();
 
         return app;
     }
@@ -60,9 +109,10 @@ public static class WorkerRoutes
             .ProducesNotFound()
             .ProducesValidationProblem()
             .ProducesInternalServerError()
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .WithName("Create Worker")
-            .WithSummary("Owner: create a worker account and assign it to a provider")
-            .WithDescription("Creates a Worker-role account (email + password + phone) and links it to the provider. One worker per provider. Only the provider owner may call this.")
+            .WithSummary("Owner: add a worker (the whole wizard in one call) — name, phone, optional email, privileges, optional own temp password. Returns the temporary password ONCE with the ready share message. One account per phone: a driver keeps their account and only gets a partner credential. 409 codes: WORKER_LIMIT_REACHED, PHONE_ALREADY_A_WORKER (one station per worker), OWNER_CANNOT_BE_WORKER, ACCOUNT_NOT_ELIGIBLE.")
+            .WithDescription("The worker then signs in with POST /api/provider/worker-login (phone + temporary password → OTP → forced password change).")
             .WithOpenApi(op =>
             {
                 op.RequestBody.Required = true;

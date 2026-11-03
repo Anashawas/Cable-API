@@ -13,9 +13,22 @@ public record WorkerDto(
     bool      IsActive,
     DateTime? AssignedAt,
     /// <summary>Stored value (null = everything). Not for the UI — see Privileges / UsesAllPrivileges.</summary>
-    string?   StoredPrivileges = null
+    string?   StoredPrivileges = null,
+    /// <summary>When the worker first signed in to the partner app; null = "waiting for the first login".</summary>
+    DateTime? FirstLoginAt = null,
+    /// <summary>The worker still holds the temporary password.</summary>
+    bool      MustChangePassword = false,
+    DateTime? TempPasswordExpiresAt = null,
+    /// <summary>Set while the login is locked after too many wrong passwords.</summary>
+    DateTime? LockedUntil = null
 )
 {
+    /// <summary>pendingFirstLogin | active | locked — the badge on the worker card.</summary>
+    public string LoginStatus =>
+        LockedUntil is DateTime l && l > DateTime.UtcNow ? "locked"
+        : FirstLoginAt is null ? "pendingFirstLogin"
+        : "active";
+
     /// <summary>What the worker may do, resolved (null stored = all).</summary>
     public IReadOnlyList<string> Privileges => Cable.Core.Constants.WorkerPrivileges.Parse(StoredPrivileges);
     public bool UsesAllPrivileges => Cable.Core.Constants.WorkerPrivileges.UsesAll(StoredPrivileges);
@@ -50,7 +63,11 @@ public class GetWorkerByProviderQueryHandler(
                 pm.User.Email,
                 pm.IsActive,
                 pm.CreatedAt,
-                pm.Privileges))
+                pm.Privileges,
+                applicationDbContext.PartnerCredentials.Where(c => c.UserId == pm.UserId && !c.IsDeleted).Select(c => c.FirstLoginAt).FirstOrDefault(),
+                applicationDbContext.PartnerCredentials.Where(c => c.UserId == pm.UserId && !c.IsDeleted).Select(c => c.MustChangePassword).FirstOrDefault(),
+                applicationDbContext.PartnerCredentials.Where(c => c.UserId == pm.UserId && !c.IsDeleted).Select(c => c.TempPasswordExpiresAt).FirstOrDefault(),
+                applicationDbContext.PartnerCredentials.Where(c => c.UserId == pm.UserId && !c.IsDeleted).Select(c => c.LockedUntil).FirstOrDefault()))
             .FirstOrDefaultAsync(cancellationToken);
     }
 }

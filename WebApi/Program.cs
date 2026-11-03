@@ -167,6 +167,7 @@ app.UseCors();
 app.UseCustomAuthenticationResponse();
 app.UseAuthentication();
 app.UseAccountSessionValidation();
+app.UseWorkerPasswordChangeGate();
 app.UseAuthorization();
 app.UseUserActivityTracking();
 app.UseSecureFileServing();

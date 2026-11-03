@@ -18,7 +18,11 @@ public record UserLoginResult(
     string AccessToken,
     string RefreshToken,
     bool IsCompletedData,
-    IReadOnlyCollection<string> Privileges
+    IReadOnlyCollection<string> Privileges,
+    /// <summary>Worker login: the partner password is still the temporary one — the app must show the change screen before anything else.</summary>
+    bool MustChangePassword = false,
+    /// <summary>Worker login after an OTP: keep it on the device and send it with the next worker-login to skip the OTP.</summary>
+    string? DeviceToken = null
 );
 
 public record UserDetailsResult(

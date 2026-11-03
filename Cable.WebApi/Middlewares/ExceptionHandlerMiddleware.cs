@@ -39,7 +39,8 @@ internal sealed class ExceptionHandlerMiddleware
             { typeof(ConflictException), HandleConflictException },
             { typeof(UnprocessableException), HandleUnprocessableException },
             { typeof(CodedNotFoundException), HandleCodedNotFoundException },
-            { typeof(GoneException), HandleGoneException }
+            { typeof(GoneException), HandleGoneException },
+            { typeof(CodedHttpException), HandleCodedHttpException }
         };
     }
 
@@ -154,6 +155,24 @@ internal sealed class ExceptionHandlerMiddleware
                 problemDetails.Extensions[key] = value;
 
         await WriteExceptionDetails(problemDetails, httpContext, StatusCodes.Status422UnprocessableEntity);
+    }
+
+    private async Task HandleCodedHttpException(HttpContext httpContext, Exception ex)
+    {
+        var exception = (CodedHttpException)ex;
+        var problemDetails = new CableProblemDetails
+        {
+            Type = "https://tools.ietf.org/html/rfc7231#section-6.5",
+            Status = exception.Status,
+            Detail = exception.Message,
+            Instance = httpContext?.Request?.Path
+        };
+        problemDetails.Extensions["code"] = exception.Code;
+        if (exception.Details is not null)
+            foreach (var (key, value) in exception.Details)
+                problemDetails.Extensions[key] = value;
+
+        await WriteExceptionDetails(problemDetails, httpContext, exception.Status);
     }
 
     private async Task HandleCodedNotFoundException(HttpContext httpContext, Exception ex)

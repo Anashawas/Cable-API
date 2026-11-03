@@ -77,6 +77,8 @@ public partial class ApplicationDbContext(
 
     // Provider managers (workers)
     public DbSet<ProviderManager> ProviderManagers { get; set; }
+    public DbSet<PartnerCredential> PartnerCredentials { get; set; }
+    public DbSet<TrustedDevice> TrustedDevices { get; set; }
 
     // Offers & Transactions DbSets
     public DbSet<PointsConversionRate> PointsConversionRates { get; set; }

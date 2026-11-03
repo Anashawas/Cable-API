@@ -23,7 +23,7 @@ using Microsoft.Extensions.Options;
 
 namespace Infrastructrue.Identity;
 
-public class AuthenticationService : IAuthenticationService
+public partial class AuthenticationService : IAuthenticationService
 {
     private readonly IApplicationDbContext _applicationDbContext;
     private readonly IIdentityService _identityService;
@@ -35,6 +35,7 @@ public class AuthenticationService : IAuthenticationService
     private readonly IFirebaseService _firebaseService;
     private readonly IOtpService _otpService;
     private readonly HybridCache _cache;
+    private readonly Application.Workers.WorkerAuth.WorkerLoginNotifier _workerLoginNotifier;
 
 
     public AuthenticationService
@@ -49,8 +50,10 @@ public class AuthenticationService : IAuthenticationService
         IFirebaseService firebaseService,
         IUserAccountRepository userAccountRepository,
         IOtpService otpService,
-        HybridCache cache)
+        HybridCache cache,
+        Application.Workers.WorkerAuth.WorkerLoginNotifier workerLoginNotifier)
     {
+        _workerLoginNotifier = workerLoginNotifier;
         _applicationDbContext = applicationDbContext;
         _identityService = identityService;
         _tokenGenerationService = tokenGenerationService;
@@ -556,8 +559,13 @@ public class AuthenticationService : IAuthenticationService
         // Provider-family session (mobile app or web portal, per the caller's
         // resolved app) — rotates only that app's stamp, leaving the Cable
         // consumer app and the other provider surface untouched.
-        return await GetUserLoginDetails(user, isCompletedData, cancellationToken,
+        var login = await GetUserLoginDetails(user, isCompletedData, cancellationToken,
             app: app);
+
+        // A worker's phone login: trust this device and record the first login.
+        return sessionData.IsWorkerLogin
+            ? await CompleteWorkerOtpLoginAsync(user, sessionData, login, app, cancellationToken)
+            : login;
     }
 
     #endregion

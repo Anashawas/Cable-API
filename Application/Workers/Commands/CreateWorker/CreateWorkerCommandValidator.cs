@@ -21,15 +21,16 @@ public class CreateWorkerCommandValidator : AbstractValidator<CreateWorkerComman
             .MaximumLength(255);
 
         RuleFor(v => v.Email)
-            .NotEmpty().WithMessage("Email is required.")
             .EmailAddress().WithMessage("A valid email is required.")
-            .MaximumLength(255);
+            .MaximumLength(255)
+            .When(v => !string.IsNullOrWhiteSpace(v.Email));
 
         RuleFor(v => v.Phone)
             .NotEmpty().WithMessage("Phone is required.");
 
-        RuleFor(v => v.Password)
-            .NotEmpty().WithMessage("Password is required.")
-            .MinimumLength(6).WithMessage("Password must be at least 6 characters.");
+        RuleFor(v => v.TempPassword)
+            .MinimumLength(8).WithMessage("The temporary password must be at least 8 characters.")
+            .MaximumLength(64)
+            .When(v => !string.IsNullOrWhiteSpace(v.TempPassword));
     }
 }

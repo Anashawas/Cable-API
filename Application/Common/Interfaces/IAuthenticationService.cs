@@ -19,6 +19,13 @@ public interface IAuthenticationService
     Task<UserLoginResult> VerifyProviderOtpAsync(string sessionToken, string otp, CancellationToken cancellationToken = default,
         string app = Cable.Core.Constants.AuthApps.Provider);
 
+    /// <summary>
+    /// Worker login by phone + partner password (WORKER_TRACKER §3.2.3). With a valid trusted-device token the
+    /// tokens are issued at once; otherwise the OTP step follows through send-otp / verify-otp.
+    /// </summary>
+    Task<WorkerLoginResult> LoginWorkerByPhoneAsync(string phone, string password, string deviceId, string? deviceToken,
+        string app, CancellationToken cancellationToken = default);
+
     // Session management
     Task Logout(int userId, CancellationToken cancellationToken = default,
         string app = Cable.Core.Constants.AuthApps.Consumer);
