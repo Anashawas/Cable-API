@@ -90,6 +90,34 @@ public class AttendanceDay : BaseAuditableEntity
     public virtual ICollection<Punch> Punches { get; set; } = new List<Punch>();
 }
 
+/// <summary>Step 4: every owner correction of a day (field, from → to, note). Never deleted.</summary>
+public class AttendanceCorrection : BaseAuditableEntity
+{
+    public int AttendanceDayId { get; set; }
+    /// <summary>in | out | status | review.</summary>
+    public string Field { get; set; } = null!;
+    public string? FromValue { get; set; }
+    public string? ToValue { get; set; }
+    public string Note { get; set; } = null!;
+    public int CorrectedByUserId { get; set; }
+    public DateTime CorrectedAt { get; set; }
+
+    public virtual AttendanceDay Day { get; set; } = null!;
+}
+
+/// <summary>Step 4: things the attendance job did once (reminders, owner alerts, daily summary), keyed so they never repeat.</summary>
+public class AttendanceEvent : BaseAuditableEntity
+{
+    public string ProviderType { get; set; } = null!;
+    public int ProviderId { get; set; }
+    /// <summary>null for a per-station event (the daily summary).</summary>
+    public int? ProviderManagerId { get; set; }
+    public DateOnly WorkDate { get; set; }
+    /// <summary>reminderIn | reminderOut | ownerMissing | dailySummary.</summary>
+    public string Kind { get; set; } = null!;
+    public DateTime SentAt { get; set; }
+}
+
 /// <summary>One punch (or a refused attempt: Verdict rejected, no day). Time is the server's.</summary>
 public class Punch : BaseAuditableEntity
 {

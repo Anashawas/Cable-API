@@ -259,12 +259,63 @@ holidays set by the admin, read by the worker, `isHoliday` on today, owner refus
 
 ---
 
-## 4. Next steps (in order)
+## 4. Step 4 — attendance table, manual entry, corrections, export, the job (done, on the branch)
+
+SQL: `Scripts/WorkerTracker_4_Reports.sql` (idempotent; `AttendanceCorrection`, `AttendanceEvent`, 5 notification
+types). Applied to dev 2026-11-07. Hangfire job `attendance-tick` every 5 minutes.
+
+### 4.1 Rules
+
+- **The table** (`GET /api/attendance`) is one row per worker per day: stored days, plus days worked out from the
+  shifts when nothing was recorded — `holiday` (public holiday), `off` (no shift that day), `absent` (the shift ended
+  with no punch; only for workers granted `Attendance`). Future days are not listed. Max 92 days per call; default this month.
+- **Manual entry** (owner, or a worker with `ManageAttendance`): time = now, a note is mandatory (`422 NOTE_REQUIRED`),
+  never for oneself (`403 CANNOT_RECORD_SELF`), `409 ALREADY_IN | NOT_IN`. The day is flagged `manual`, the row's
+  `method` = `manual` and `recordedByName` says who; the owner is pushed when a supervisor did it (`attendance_manual`).
+- **Corrections** (owner only): the first "in", the last "out" (added when missing), the status, or confirming a
+  review punch. Note mandatory. Every change is a row in the history (field, from → to, note, who, when); the day is
+  flagged `corrected`; totals are recomputed; the worker is pushed (`attendance_correction`). Nothing is deleted.
+  `absent` / `off` cannot be set on a day with punches. Times in the body are Jordan time.
+- **The job** (every 5 min, each push keyed in `AttendanceEvent` — never twice):
+  - forgotten "out" → closed `missingOut` 2 h after the shift end (16 h after the "in" when there was no shift), no
+    minutes added; the owner fixes it with a correction;
+  - shift ended with no punch → an `absent` row (`holiday` on a public holiday);
+  - worker reminders: +5 min after the shift start with no "in" (`attendance_reminder`, kind `in`), +15 min after the
+    end while still open (kind `out`);
+  - owner + `ViewAttendance` workers: +15 min after the start with no "in" (`attendance_missing`) — one push per
+    station per tick listing every worker that crossed the threshold ("3 workers did not punch in");
+  - owner daily summary at 21:00 Jordan (`attendance_summary`): present · late · absent;
+  - raw coordinates older than 90 days are cleared (`Lat`/`Lng`), zone, distance and verdict stay.
+
+### 4.2 Endpoints
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| GET | `/api/attendance?providerType=&providerId=&workerId=&from=&to=&status=` | owner, admin, ViewAttendance | `{ from, to, days: [row], summary: [perWorker] }`. Row: `id` (null for a worked-out day), `workerName`, `workDate`, `status`, `flags[]` (late, review, noZone, extra, manual, corrected), `firstInAt`, `lastOutAt`, `minutesWorked`, `lateMinutes`, `extraMinutes`, `shiftText`, `zoneName`, `method` (app \| manual \| correction \| —), `recordedByName`, `isOpen`, `punches`. Summary: `daysPresent`, `minutesWorked`, `lateMinutes`, `daysLate`, `daysAbsent`, `daysLeave`, `daysMissingOut`, `extraMinutes`, `daysReview` |
+| GET | `/api/attendance/export?…same…` | same | CSV, UTF-8 with BOM: the days, a blank line, the summary |
+| GET | `/api/attendance/my?providerType=&providerId=&month=YYYY-MM` | worker | the worker's own month, same shape |
+| POST | `/api/attendance/manual` | owner, ManageAttendance | `{ providerType, providerId, workerId, direction, note }` → `{ punchId, at, direction, state, workedMinutes, message }` |
+| POST | `/api/attendance/days` | owner | `{ providerType, providerId, workerId, workDate, inAt?, outAt?, status?, note }` — adds a day with no row, then applies the correction rules |
+| PATCH | `/api/attendance/days/{id}` | owner | `{ inAt?, outAt?, status?, confirmReview?, note }` → the row |
+| GET | `/api/attendance/days/{id}/history` | owner, admin, ViewAttendance, the worker | `{ day, punches: [{ direction, at, verdict, reason, source, zoneName, distanceMeters, accuracyMeters, isMocked, recordedByName, note }], corrections: [{ field, fromValue, toValue, note, correctedByName, correctedAt }] }` |
+
+### 4.3 Tested on dev (2026-11-07, station 210, two workers)
+
+30 checks: table with an open present day and no row for a shift still running · a worker without `ViewAttendance`
+refused · **the job**: +5 min reminder to the worker, +15 min "did not punch in" to the owner, both arrived once ·
+manual entry: note required, not for oneself, supervisor records B → owner pushed, `ALREADY_IN`, owner records the
+out · table shows method manual + who · corrections: supervisor refused, note required, owner moves the "in" before the
+shift → late 0, `corrected`, worker pushed · absent on a day with punches → 400 · history rows · owner adds a missing
+day (8 h) · worker's month · CSV with BOM and the summary · status filter · **auto-close** of a forgotten out as
+`missingOut` by the job, then the owner adds the out → present with the minutes.
+Not exercised: the 21:00 summary push (time-of-day; the code path is the same as the others).
+
+---
+
+## 5. Next steps (in order)
 
 | Step | Scope | Status |
 |---|---|---|
-| 3 | Shifts (weekly schedule, cross-midnight, grace, earliest punch), public holidays (admin), punch zones, punch in / out with server verdict, who-is-in | |
-| 4 | Attendance days, manual entry, corrections with history, rejected attempts, CSV export, the 5-minute attendance job (auto-close, absent, reminders, grouped owner pushes), daily summary, 90-day coordinate scrub | |
 | 5 | Leave: balances computed from approved leaves, requests, approvals, sick attachment (owner-only, 1-year delete), retroactive sick | |
 
 Open before launch (not code): labour-law and data-protection review of the defaults; `cable-app.com/partner/login`

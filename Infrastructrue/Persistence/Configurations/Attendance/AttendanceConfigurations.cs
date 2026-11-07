@@ -103,6 +103,40 @@ public class AttendanceDayConfiguration : IEntityTypeConfiguration<AttendanceDay
     }
 }
 
+public class AttendanceCorrectionConfiguration : IEntityTypeConfiguration<AttendanceCorrection>
+{
+    public void Configure(EntityTypeBuilder<AttendanceCorrection> b)
+    {
+        b.ToTable("AttendanceCorrection");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.Field).IsRequired().HasMaxLength(20);
+        b.Property(e => e.FromValue).HasMaxLength(100);
+        b.Property(e => e.ToValue).HasMaxLength(100);
+        b.Property(e => e.Note).IsRequired().HasMaxLength(500);
+        b.Property(e => e.IsDeleted).HasDefaultValue(false);
+        b.Property(e => e.CreatedAt).HasColumnType("datetime");
+        b.Property(e => e.ModifiedAt).HasColumnType("datetime");
+        b.HasOne(e => e.Day).WithMany().HasForeignKey(e => e.AttendanceDayId).OnDelete(DeleteBehavior.Cascade)
+            .HasConstraintName("FK_AttendanceCorrection_Day");
+        b.HasIndex(e => e.AttendanceDayId).HasDatabaseName("IX_AttendanceCorrection_Day");
+    }
+}
+
+public class AttendanceEventConfiguration : IEntityTypeConfiguration<AttendanceEvent>
+{
+    public void Configure(EntityTypeBuilder<AttendanceEvent> b)
+    {
+        b.ToTable("AttendanceEvent");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.ProviderType).IsRequired().HasMaxLength(50);
+        b.Property(e => e.Kind).IsRequired().HasMaxLength(30);
+        b.Property(e => e.IsDeleted).HasDefaultValue(false);
+        b.Property(e => e.CreatedAt).HasColumnType("datetime");
+        b.Property(e => e.ModifiedAt).HasColumnType("datetime");
+        b.HasIndex(e => new { e.ProviderType, e.ProviderId, e.ProviderManagerId, e.WorkDate, e.Kind }).IsUnique().HasDatabaseName("UX_AttendanceEvent_Key");
+    }
+}
+
 public class PunchConfiguration : IEntityTypeConfiguration<Punch>
 {
     public void Configure(EntityTypeBuilder<Punch> b)

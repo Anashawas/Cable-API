@@ -83,6 +83,8 @@ public interface IApplicationDbContext
     DbSet<PunchZoneWorker> PunchZoneWorkers { get; set; }
     DbSet<AttendanceDay> AttendanceDays { get; set; }
     DbSet<Punch> Punches { get; set; }
+    DbSet<AttendanceCorrection> AttendanceCorrections { get; set; }
+    DbSet<AttendanceEvent> AttendanceEvents { get; set; }
 
     // Offers & Transactions DbSets
     DbSet<PointsConversionRate> PointsConversionRates { get; set; }

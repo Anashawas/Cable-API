@@ -300,6 +300,13 @@ RecurringJob.AddOrUpdate<Application.Billing.Jobs.IBillingJobs>(
     service => service.RunBillingWatchAsync(CancellationToken.None),
     "*/10 * * * *");
 
+// Worker tracker (step 4): auto-close forgotten punch-outs, mark absent, worker reminders, owner alerts (grouped),
+// the 21:00 daily summary and the 90-day coordinate scrub. Keyed in AttendanceEvent — nothing is sent twice.
+RecurringJob.AddOrUpdate<Application.Attendance.Jobs.IAttendanceJobs>(
+    "attendance-tick",
+    service => service.RunTickAsync(CancellationToken.None),
+    "*/5 * * * *");
+
 app.MapUserRoutes()
     .MapChargingPointsRoutes()
     .MapChargingPointTypesRoutes()

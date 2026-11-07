@@ -88,6 +88,8 @@ public partial class ApplicationDbContext(
     public DbSet<PunchZoneWorker> PunchZoneWorkers { get; set; }
     public DbSet<AttendanceDay> AttendanceDays { get; set; }
     public DbSet<Punch> Punches { get; set; }
+    public DbSet<AttendanceCorrection> AttendanceCorrections { get; set; }
+    public DbSet<AttendanceEvent> AttendanceEvents { get; set; }
 
     // Offers & Transactions DbSets
     public DbSet<PointsConversionRate> PointsConversionRates { get; set; }

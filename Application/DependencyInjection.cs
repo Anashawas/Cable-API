@@ -30,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<Ocpp.LiveCharging.LiveChargingNotifications>();
         services.AddScoped<Workers.WorkerAuth.WorkerLoginNotifier>();
         services.AddScoped<Attendance.AttendanceNotifier>();
+        services.AddScoped<Attendance.Jobs.IAttendanceJobs, Attendance.Jobs.AttendanceJobs>();
         // §13.2: the receipt email after a driver's session ends (opt-in), run by the "finished" Hangfire job.
         services.AddScoped<Ocpp.LiveCharging.SessionReceiptEmailer>();
         // Partner billing (Sprint 5): plan subscriptions on top of PaymentRecorder, and its Hangfire jobs.

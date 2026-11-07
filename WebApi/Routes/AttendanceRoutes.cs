@@ -1,5 +1,7 @@
 using Application.Attendance.Holidays;
+using Application.Attendance.Manual;
 using Application.Attendance.Punching;
+using Application.Attendance.Reports;
 using Application.Attendance.Shifts;
 using Application.Attendance.Zones;
 using Cable.WebApi.OpenAPI;
@@ -121,6 +123,62 @@ public static class AttendanceRoutes
             .Produces<List<WhoIsInRowDto>>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesInternalServerError()
             .WithName("Who Is In")
             .WithSummary("Owner, admin or ViewAttendance: every usable worker with state in | late | notPunched | beforeShift | out | off | holiday, since, lateMinutes, zone, shift, worked minutes, review flag.")
+            .WithOpenApi();
+
+        // ---- step 4: table, export, history, manual entry, corrections ----
+        app.MapGet("/", async (IMediator mediator, [FromQuery] string providerType, [FromQuery] int providerId, [FromQuery] int? workerId, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to, [FromQuery] string? status, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetAttendanceTableRequest(providerType, providerId, workerId, from, to, status), ct)))
+            .Produces<AttendanceTableDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("Attendance Table")
+            .WithSummary("Owner, admin or ViewAttendance: one row per worker per day (stored days plus absent / off / holiday days worked out from the shifts), newest first, with the period summary per worker. Default range: this month; max 92 days. status filter: present | missingOut | absent | leave | holiday | off.")
+            .WithOpenApi();
+
+        app.MapGet("/export", async (IMediator mediator, [FromQuery] string providerType, [FromQuery] int providerId, [FromQuery] int? workerId, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to, [FromQuery] string? status, CancellationToken ct) =>
+            {
+                var f = await mediator.Send(new GetAttendanceCsvRequest(providerType, providerId, workerId, from, to, status), ct);
+                return Results.File(f.Content, f.ContentType, f.FileName);
+            })
+            .Produces(200, contentType: "text/csv").RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesInternalServerError()
+            .WithName("Attendance Export")
+            .WithSummary("Owner, admin or ViewAttendance: the table as CSV (UTF-8 with BOM) for payroll — days, then the per-worker summary. Column 'Method' = app | manual | correction.")
+            .WithOpenApi();
+
+        app.MapGet("/my", async (IMediator mediator, [FromQuery] string providerType, [FromQuery] int providerId, [FromQuery] string? month, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetMyAttendanceHistoryRequest(providerType, providerId, month), ct)))
+            .Produces<AttendanceTableDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesValidationProblem().ProducesInternalServerError()
+            .WithName("My Attendance History")
+            .WithSummary("Worker: my days of a month (month = YYYY-MM, default this month) with the summary; corrected days carry the 'corrected' flag.")
+            .WithOpenApi();
+
+        app.MapPost("/manual", async (IMediator mediator, ManualPunchCommand body, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(body, ct)))
+            .Produces<ManualPunchResult>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status409Conflict).ProducesProblem(StatusCodes.Status422UnprocessableEntity).ProducesInternalServerError()
+            .WithName("Manual Punch")
+            .WithSummary("Owner, or a worker with ManageAttendance: { providerType, providerId, workerId, direction in | out, note } — starts / ends another worker's shift now. 422 NOTE_REQUIRED; 403 CANNOT_RECORD_SELF; 409 ALREADY_IN | NOT_IN. The owner is pushed when a supervisor did it; the day is flagged 'manual'.")
+            .WithOpenApi();
+
+        app.MapPost("/days", async (IMediator mediator, CreateAttendanceDayCommand body, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(body, ct)))
+            .Produces<AttendanceDayRowDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity).ProducesInternalServerError()
+            .WithName("Create Attendance Day")
+            .WithSummary("Owner: add a day that has no row { providerType, providerId, workerId, workDate, inAt?, outAt?, status?, note } (Jordan times), then the same rules as a correction.")
+            .WithOpenApi();
+
+        app.MapPatch("/days/{id:int}", async (IMediator mediator, [FromRoute] int id, CorrectAttendanceDayCommand body, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(body with { AttendanceDayId = id }, ct)))
+            .Produces<AttendanceDayRowDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesValidationProblem()
+            .ProducesProblem(StatusCodes.Status422UnprocessableEntity).ProducesInternalServerError()
+            .WithName("Correct Attendance Day")
+            .WithSummary("Owner only: { inAt?, outAt?, status?, confirmReview?, note } (Jordan times). Sets the first in / last out (added when missing), the status, or confirms a review punch. Every change goes to the history with the note; the day is flagged 'corrected'; the worker is pushed. 422 NOTE_REQUIRED. Nothing is deleted.")
+            .WithOpenApi();
+
+        app.MapGet("/days/{id:int}/history", async (IMediator mediator, [FromRoute] int id, CancellationToken ct) =>
+                Results.Ok(await mediator.Send(new GetAttendanceDayHistoryRequest(id), ct)))
+            .Produces<AttendanceDayHistoryDto>().RequireAuthorization().ProducesUnAuthorized().ProducesForbidden().ProducesNotFound().ProducesInternalServerError()
+            .WithName("Attendance Day History")
+            .WithSummary("Owner, admin, ViewAttendance or the worker: the day's punches (source, zone, distance, who recorded) and every correction (field, from → to, note, who, when).")
             .WithOpenApi();
         return app;
     }
