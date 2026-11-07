@@ -80,6 +80,15 @@ public partial class ApplicationDbContext(
     public DbSet<PartnerCredential> PartnerCredentials { get; set; }
     public DbSet<TrustedDevice> TrustedDevices { get; set; }
 
+    // Worker tracker: shifts, holidays, punch zones, attendance
+    public DbSet<WorkerShiftSchedule> WorkerShiftSchedules { get; set; }
+    public DbSet<WorkerShiftDay> WorkerShiftDays { get; set; }
+    public DbSet<PublicHoliday> PublicHolidays { get; set; }
+    public DbSet<PunchZone> PunchZones { get; set; }
+    public DbSet<PunchZoneWorker> PunchZoneWorkers { get; set; }
+    public DbSet<AttendanceDay> AttendanceDays { get; set; }
+    public DbSet<Punch> Punches { get; set; }
+
     // Offers & Transactions DbSets
     public DbSet<PointsConversionRate> PointsConversionRates { get; set; }
     public DbSet<ProviderOffer> ProviderOffers { get; set; }

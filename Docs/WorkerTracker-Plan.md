@@ -203,7 +203,63 @@ Test data removed afterwards.
 
 ---
 
-## 3. Next steps (in order)
+## 3. Step 3 — shifts, holidays, punch zones, punching, who is in (done, on the branch)
+
+SQL: `Scripts/WorkerTracker_3_Attendance.sql` (idempotent; 7 new tables + NotificationType `attendance_attempt`).
+Applied to dev 2026-11-07. Defaults (all `AppSetting` rows, optional): `Attendance.MaxAccuracyMeters` 150,
+`Attendance.MinRadiusMeters` 50, `Attendance.MaxRadiusMeters` 800, `Attendance.DefaultGraceMinutes` 10,
+`Attendance.DefaultEarliestPunchMinutes` 60, `Attendance.AutoCloseHours` 2.
+
+### 3.1 Rules
+
+- **Plan gate:** every attendance endpoint needs the station's plan to have `workers` → else `403 FEATURE_NOT_IN_PLAN`.
+  A worker also needs the effective `Attendance` privilege (`403 PRIVILEGE_MISSING`); a suspended one gets `403 WORKER_INACTIVE`.
+- **Time is the server's.** The app sends no time. All JSON dates are Jordan time; the work date is the Jordan date
+  of the shift's start — a 22:00–06:00 shift belongs to the day it started, and the 06:00 "out" attaches to it.
+- **Shifts:** a weekly schedule per worker (0 = Sunday … 6 = Saturday), versioned by `effectiveFrom`; past days never
+  change. `endTime ≤ startTime` = crosses midnight. Grace 10 min, earliest punch 60 min before, per schedule.
+- **Position verdict, in this order (first rule wins):** accuracy > 150 m → `rejected lowAccuracy` · no zone for
+  the worker → accepted, flagged `noZone` (mocked → review) · distance − accuracy > radius → `rejected outsideZone`
+  · `isMocked` → `review mocked` · distance > radius → `review borderline` · inside → `accepted`.
+  Rejected attempts are recorded (no day) and the owner + `ViewAttendance` workers get a push (`attendance_attempt`);
+  review punches are recorded on the day, flagged `review`, and pushed too. **No automatic penalty** — the owner decides.
+- **Shift rules on "in":** before start − earliest → `422 TOO_EARLY` (`shiftStart`, `earliestAt`) · after start + grace
+  → accepted with `lateMinutes` (from the shift start) and flag `late` · no shift / holiday → accepted, flag `extra`.
+- **States:** `409 ALREADY_IN` (`since`) · `409 NOT_IN`. Several in/out per day: minutes add up; lateness is from the
+  first "in". A forgotten "out" leaves the older day open; today's "in" is still accepted and the answer says
+  `openFromYesterday` (step 4's job closes it as `missingOut`).
+- **One lock per worker** (row lock on the assignment) — a double tap cannot punch twice.
+
+### 3.2 Endpoints
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| GET | `/api/workers/{id}/shifts` | owner, admin, the worker | `{ current, upcoming, today }`; `today` = the shift window of today (null = off) |
+| PUT | `/api/workers/{id}/shifts` | owner | `{ effectiveFrom?, days: [{ dayOfWeek, startTime "HH:mm", endTime, off }], graceMinutes?, earliestPunchMinutes? }`. Default `effectiveFrom`: today for a first schedule, else next Sunday; a past date → 400. Missing days = off |
+| GET | `/api/public-holidays?year=` | signed in | `[{ id, date, nameAr, nameEn, name }]` |
+| GET / PUT | `/api/admin/public-holidays` | admin | PUT `{ year, days: [{ date, nameAr, nameEn }] }` replaces the year |
+| GET | `/api/punch-zones?providerType=&providerId=` | owner, admin | zones with `workers[]`, `appliesToNobody`, `warning` (< 120 m / > 400 m) |
+| POST / PUT `/{id}` | `/api/punch-zones` | owner | `{ providerType, providerId, name, lat, lng, radiusMeters (50–800), workerIds?, isActive? }` |
+| DELETE | `/api/punch-zones/{id}` | owner | soft |
+| PUT | `/api/punch-zones/{id}/workers` | owner | `{ workerIds }` |
+| POST | `/api/punch-zones/test` | owner | `{ providerType, providerId, lat, lng, accuracyMeters, isMocked? }` → `{ zoneName, distanceMeters, radiusMeters, wouldBe, reason, message }` — nothing recorded |
+| GET | `/api/punch-zones/attempts?providerType=&providerId=&from=&to=&verdict=` | owner, admin, ViewAttendance | rejected + review punches, newest first (default 30 days) |
+| POST | `/api/attendance/punch` | worker (`Attendance`) | `{ providerType, providerId, direction: "in" \| "out", lat, lng, accuracyMeters, isMocked, deviceId }` → `{ punchId, at, verdict, reason, zoneName, distanceMeters, lateMinutes, state, workedMinutes, openFromYesterday, noZone, message }`. 422 `OUTSIDE_ZONE` (`distanceMeters`, `zoneName`, `radiusMeters`) \| `LOW_ACCURACY` \| `TOO_EARLY`; 409 `ALREADY_IN` \| `NOT_IN` |
+| GET | `/api/attendance/today?providerType=&providerId=` | worker | `{ state in \| out \| finished \| off, workDate, punchedInAt, punchedOutAt, shift, lateMinutes, workedMinutes (live), openFromYesterday, hasZone, isHoliday, earliestAt, canPunchIn, canPunchOut, hint, last7Days[] }` |
+| GET | `/api/attendance/who-is-in?providerType=&providerId=` | owner, admin, ViewAttendance | per usable worker: `state in \| late \| notPunched \| beforeShift \| out \| off \| holiday`, `since`, `lateMinutes`, `zoneName`, `shiftText`, `workedMinutes`, `review` |
+
+### 3.3 Tested on dev (2026-11-07, station 210)
+
+39 checks: privilege gate · shifts (first schedule from today, past date 400, rewrite, worker can read own) · zone create
+with the radius warning, radius 20 → 400, worker cannot list · zone test for all five verdicts · punch: 400 m →
+`OUTSIDE_ZONE` with the distance, accuracy 200 → `LOW_ACCURACY`, both listed as rejected attempts · 2 h early →
+`TOO_EARLY` with `earliestAt` · in 31 min late → accepted + `late` · `ALREADY_IN` · today/who-is-in show "late",
+since, zone · borderline out → `review` + owner inbox push · `NOT_IN` · second in/out of the day · `finished` ·
+holidays set by the admin, read by the worker, `isHoliday` on today, owner refused.
+
+---
+
+## 4. Next steps (in order)
 
 | Step | Scope | Status |
 |---|---|---|

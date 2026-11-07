@@ -75,6 +75,15 @@ public interface IApplicationDbContext
     DbSet<PartnerCredential> PartnerCredentials { get; set; }
     DbSet<TrustedDevice> TrustedDevices { get; set; }
 
+    // Worker tracker: shifts, holidays, punch zones, attendance
+    DbSet<WorkerShiftSchedule> WorkerShiftSchedules { get; set; }
+    DbSet<WorkerShiftDay> WorkerShiftDays { get; set; }
+    DbSet<PublicHoliday> PublicHolidays { get; set; }
+    DbSet<PunchZone> PunchZones { get; set; }
+    DbSet<PunchZoneWorker> PunchZoneWorkers { get; set; }
+    DbSet<AttendanceDay> AttendanceDays { get; set; }
+    DbSet<Punch> Punches { get; set; }
+
     // Offers & Transactions DbSets
     DbSet<PointsConversionRate> PointsConversionRates { get; set; }
     DbSet<ProviderOffer> ProviderOffers { get; set; }
