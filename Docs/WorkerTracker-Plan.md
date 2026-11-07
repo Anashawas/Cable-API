@@ -312,11 +312,70 @@ Not exercised: the 21:00 summary push (time-of-day; the code path is the same as
 
 ---
 
-## 5. Next steps (in order)
+## 5. Step 5 — leave (done, on the branch)
 
-| Step | Scope | Status |
-|---|---|---|
-| 5 | Leave: balances computed from approved leaves, requests, approvals, sick attachment (owner-only, 1-year delete), retroactive sick | |
+SQL: `Scripts/WorkerTracker_5_Leave.sql` (idempotent; `ProviderManager.AnnualLeaveDays` / `SickLeaveDays`, `LeaveRequest`,
+2 notification types). Applied to dev 2026-11-07.
+
+### 5.1 Rules (§3.9, decisions 13–15, 35–37)
+
+- **Kinds:** `paid` (annual balance), `unpaid` (no balance, counted), `sick` (own balance, optional medical report).
+- **Balances per calendar year** (1 January – 31 December, no carry-over), per worker: annual 14, sick 14 by default,
+  owner-editable (0–90). Computed, never stored: `used` = approved days, `pending` = waiting, `remaining` = total − used.
+  A request is refused when used + pending + requested > total (`422 INSUFFICIENT_BALANCE` with `remaining`).
+- **Days counted:** the worker's off days (from the shift schedule) and public holidays are left out. With no schedule
+  on a date, every day counts.
+- **Dates:** paid / unpaid from today on; sick may be backdated 7 days; the owner may backdate 30 days; max 60 days;
+  one calendar year. Overlap with a pending or approved request → `409 OVERLAPS_EXISTING`.
+- **Who decides:** owner, admin, or a worker with `ApproveLeave`; never one's own (`403 CANNOT_DECIDE_OWN`); a
+  supervisor's own request is the owner's only (`403 OWNER_ONLY`) and is pushed to the owner only.
+- **Approved** → every counted day becomes a `leave` row in attendance (an `absent` row turns into `leave`; a day with
+  punches is left alone). **Cancelled after approval** → the balance comes back, future leave rows are removed, past
+  ones go back to absent / off. The worker may cancel while pending or before the leave starts
+  (`422 LEAVE_ALREADY_STARTED` afterwards); the owner may cancel any time.
+- **Medical report:** jpg / png / webp / pdf ≤ 5 MB on a pending or approved sick leave, uploaded by the worker or
+  the owner; readable by the owner, admin and the worker — **never by a supervisor**; deleted by the job a year
+  after the leave ended.
+- **Punching on a leave day** is accepted (case 13 is the app's question); the day becomes `present` with the
+  `extra` flag; the leave stays approved — the owner cancels it if that is wanted.
+- Pushes: `leave_request` (owner + `ApproveLeave` workers, minus the requester), `leave_decision` (the worker, on
+  approve / reject / owner cancel).
+
+### 5.2 Endpoints
+
+| Method | Path | Who | Notes |
+|---|---|---|---|
+| GET | `/api/leave/balance?providerType=&providerId=&workerId=&year=` | worker (own), owner / admin / ApproveLeave (`workerId`) | `{ year, annual: { total, used, pending, remaining }, sick: {…}, unpaidUsed }` |
+| GET | `/api/leave?providerType=&providerId=&workerId=&status=&from=&to=` | worker (own), owner / admin / ApproveLeave (all) | pending first; each row: `kind`, dates, `daysCounted`, `reason`, `hasAttachment`, `status`, who requested / decided, `decisionNote`, `canApprove`, `canCancel` |
+| POST | `/api/leave/preview` | worker, or owner for a worker | `{ providerType, providerId, workerId?, kind, fromDate, toDate }` → `{ daysCounted, remainingAfter, days[] }` |
+| POST | `/api/leave` | worker (`Attendance`) | `{ providerType, providerId, kind, fromDate, toDate, reason? }` → pending |
+| POST | `/api/leave/direct` | owner | same + `workerId` → approved at once |
+| PATCH | `/api/leave/{id}` | see rules | `{ status: approved \| rejected \| cancelled, note? }` |
+| POST / GET | `/api/leave/{id}/attachment` | worker / owner; read: owner, admin, worker | multipart `file` |
+| PUT | `/api/workers/{id}/leave-settings` | owner | `{ annualLeaveDays, sickLeaveDays }` → this year's balance |
+
+`GET /api/attendance/today` → `state: "leave"` on an approved leave day; who-is-in → `leave`; the table's `leave`
+rows and `daysLeave` in the summary.
+
+### 5.3 Tested on dev (2026-11-07, station 210)
+
+41 checks: balances 14/14, owner sets 10 · preview Thu–Sat counts 1 (Fri/Sat off) · past paid refused · request →
+supervisor pushed · overlap 409 · 20 days with 9 left → 422 · pending counted · own approval refused · supervisor
+approves → worker pushed, balance used, Thursday is a `leave` row · approve twice → 422 · worker cancels before the
+start → balance back, row gone · supervisor's own request → owner only, plain worker refused, owner rejects with a
+note · sick backdated 3 days, 20 days refused · report uploaded, supervisor refused, owner reads it · approved → the
+days are `leave` rows, sick used 3 · started leave cannot be cancelled by the worker · owner direct unpaid → approved,
+`unpaidUsed` 2, worker pushed · lists and filters · direct over an approved one → 409.
+
+---
+
+## 6. What is left
+
+| Item | Notes |
+|---|---|
+| Per-type notification switches for workers and owners (§3.10 "every type can be switched off") | small; a settings row per user, honoured by the notifier |
+| Admin: attendance read-only in the partner profile (§6.4) | the owner endpoints already accept admins; a dedicated admin screen is web work |
+| Partner app, partner web, admin web screens | frontend |
 
 Open before launch (not code): labour-law and data-protection review of the defaults; `cable-app.com/partner/login`
 must exist on production; iOS location-permission text (mobile).

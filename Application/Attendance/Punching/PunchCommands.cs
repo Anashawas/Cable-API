@@ -146,6 +146,7 @@ public class PunchCommandHandler(IApplicationDbContext db, ICurrentUserService c
                     if (shift is null) day.Flags = AttendanceFlags.Add(day.Flags, AttendanceFlag.Extra);
                     if (await AttendanceAccess.IsHolidayAsync(db, workDate, ct)) { day.Status = AttendanceStatus.Holiday; day.Flags = AttendanceFlags.Add(day.Flags, AttendanceFlag.Extra); }
                 }
+                if (day.Status == AttendanceStatus.Leave) day.Flags = AttendanceFlags.Add(day.Flags, AttendanceFlag.Extra);   // case 13: worked on a leave day
                 if (day.Status is not AttendanceStatus.Holiday) day.Status = AttendanceStatus.Present;
                 day.IsOpen = true;
                 lateMinutes = day.LateMinutes;
@@ -195,7 +196,7 @@ public class PunchCommandHandler(IApplicationDbContext db, ICurrentUserService c
 public record AttendanceDayBriefDto(DateOnly WorkDate, string Status, string? Flags, int MinutesWorked, int LateMinutes, DateTime? FirstInAt, DateTime? LastOutAt);
 
 public record AttendanceTodayDto(
-    /// <summary>in | out | finished (punched out today; may punch in again) | off (no shift today, no punch yet).</summary>
+    /// <summary>in | out | finished (punched out today; may punch in again) | leave (approved leave today; a punch still works and counts as extra) | off (no shift today, no punch yet).</summary>
     string State, DateOnly WorkDate, DateTime? PunchedInAt, DateTime? PunchedOutAt, ShiftWindowDto? Shift, int LateMinutes,
     /// <summary>Minutes worked today, live while punched in.</summary>
     int WorkedMinutes, bool OpenFromYesterday, bool HasZone, bool IsHoliday,
@@ -228,7 +229,8 @@ public class GetMyAttendanceTodayRequestHandler(IApplicationDbContext db, ICurre
             if (lastIn is not null) worked += Math.Max(0, (int)Math.Round((now - lastIn.At).TotalMinutes));
         }
 
-        var state = today is { IsOpen: true } ? "in" : today?.LastOutAt is not null ? "finished" : shift is null ? "off" : "out";
+        var isLeave = today is { Status: AttendanceStatus.Leave, FirstInAt: null };
+        var state = today is { IsOpen: true } ? "in" : today?.LastOutAt is not null ? "finished" : isLeave ? "leave" : shift is null ? "off" : "out";
         var earliest = shift is not null && now < shift.StartUtc.AddMinutes(-shift.EarliestPunchMinutes) ? shift.StartUtc.AddMinutes(-shift.EarliestPunchMinutes) : (DateTime?)null;
         var canIn = state != "in" && earliest is null;
         var hasZone = await db.PunchZones.AsNoTracking().AnyAsync(z => z.ProviderType == request.ProviderType && z.ProviderId == request.ProviderId && z.IsActive && !z.IsDeleted
@@ -242,6 +244,7 @@ public class GetMyAttendanceTodayRequestHandler(IApplicationDbContext db, ICurre
             : isHoliday ? Lang.Pick("اليوم عطلة رسمية — الشغل فيها بينحسب إضافي", "Today is a public holiday — work counts as extra")
             : shift is null ? Lang.Pick("ما عندك وردية اليوم — البصمة بتنحسب دوام إضافي", "No shift today — a punch counts as extra work")
             : Lang.Pick($"سجّل حضور (ورديتك {PunchTexts.Clock(shift.StartUtc)})", $"Punch in (your shift starts {PunchTexts.Clock(shift.StartUtc)})");
+        if (isLeave) hint = Lang.Pick("اليوم عندك إجازة — بدّك تسجّل دوام؟", "You are on leave today — record work anyway?");
         if (openFromYesterday) hint += Lang.Pick(" · آخر دوام ما إله انصراف — بلّغ المالك", " · your last shift has no punch-out — tell the owner");
 
         var since = workDate.AddDays(-7);
@@ -257,7 +260,7 @@ public class GetMyAttendanceTodayRequestHandler(IApplicationDbContext db, ICurre
 }
 
 public record WhoIsInRowDto(int ProviderManagerId, string? Name,
-    /// <summary>in | late (in, after the grace) | notPunched (shift started, nothing yet) | out (punched out) | off (no shift today) | holiday | beforeShift.</summary>
+    /// <summary>in | late (in, after the grace) | notPunched (shift started, nothing yet) | out (punched out) | leave | off (no shift today) | holiday | beforeShift.</summary>
     string State, DateTime? Since, int LateMinutes, string? ZoneName, string? ShiftText, DateTime? ShiftStartAt, int WorkedMinutes, bool Review);
 
 /// <summary>"Who is in now" (§3.8): owner, admin or ViewAttendance.</summary>
@@ -307,6 +310,7 @@ public class GetWhoIsInRequestHandler(IApplicationDbContext db, ICurrentUserServ
 
             var state = day is { IsOpen: true } ? (day.LateMinutes > 0 ? "late" : "in")
                 : day?.LastOutAt is not null ? "out"
+                : day is { Status: AttendanceStatus.Leave } ? "leave"
                 : isHoliday ? "holiday"
                 : shift is null ? "off"
                 : now < shift.StartUtc.AddMinutes(shift.GraceMinutes) ? "beforeShift"

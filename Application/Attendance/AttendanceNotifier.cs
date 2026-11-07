@@ -122,6 +122,65 @@ public class AttendanceNotifier(IApplicationDbContext db, INotificationService n
         await SendAsync([ownerId.Value], Text, SummaryType, Data(SummaryType, providerType, providerId), ct);
     }
 
+    public const string LeaveRequestType = "leave_request";
+    public const string LeaveDecisionType = "leave_decision";
+
+    /// <summary>Team: "{name} asked for 3 days of leave (2–4 Nov)". A supervisor's own request goes to the owner only.</summary>
+    public async Task NotifyLeaveRequestAsync(int leaveId, CancellationToken ct = default)
+    {
+        var l = await LeaveAsync(leaveId, ct);
+        if (l is null) return;
+        var recipients = WorkerPrivileges.Has(l.Privileges, WorkerPrivileges.ApproveLeave)
+            ? (await OwnerAsync(l.ProviderType, l.ProviderId, ct) is int o ? [o] : new List<int>())
+            : (await ApproversAsync(l.ProviderType, l.ProviderId, ct));
+        recipients.Remove(l.UserId);
+        var name = WorkerName(l.WorkerName);
+        (string Title, string Body) Text(string? lang) => (Lang.Pick(lang, "طلب إجازة", "Leave request"),
+            Lang.Pick(lang, $"{name} طلب إجازة {KindAr(l.Kind)} {l.DaysCounted} {(l.DaysCounted == 1 ? "يوم" : "أيام")} ({Dates(l.FromDate, l.ToDate)})",
+                            $"{name} asked for {l.DaysCounted} day(s) of {l.Kind} leave ({Dates(l.FromDate, l.ToDate)})"));
+        await SendAsync(recipients, Text, LeaveRequestType, Data(LeaveRequestType, l.ProviderType, l.ProviderId, ("leaveId", l.Id), ("providerManagerId", l.ProviderManagerId)), ct);
+    }
+
+    /// <summary>Worker: approved / rejected / cancelled by the owner.</summary>
+    public async Task NotifyLeaveDecisionAsync(int leaveId, CancellationToken ct = default)
+    {
+        var l = await LeaveAsync(leaveId, ct);
+        if (l is null) return;
+        (string Title, string Body) Text(string? lang) => l.Status switch
+        {
+            "approved" => (Lang.Pick(lang, "انقبلت إجازتك", "Leave approved"), Lang.Pick(lang, $"انقبلت إجازتك {Dates(l.FromDate, l.ToDate)}", $"Your leave {Dates(l.FromDate, l.ToDate)} was approved")),
+            "rejected" => (Lang.Pick(lang, "انرفضت إجازتك", "Leave rejected"), Lang.Pick(lang, $"انرفضت إجازتك {Dates(l.FromDate, l.ToDate)}" + (l.DecisionNote is null ? "" : $" — {l.DecisionNote}"), $"Your leave {Dates(l.FromDate, l.ToDate)} was rejected" + (l.DecisionNote is null ? "" : $" — {l.DecisionNote}"))),
+            _ => (Lang.Pick(lang, "ألغى المالك إجازتك", "Leave cancelled"), Lang.Pick(lang, $"ألغى المالك إجازتك {Dates(l.FromDate, l.ToDate)}", $"The owner cancelled your leave {Dates(l.FromDate, l.ToDate)}")),
+        };
+        var data = Data(LeaveDecisionType, l.ProviderType, l.ProviderId, ("leaveId", l.Id), ("providerManagerId", l.ProviderManagerId));
+        data["status"] = l.Status;
+        await SendAsync([l.UserId], Text, LeaveDecisionType, data, ct);
+    }
+
+    private static string KindAr(string kind) => kind switch { "paid" => "مدفوعة", "unpaid" => "غير مدفوعة", _ => "مرضية" };
+    private static string Dates(DateOnly from, DateOnly to) => from == to ? from.ToString("d/M") : $"{from:d/M} – {to:d/M}";
+
+    private async Task<LeaveRow?> LeaveAsync(int leaveId, CancellationToken ct) =>
+        await db.LeaveRequests.AsNoTracking().Where(x => x.Id == leaveId)
+            .Select(x => new LeaveRow(x.Id, x.ProviderManagerId, x.ProviderManager.UserId, x.ProviderManager.ProviderType, x.ProviderManager.ProviderId,
+                x.ProviderManager.User.Name, x.ProviderManager.Privileges, x.Kind, x.FromDate, x.ToDate, x.DaysCounted, x.Status, x.DecisionNote))
+            .FirstOrDefaultAsync(ct);
+
+    private record LeaveRow(int Id, int ProviderManagerId, int UserId, string ProviderType, int ProviderId, string? WorkerName, string? Privileges,
+        string Kind, DateOnly FromDate, DateOnly ToDate, int DaysCounted, string Status, string? DecisionNote);
+
+    /// <summary>The owner plus usable workers granted ApproveLeave.</summary>
+    private async Task<List<int>> ApproversAsync(string providerType, int providerId, CancellationToken ct)
+    {
+        var ids = new List<int>();
+        if (await OwnerAsync(providerType, providerId, ct) is int o) ids.Add(o);
+        var rows = await db.ProviderManagers.AsNoTracking()
+            .Where(pm => pm.ProviderType == providerType && pm.ProviderId == providerId && pm.IsActive && pm.SuspendedByPlanAt == null && !pm.IsDeleted)
+            .Select(pm => new { pm.UserId, pm.Privileges }).ToListAsync(ct);
+        ids.AddRange(rows.Where(v => WorkerPrivileges.Has(v.Privileges, WorkerPrivileges.ApproveLeave)).Select(v => v.UserId));
+        return ids.Distinct().ToList();
+    }
+
     // ---- plumbing ----------------------------------------------------------------------------------------------
 
     private static string WorkerName(string? name) => string.IsNullOrWhiteSpace(name) ? Lang.Pick("موظف", "A worker") : name;

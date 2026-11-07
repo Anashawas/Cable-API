@@ -27,6 +27,8 @@ public class ProviderManagerConfiguration : IEntityTypeConfiguration<ProviderMan
 
         builder.Property(e => e.Privileges).HasMaxLength(500);
         builder.Property(e => e.KeepOnFree).IsRequired().HasDefaultValue(false);
+        builder.Property(e => e.AnnualLeaveDays).IsRequired().HasDefaultValue(14);
+        builder.Property(e => e.SickLeaveDays).IsRequired().HasDefaultValue(14);
 
         builder.Property(e => e.IsDeleted)
             .IsRequired()

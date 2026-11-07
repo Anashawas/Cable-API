@@ -90,6 +90,7 @@ public partial class ApplicationDbContext(
     public DbSet<Punch> Punches { get; set; }
     public DbSet<AttendanceCorrection> AttendanceCorrections { get; set; }
     public DbSet<AttendanceEvent> AttendanceEvents { get; set; }
+    public DbSet<LeaveRequest> LeaveRequests { get; set; }
 
     // Offers & Transactions DbSets
     public DbSet<PointsConversionRate> PointsConversionRates { get; set; }

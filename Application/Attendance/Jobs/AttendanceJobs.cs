@@ -23,8 +23,10 @@ public interface IAttendanceJobs
     Task<int> RunTickAsync(CancellationToken cancellationToken = default);
 }
 
-public sealed class AttendanceJobs(IApplicationDbContext db, AttendanceNotifier notifier, ILogger<AttendanceJobs> logger) : IAttendanceJobs
+public sealed class AttendanceJobs(IApplicationDbContext db, AttendanceNotifier notifier, IUploadFileService files, ILogger<AttendanceJobs> logger) : IAttendanceJobs
 {
+    private const int AttachmentKeepDays = 365;
+
     public const string ReminderIn = "reminderIn", ReminderOut = "reminderOut", OwnerMissing = "ownerMissing", DailySummary = "dailySummary";
     private const int ReminderInMinutes = 5, OwnerAlertMinutes = 15, ReminderOutMinutes = 15, NoShiftAutoCloseHours = 16, SummaryHour = 21, ScrubDays = 90;
 
@@ -36,8 +38,24 @@ public sealed class AttendanceJobs(IApplicationDbContext db, AttendanceNotifier 
         count += await AutoCloseAsync(now, settings, ct);
         count += await WorkersTickAsync(now, settings, ct);
         count += await ScrubAsync(now, ct);
+        count += await DeleteOldAttachmentsAsync(now, ct);
         logger.LogInformation("Attendance tick: {Count} action(s)", count);
         return count;
+    }
+
+    /// <summary>Decision 36: the medical report is deleted a year after the leave ended.</summary>
+    private async Task<int> DeleteOldAttachmentsAsync(DateTime now, CancellationToken ct)
+    {
+        var limit = DateOnly.FromDateTime(now).AddDays(-AttachmentKeepDays);
+        var old = await db.LeaveRequests.Where(l => l.AttachmentFileName != null && l.ToDate < limit).Take(50).ToListAsync(ct);
+        foreach (var l in old)
+        {
+            try { var path = files.GetFilePath(Cable.Core.Emuns.UploadFileFolders.CableLeaveAttachments, l.AttachmentFileName!); if (File.Exists(path)) File.Delete(path); }
+            catch (Exception ex) { logger.LogWarning(ex, "Leave attachment {File} could not be deleted", l.AttachmentFileName); }
+            l.AttachmentFileName = null;
+        }
+        if (old.Count > 0) await db.SaveChanges(ct);
+        return old.Count;
     }
 
     private async Task<int> AutoCloseAsync(DateTime now, AttendanceSettings s, CancellationToken ct)

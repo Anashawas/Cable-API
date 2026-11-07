@@ -326,7 +326,8 @@ app.MapUserRoutes()
     .MapSocialMediaPlatformRoutes()
     .MapSocialLinkRoutes()
     .MapWorkerRoutes()
-    .MapAttendanceRoutes()   // worker tracker step 3
+    .MapAttendanceRoutes()   // worker tracker steps 3–4
+    .MapLeaveRoutes()        // worker tracker step 5
     .MapNotificationInboxRoutes()
     .MapNotificationTypeRoutes()
     .MapNotificationTemplateRoutes()

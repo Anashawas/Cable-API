@@ -85,6 +85,7 @@ public interface IApplicationDbContext
     DbSet<Punch> Punches { get; set; }
     DbSet<AttendanceCorrection> AttendanceCorrections { get; set; }
     DbSet<AttendanceEvent> AttendanceEvents { get; set; }
+    DbSet<LeaveRequest> LeaveRequests { get; set; }
 
     // Offers & Transactions DbSets
     DbSet<PointsConversionRate> PointsConversionRates { get; set; }

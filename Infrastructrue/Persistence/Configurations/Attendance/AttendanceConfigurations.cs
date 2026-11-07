@@ -137,6 +137,26 @@ public class AttendanceEventConfiguration : IEntityTypeConfiguration<AttendanceE
     }
 }
 
+public class LeaveRequestConfiguration : IEntityTypeConfiguration<LeaveRequest>
+{
+    public void Configure(EntityTypeBuilder<LeaveRequest> b)
+    {
+        b.ToTable("LeaveRequest");
+        b.HasKey(e => e.Id);
+        b.Property(e => e.Kind).IsRequired().HasMaxLength(10);
+        b.Property(e => e.Status).IsRequired().HasMaxLength(20);
+        b.Property(e => e.Reason).HasMaxLength(500);
+        b.Property(e => e.DecisionNote).HasMaxLength(500);
+        b.Property(e => e.AttachmentFileName).HasMaxLength(300);
+        b.Property(e => e.IsDeleted).HasDefaultValue(false);
+        b.Property(e => e.CreatedAt).HasColumnType("datetime");
+        b.Property(e => e.ModifiedAt).HasColumnType("datetime");
+        b.HasOne(e => e.ProviderManager).WithMany().HasForeignKey(e => e.ProviderManagerId).OnDelete(DeleteBehavior.Restrict)
+            .HasConstraintName("FK_LeaveRequest_ProviderManager");
+        b.HasIndex(e => new { e.ProviderManagerId, e.FromDate }).HasDatabaseName("IX_LeaveRequest_Worker_From").HasFilter("[IsDeleted] = 0");
+    }
+}
+
 public class PunchConfiguration : IEntityTypeConfiguration<Punch>
 {
     public void Configure(EntityTypeBuilder<Punch> b)

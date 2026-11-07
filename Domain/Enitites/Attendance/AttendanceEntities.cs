@@ -118,6 +118,31 @@ public class AttendanceEvent : BaseAuditableEntity
     public DateTime SentAt { get; set; }
 }
 
+/// <summary>Step 5 (§3.9): a leave request — paid, unpaid or sick — and its decision.</summary>
+public class LeaveRequest : BaseAuditableEntity
+{
+    public int ProviderManagerId { get; set; }
+    /// <summary>paid | unpaid | sick.</summary>
+    public string Kind { get; set; } = null!;
+    public DateOnly FromDate { get; set; }
+    public DateOnly ToDate { get; set; }
+    /// <summary>Days deducted: the worker's off days and public holidays are left out.</summary>
+    public int DaysCounted { get; set; }
+    public string? Reason { get; set; }
+    /// <summary>Sick leave: the medical report (private folder, owner only, deleted after a year).</summary>
+    public string? AttachmentFileName { get; set; }
+    /// <summary>pending | approved | rejected | cancelled.</summary>
+    public string Status { get; set; } = null!;
+    public int RequestedByUserId { get; set; }
+    public int? DecidedByUserId { get; set; }
+    public DateTime? DecidedAt { get; set; }
+    public string? DecisionNote { get; set; }
+    public int? CancelledByUserId { get; set; }
+    public DateTime? CancelledAt { get; set; }
+
+    public virtual ProviderManager ProviderManager { get; set; } = null!;
+}
+
 /// <summary>One punch (or a refused attempt: Verdict rejected, no day). Time is the server's.</summary>
 public class Punch : BaseAuditableEntity
 {

@@ -40,5 +40,9 @@ public class ProviderManager : BaseAuditableEntity
     /// <summary>The owner's choice of which worker stays when the plan drops to one (default: the oldest active).</summary>
     public bool KeepOnFree { get; set; }
 
+    /// <summary>Leave balances per calendar year (WORKER_TRACKER §3.9, decision 14): defaults 14 / 14, owner-editable.</summary>
+    public int AnnualLeaveDays { get; set; } = 14;
+    public int SickLeaveDays { get; set; } = 14;
+
     public virtual UserAccount User { get; set; } = null!;
 }
